@@ -26,7 +26,7 @@ This directory contains implementation plans for **M1: Source-Anchored Probing**
 ┌─────────────────────────────────────────────────────────────────┐
 │ Phase 2: Parallel Work (4 agents)                               │
 │                                                                 │
-│   Agent A: Plan 1 → Plan 2 (AST + Code Viewer)                 │
+│   Agent A: Plan 1 → Plan 2 (AST + Code Viewer)                  │
 │   Agent B: Plan 3 (File Watcher)                                │
 │   Agent C: Plan 4 (Tracer Refactor)                             │
 │   Agent D: Plan 5 (Visual Polish)                               │
