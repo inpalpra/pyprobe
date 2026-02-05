@@ -27,6 +27,11 @@ class MessageType(Enum):
     DATA_SCRIPT_END = auto()    # Script finished
     DATA_SCRIPT_START = auto()  # Script started
 
+    # M1: Anchor-based probe commands
+    CMD_ADD_PROBE = auto()      # Add probe by anchor
+    CMD_REMOVE_PROBE = auto()   # Remove probe by anchor
+    DATA_PROBE_VALUE = auto()   # Probe data with anchor context
+
 
 @dataclass
 class Message:
@@ -98,5 +103,44 @@ def make_exception_msg(exc_type: str, message: str, traceback: str) -> Message:
             'type': exc_type,
             'message': message,
             'traceback': traceback
+        }
+    )
+
+
+# === M1: Anchor-based probe messages ===
+
+def make_add_probe_cmd(anchor: 'ProbeAnchor', throttle_ms: float = 50.0) -> Message:
+    """Create CMD_ADD_PROBE message."""
+    return Message(
+        msg_type=MessageType.CMD_ADD_PROBE,
+        payload={
+            'anchor': anchor.to_dict(),
+            'throttle_ms': throttle_ms,
+        }
+    )
+
+
+def make_remove_probe_cmd(anchor: 'ProbeAnchor') -> Message:
+    """Create CMD_REMOVE_PROBE message."""
+    return Message(
+        msg_type=MessageType.CMD_REMOVE_PROBE,
+        payload={'anchor': anchor.to_dict()}
+    )
+
+
+def make_probe_value_msg(
+    anchor: 'ProbeAnchor',
+    value: Any,
+    dtype: str,
+    shape: Optional[tuple] = None,
+) -> Message:
+    """Create DATA_PROBE_VALUE message."""
+    return Message(
+        msg_type=MessageType.DATA_PROBE_VALUE,
+        payload={
+            'anchor': anchor.to_dict(),
+            'value': value,
+            'dtype': dtype,
+            'shape': shape,
         }
     )
