@@ -81,9 +81,8 @@ GOOD: probe(file:42, "x")  # THIS x
 class ProbeAnchor:
     file: str      # abs path
     line: int      # 1-indexed
-    symbol: str    # var name at that line
-
-    # derived
+    col: int       # column offset (disambiguates x = x + 1)
+    symbol: str    # var name at that location
     func: str = "" # enclosing function (optional)
 ```
 
@@ -91,6 +90,10 @@ class ProbeAnchor:
 - hashable → use as dict key
 - stable → survives code edits (mostly)
 - unique → no ambiguity
+
+### Why col?
+- `z = y * h` → click y vs z = different probes
+- same line, diff column = diff anchor
 
 ### Current vs New
 
@@ -105,47 +108,90 @@ class ProbeAnchor:
 ## Milestones
 
 ### M1: Source-Anchored Probing
-**Kill the textbox. Click to probe.**
+**Code is the UI. Hover to reveal. Click to probe.**
+
+No [+] buttons. Visual noise. Breaks code density.
+Instead: **Active Text** - variables are clickable wires.
 
 ```
-┌────────────────────────┐
-│ code_view.py           │
-│────────────────────────│
-│ 10: x = np.sin(t)  [+] │  ← click [+] → probe x@line10
-│ 11: y = fft(x)     [+] │
-│ 12: z = y * h      [+] │
-└────────────────────────┘
+STATE 1: Clean (no mouse)
+┌───┬─────────────────────────┐
+│   │ 10: t = np.arange(100)  │
+│   │ 11: x = np.sin(t)       │
+│   │ 12: z = y * h           │
+└───┴─────────────────────────┘
+
+STATE 2: Hover (mouse over line 12, near 'y')
+┌───┬─────────────────────────┐
+│   │ 12: z = [y] * h         │  ← 'y' glows, clickable
+└───┴─────────────────────────┘
+
+STATE 3: Click (probed z=cyan, y=magenta)
+┌───┬─────────────────────────┐
+│ 👁 │ 12: [z] = [y] * h       │  ← z=cyan bg, y=magenta bg
+└───┴─────────────────────────┘
+     Eye = "something probed here"
+     Colors = match plot colors
+```
+
+**Hybrid UI:**
+- 👁 in gutter → scannability (scroll fast, spot probes)
+- Color highlight on text → precision (which var exactly)
+- Color sync → plot1=cyan, var text=cyan bg
+
+**Data model update:**
+```python
+@dataclass(frozen=True)
+class ProbeAnchor:
+    file: str      # abs path
+    line: int      # 1-indexed
+    col: int       # column offset (for multi-var lines)
+    symbol: str    # var name
+    func: str = "" # enclosing function
 ```
 
 **Tasks:**
-- [ ] Add `ProbeAnchor` dataclass to `messages.py`
-- [ ] Refactor `VariableTracer` to use anchor matching
-- [ ] Add `CodeViewer` widget (QPlainTextEdit + line gutter)
-- [ ] AST parser: click line → extract var names
-- [ ] Wire click → CMD_ADD_WATCH(anchor)
+- [ ] Add `ProbeAnchor` dataclass to `messages.py` (with col)
+- [ ] Refactor `VariableTracer` to match `(file, line, symbol)`
+- [ ] Build `CodeViewer` (QPlainTextEdit subclass)
+  - [ ] `setMouseTracking(True)`
+  - [ ] `cursorForPosition(pos)` → get text under mouse
+  - [ ] Connect to AST locator for var detection
+- [ ] Build `ASTLocator` - map (line, col) → ast.Name node
+- [ ] `QSyntaxHighlighter` for hover glow + probe highlights
+- [ ] Gutter widget with 👁 icon painting
+- [ ] Color manager: assign colors to probes, sync to plots
+- [ ] Wire click → `CMD_ADD_WATCH(anchor)`
 - [ ] Update `WatchConfig` to use anchor
 - [ ] Update IPC payload to include anchor
 
 **Key files:**
-- `pyprobe/core/tracer.py` - anchor matching
-- `pyprobe/ipc/messages.py` - new anchor type
-- `pyprobe/gui/code_viewer.py` - NEW
+- `pyprobe/ipc/messages.py` - ProbeAnchor dataclass
+- `pyprobe/core/tracer.py` - anchor matching in trace func
+- `pyprobe/gui/code_viewer.py` - NEW (complex: mouse tracking)
+- `pyprobe/gui/code_gutter.py` - NEW (eye icon painting)
+- `pyprobe/analysis/ast_locator.py` - NEW (cursor → var)
 - `pyprobe/gui/main_window.py` - layout change
 
-**AST trick:**
+**AST trick (column-aware):**
 ```python
-# click line 10 → find assignments
-import ast
-tree = ast.parse(source)
-for node in ast.walk(tree):
-    if isinstance(node, ast.Assign) and node.lineno == 10:
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                yield target.id  # "x"
+def get_var_at_cursor(source: str, line: int, col: int) -> str | None:
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            if (node.lineno == line and
+                node.col_offset <= col <= node.end_col_offset):
+                return node.id
+    return None
 ```
 
-**Risk:** AST only sees static code. Runtime expressions like `d['key']` harder.
-**Mitigation:** Start with Name nodes. Extend later.
+**Risks:**
+| Risk | Mitigation |
+|------|------------|
+| `x = x + 1` (two x's) | col disambiguates. LHS default. |
+| `obj.attr` | ast.Attribute node. Handle in M1.5. |
+| `d['key']` | ast.Subscript. Defer to M1.5. |
+| Dynamic code | AST = static only. Accept limitation. |
 
 ---
 
@@ -290,9 +336,8 @@ class ProbePlugin(ABC):
 │──────────────│────────────────────────────────│
 │ ▼ src/       │ # filters.py                   │
 │   main.py    │ def lowpass(x, fc):            │
-│ ► filters.py │     y = convolve(x, h)  [+]    │
+│ ► filters.py │     y = convolve(x, h)         │  ← hover y, click to probe
 │   utils.py   │     return y                   │
-│              │                                │
 └──────────────┴────────────────────────────────┘
 ```
 
@@ -345,11 +390,12 @@ anchor
 ### M1 Test
 ```bash
 python -m pyprobe examples/dsp_demo.py
-# 1. See code viewer with dsp_demo.py
-# 2. Click [+] on line with `received_symbols`
-# 3. Constellation appears
-# 4. Run script
-# 5. Plot updates live
+# 1. See code viewer with dsp_demo.py loaded
+# 2. Hover over `received_symbols` → var glows
+# 3. Click it → probe created, var turns colored
+# 4. Eye icon appears in gutter
+# 5. Run script
+# 6. Plot updates live, color matches text highlight
 ```
 
 ### M2 Test
