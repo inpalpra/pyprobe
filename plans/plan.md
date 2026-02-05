@@ -147,6 +147,20 @@ Every feature must pass:
 - [ ] Can I understand probe layout without reading a list?
 - [ ] Does this feel like touching a signal, not configuring a tool?
 
+> **Note:** Each milestone's UX Acceptance Criteria operationalize these principles for that specific feature set.
+
+---
+
+## Definition of Done
+
+Each milestone includes **UX Acceptance Criteria** — behavioral tests that must ALL pass before the milestone is considered complete. These are not implementation tasks; they are the user-experience bar that implementation must achieve.
+
+**Criteria categories:**
+- **Behavioral criteria** — observable user interactions that must work exactly as specified
+- **Mental Model Check** — the subjective "feel" test (every milestone ends with one)
+
+❌ **If any checkbox fails, the milestone is not complete.**
+
 ---
 
 ## Milestones
@@ -227,6 +241,45 @@ class ProbeAnchor:
     symbol: str    # var name
     func: str = "" # enclosing function
 ```
+
+#### UX Acceptance Criteria
+
+> **All criteria must pass for M1 to be considered complete.**
+
+**Probe Gesture**
+- [ ] I can add a probe with a single click on a variable
+- [ ] I can remove the same probe by clicking it again
+- [ ] No dialogs, menus, or configuration steps are required
+- [ ] I never have to type a variable name to probe it
+
+**Liveness**
+- [ ] I can add or remove probes while the script is running
+- [ ] A newly added probe starts updating in the same or next frame
+- [ ] No restart is required to observe a new signal
+
+**Code Trust**
+- [ ] The code view always reflects the latest saved file
+- [ ] If the file changes on disk, the view updates automatically
+- [ ] If a probe anchor becomes invalid, it is visually marked
+- [ ] Invalid probes never show stale or misleading data
+
+**Discoverability**
+- [ ] I can scroll through a file and instantly see where probes exist
+- [ ] Gutter icons make probe locations obvious at a glance
+- [ ] Hovering over code never shows confusing or noisy UI states
+- [ ] If no probeable symbol exists under the cursor, nothing happens
+
+**Precision**
+- [ ] Clicking `x` in `x = x + 1` probes the intended symbol
+- [ ] Multiple symbols on the same line are disambiguated reliably
+- [ ] The probed symbol is visually unambiguous in the code
+
+**Mental Model Check**
+- [ ] Probing feels like touching a wire, not setting up a watch
+- [ ] I do not think about "configuration" at any point
+- [ ] I trust what I see without second-guessing
+
+❌ If any box fails, M1 is not complete.
 
 **Tasks:**
 - [ ] Add `ProbeAnchor` dataclass to `messages.py` (with col)
@@ -323,6 +376,35 @@ class ProbePlugin(ABC):
         """Called with new data"""
 ```
 
+#### UX Acceptance Criteria
+
+> **All criteria must pass for M2 to be considered complete.**
+
+**View Switching**
+- [ ] I can change how a signal is visualized without re-probing it
+- [ ] Switching views does not interrupt data flow
+- [ ] The default view is always reasonable
+
+**UI Friction**
+- [ ] Common view switches do NOT require right-click
+- [ ] Lens switching is discoverable without documentation
+- [ ] Right-click menus are optional, not mandatory
+
+**Consistency**
+- [ ] Plot color remains consistent across all lenses
+- [ ] The same probe identity is preserved across views
+- [ ] Switching views never duplicates or loses probes
+
+**Safety**
+- [ ] Unsupported views are clearly disabled, not hidden
+- [ ] I am never allowed to select a view that silently fails
+
+**Mental Model Check**
+- [ ] One signal, many lenses — not many probes
+- [ ] Views feel like changing instruments, not re-wiring
+
+❌ If any box fails, M2 is not complete.
+
 **Tasks:**
 - [ ] Define `ProbePlugin` ABC in `pyprobe/plugins/base.py`
 - [ ] Refactor existing plots to implement plugin API
@@ -359,6 +441,35 @@ class ProbePlugin(ABC):
 - Grouping should feel inevitable, not optional.
 - Manual drag-drop is an **override**, not the baseline workflow.
 - Rename tabs freely. Drag probes between tabs to override auto-grouping.
+
+#### UX Acceptance Criteria
+
+> **All criteria must pass for M3 to be considered complete.**
+
+**Default Behavior**
+- [ ] Probes are grouped automatically without user action
+- [ ] Grouping reflects code structure (file + function)
+- [ ] I never start in an ungrouped "pile of plots" state
+
+**Override Capability**
+- [ ] I can manually move probes between groups
+- [ ] Manual overrides persist across runs
+- [ ] Auto-grouping never fights manual intent
+
+**Navigation**
+- [ ] I can understand the probe layout at a glance
+- [ ] Tab names clearly explain why probes are grouped
+- [ ] Switching groups is instant and obvious
+
+**Cognitive Load**
+- [ ] I do not think "where should this go?" when probing
+- [ ] The tool answers that question for me by default
+
+**Mental Model Check**
+- [ ] Grouping feels like a reflection of my code, not a UI chore
+- [ ] I never feel punished for probing many signals
+
+❌ If any box fails, M3 is not complete.
 
 **Tasks:**
 - [ ] Add `ProbeGroup` dataclass
@@ -418,6 +529,35 @@ class ProbePlugin(ABC):
 └─────────────────────────────────────────────┘
 ```
 
+#### UX Acceptance Criteria
+
+> **All criteria must pass for M4 to be considered complete.**
+
+**Discoverability**
+- [ ] Time navigation UI is visible even before it is usable
+- [ ] Disabled state clearly communicates future capability
+- [ ] I discover time travel without reading documentation
+
+**Control**
+- [ ] I can scrub backward and forward intuitively
+- [ ] Scrubbing never changes probe identity or layout
+- [ ] Live and historical modes are visually distinct
+
+**Trust**
+- [ ] Historical data never mutates or reorders
+- [ ] I always know whether I am viewing live or past data
+- [ ] Frame counters and position are explicit
+
+**Performance Feel**
+- [ ] Scrubbing feels immediate, not laggy
+- [ ] Playback speed feels smooth and intentional
+
+**Mental Model Check**
+- [ ] This feels like a DVR, not a buffer dump
+- [ ] I instinctively try to scrub — and it works
+
+❌ If any box fails, M4 is not complete.
+
 **Tasks:**
 - [ ] Implement `RingBuffer` class with shm backend
 - [ ] Tracer writes to ring buffer (not queue)
@@ -453,6 +593,30 @@ class ProbePlugin(ABC):
 │   utils.py   │     return y                   │
 └──────────────┴────────────────────────────────┘
 ```
+
+#### UX Acceptance Criteria
+
+> **All criteria must pass for M5 to be considered complete.**
+
+**Navigation**
+- [ ] I can browse project files without leaving PyProbe
+- [ ] Loading a file never breaks probe context
+- [ ] Probes across files behave identically to same-file probes
+
+**Context**
+- [ ] Probes clearly indicate which file/function they belong to
+- [ ] Grouping remains coherent across files
+- [ ] Cross-file comparisons are visually obvious
+
+**Scale**
+- [ ] Large projects do not feel heavier than small ones
+- [ ] I do not need to mentally track "which file I'm in"
+
+**Mental Model Check**
+- [ ] The project feels like one continuous signal graph
+- [ ] File boundaries do not break my debugging flow
+
+❌ If any box fails, M5 is not complete.
 
 **Tasks:**
 - [ ] Add `QTreeView` file browser
@@ -498,7 +662,9 @@ anchor    (lenses)  groups
 
 ---
 
-## Verification Plan
+## Manual Test Scripts
+
+> Step-by-step procedures to verify acceptance criteria are met.
 
 ### M1 Test
 ```bash
