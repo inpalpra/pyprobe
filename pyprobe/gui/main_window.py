@@ -1,5 +1,7 @@
 """
 Main application window with probe panels and controls.
+
+M1: Source-anchored probing with code viewer.
 """
 
 from typing import Dict, List, Optional
@@ -8,16 +10,27 @@ from PyQt6.QtWidgets import (
     QStatusBar, QFileDialog, QMessageBox
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QColor
 import multiprocessing as mp
 import os
 
-from .watch_list import WatchListWidget
 from .probe_panel import ProbePanelContainer, ProbePanel
 from .control_bar import ControlBar
 from .theme.cyberpunk import apply_cyberpunk_theme
 from ..ipc.channels import IPCChannel
-from ..ipc.messages import Message, MessageType, make_add_watch_cmd
+from ..ipc.messages import Message, MessageType, make_add_probe_cmd, make_remove_probe_cmd
 from ..core.runner import run_script_subprocess
+
+# === M1 IMPORTS ===
+from ..core.anchor import ProbeAnchor
+from .code_viewer import CodeViewer
+from .code_gutter import CodeGutter
+from .code_highlighter import PythonHighlighter
+from .file_watcher import FileWatcher
+from .probe_registry import ProbeRegistry
+from .probe_state import ProbeState
+from ..analysis.anchor_mapper import AnchorMapper
+from .animations import ProbeAnimations
 
 
 class MainWindow(QMainWindow):
@@ -51,12 +64,15 @@ class MainWindow(QMainWindow):
         self._ipc: Optional[IPCChannel] = None
         self._is_running = False  # Flag to track if script is running
 
-        # Probe panels by variable name
-        self._probe_panels: Dict[str, ProbePanel] = {}
+        # M1: Probe panels by anchor (not by variable name)
+        self._probe_panels: Dict[ProbeAnchor, ProbePanel] = {}
 
         # FPS tracking
         self._frame_count = 0
         self._fps = 0.0
+
+        # M1: Source file content cache for anchor mapping
+        self._last_source_content: Optional[str] = None
 
         self._setup_ui()
         self._setup_signals()
@@ -68,11 +84,6 @@ class MainWindow(QMainWindow):
         # Load script if provided
         if script_path:
             self._load_script(script_path)
-
-        # Add default watch variables
-        if watch_variables:
-            for var_name in watch_variables:
-                self._watch_list.add_variable_programmatically(var_name)
 
     def _setup_ui(self):
         """Create the UI layout."""
@@ -88,16 +99,29 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # Watch list (left panel)
-        self._watch_list = WatchListWidget()
-        self._watch_list.setMaximumWidth(300)
-        splitter.addWidget(self._watch_list)
+        # === M1: Code viewer with gutter (replaces watch list) ===
+        code_container = QWidget()
+        code_layout = QHBoxLayout(code_container)
+        code_layout.setContentsMargins(0, 0, 0, 0)
+        code_layout.setSpacing(0)
+
+        self._code_viewer = CodeViewer()
+        self._code_gutter = CodeGutter(self._code_viewer)
+        self._highlighter = PythonHighlighter(self._code_viewer.document())
+
+        code_layout.addWidget(self._code_gutter)
+        code_layout.addWidget(self._code_viewer)
+        splitter.addWidget(code_container)
 
         # Probe panel container (right panel)
         self._probe_container = ProbePanelContainer()
         splitter.addWidget(self._probe_container)
 
-        splitter.setSizes([250, 950])
+        splitter.setSizes([400, 800])
+
+        # === M1: File watcher and probe registry ===
+        self._file_watcher = FileWatcher(self)
+        self._probe_registry = ProbeRegistry(self)
 
         # Control bar (toolbar)
         self._control_bar = ControlBar()
@@ -116,9 +140,15 @@ class MainWindow(QMainWindow):
         self._control_bar.pause_clicked.connect(self._on_pause_script)
         self._control_bar.stop_clicked.connect(self._on_stop_script)
 
-        # Watch list signals
-        self._watch_list.variable_added.connect(self._on_add_watch)
-        self._watch_list.variable_removed.connect(self._on_remove_watch)
+        # === M1: Code viewer signals ===
+        self._code_viewer.probe_requested.connect(self._on_probe_requested)
+        self._code_viewer.probe_removed.connect(self._on_probe_remove_requested)
+
+        # === M1: File watcher signals ===
+        self._file_watcher.file_changed.connect(self._on_file_changed)
+
+        # === M1: Probe registry signals ===
+        self._probe_registry.probe_state_changed.connect(self._on_probe_state_changed)
 
         # Internal signals (for thread-safe GUI updates)
         self.variable_received.connect(self._on_variable_data)
@@ -169,6 +199,18 @@ class MainWindow(QMainWindow):
             self._frame_count += 1
             # Emit signal for thread-safe GUI update
             self.variable_received.emit(msg.payload)
+
+        # === M1: Handle anchor-based probe data ===
+        elif msg.msg_type == MessageType.DATA_PROBE_VALUE:
+            self._frame_count += 1
+            anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
+            self._probe_registry.update_data_received(anchor)
+            if anchor in self._probe_panels:
+                self._probe_panels[anchor].update_data(
+                    value=msg.payload['value'],
+                    dtype=msg.payload['dtype'],
+                    shape=msg.payload.get('shape'),
+                )
 
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
             # Mark as not running FIRST to stop any further polling
@@ -236,6 +278,11 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"Loaded: {path}")
         self._control_bar.set_script_loaded(True, path)
 
+        # === M1: Load into code viewer and start watching ===
+        self._code_viewer.load_file(path)
+        self._file_watcher.watch_file(path)
+        self._last_source_content = self._code_viewer.toPlainText()
+
     @pyqtSlot()
     def _on_run_script(self):
         """Start running the loaded script."""
@@ -245,8 +292,8 @@ class MainWindow(QMainWindow):
         # Create IPC channel
         self._ipc = IPCChannel(is_gui_side=True)
 
-        # Get initial watch list to pass to subprocess
-        initial_watches = list(self._watch_list.get_watched_variables())
+        # M1: Start with anchored mode - send existing probe anchors
+        initial_watches = []  # No legacy watches in M1
 
         # Start runner subprocess
         self._runner_process = mp.Process(
@@ -259,6 +306,11 @@ class MainWindow(QMainWindow):
             )
         )
         self._runner_process.start()
+
+        # M1: Send probe commands for any existing anchors
+        for anchor in self._probe_registry.active_anchors:
+            msg = make_add_probe_cmd(anchor)
+            self._ipc.send_command(msg)
 
         # Mark as running and start polling
         self._is_running = True
@@ -292,27 +344,117 @@ class MainWindow(QMainWindow):
 
         self._cleanup_run()
 
-    @pyqtSlot(str)
-    def _on_add_watch(self, var_name: str):
-        """Add a variable to the watch list."""
-        if self._ipc:
-            msg = make_add_watch_cmd(var_name)
+    # === M1: ANCHOR-BASED PROBE HANDLERS ===
+
+    @pyqtSlot(object)
+    def _on_probe_requested(self, anchor: ProbeAnchor):
+        """Handle click-to-probe request from code viewer."""
+        if self._probe_registry.is_full():
+            self._status_bar.showMessage("Maximum probes reached (5)")
+            return
+
+        # Add to registry and get assigned color
+        color = self._probe_registry.add_probe(anchor)
+
+        # Update code viewer
+        self._code_viewer.set_probe_active(anchor, color)
+
+        # Update gutter
+        self._code_gutter.set_probed_line(anchor.line, color)
+
+        # Create probe panel
+        panel = self._probe_container.create_probe_panel(anchor, color)
+        self._probe_panels[anchor] = panel
+
+        # Send to runner if running
+        if self._ipc and self._is_running:
+            msg = make_add_probe_cmd(anchor)
             self._ipc.send_command(msg)
 
-    @pyqtSlot(str)
-    def _on_remove_watch(self, var_name: str):
-        """Remove a variable from the watch list."""
-        if self._ipc:
-            msg = Message(
-                msg_type=MessageType.CMD_REMOVE_WATCH,
-                payload={'var_name': var_name}
-            )
+        self._status_bar.showMessage(f"Probe added: {anchor.identity_label()}")
+
+    @pyqtSlot(object)
+    def _on_probe_remove_requested(self, anchor: ProbeAnchor):
+        """Handle probe removal request."""
+        if anchor not in self._probe_panels:
+            return
+
+        panel = self._probe_panels[anchor]
+
+        # Animate removal
+        ProbeAnimations.fade_out(panel, lambda: self._complete_probe_removal(anchor))
+
+    def _complete_probe_removal(self, anchor: ProbeAnchor):
+        """Complete probe removal after animation."""
+        # Remove from registry
+        self._probe_registry.remove_probe(anchor)
+
+        # Update code viewer
+        self._code_viewer.remove_probe(anchor)
+
+        # Update gutter
+        self._code_gutter.clear_probed_line(anchor.line)
+
+        # Remove panel
+        if anchor in self._probe_panels:
+            panel = self._probe_panels.pop(anchor)
+            self._probe_container.remove_probe_panel(anchor)
+
+        # Send to runner if running
+        if self._ipc and self._is_running:
+            msg = make_remove_probe_cmd(anchor)
             self._ipc.send_command(msg)
 
-        # Remove probe panel
-        if var_name in self._probe_panels:
-            self._probe_container.remove_panel(var_name)
-            del self._probe_panels[var_name]
+        self._status_bar.showMessage(f"Probe removed: {anchor.identity_label()}")
+
+    @pyqtSlot(str)
+    def _on_file_changed(self, filepath: str):
+        """Handle file modification detected by file watcher."""
+        if filepath != self._script_path:
+            return
+
+        # Get old and new source
+        old_source = self._last_source_content or ""
+        try:
+            with open(filepath, 'r') as f:
+                new_source = f.read()
+        except (IOError, OSError):
+            return
+
+        # Map anchors to new positions
+        mapper = AnchorMapper(old_source, new_source, filepath)
+        active_anchors = self._probe_registry.active_anchors
+
+        # Find invalidated anchors
+        invalid = mapper.get_invalidated(list(active_anchors))
+
+        # Mark invalid anchors
+        for anchor in invalid:
+            self._code_viewer.set_probe_invalid(anchor)
+            if anchor in self._probe_panels:
+                self._probe_panels[anchor].set_state(ProbeState.INVALID)
+
+        self._probe_registry.invalidate_anchors(invalid)
+
+        # Reload file in viewer
+        self._code_viewer.reload_file()
+        self._last_source_content = self._code_viewer.toPlainText()
+
+        # Re-apply valid probe highlights
+        for anchor in active_anchors - invalid:
+            color = self._probe_registry.get_color(anchor)
+            if color:
+                self._code_viewer.set_probe_active(anchor, color)
+                self._code_gutter.set_probed_line(anchor.line, color)
+
+        if invalid:
+            self._status_bar.showMessage(f"File changed: {len(invalid)} probe(s) invalidated")
+
+    @pyqtSlot(object, object)
+    def _on_probe_state_changed(self, anchor: ProbeAnchor, state: ProbeState):
+        """Handle probe state change from registry."""
+        if anchor in self._probe_panels:
+            self._probe_panels[anchor].set_state(state)
 
     @pyqtSlot()
     def _on_script_ended(self):

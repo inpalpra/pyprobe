@@ -294,3 +294,18 @@ class ProbePanelContainer(QScrollArea):
         if var_name is not None:
             return self._panels_by_name.get(var_name)
         return None
+
+    # === M1 CONVENIENCE METHODS ===
+
+    def create_probe_panel(self, anchor: ProbeAnchor, color: QColor) -> ProbePanel:
+        """Create a probe panel for an anchor (M1 API)."""
+        return self.create_panel(
+            var_name=anchor.symbol,
+            dtype='unknown',
+            anchor=anchor,
+            color=color
+        )
+
+    def remove_probe_panel(self, anchor: ProbeAnchor):
+        """Remove a probe panel by anchor (M1 API)."""
+        self.remove_panel(anchor=anchor)
