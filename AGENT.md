@@ -105,6 +105,9 @@ To prevent overwhelming the GUI with rapid updates:
 ## Running
 
 ```bash
+# Ensure venv
+source ./.venv/bin/activate
+
 # Run with a script
 python -m pyprobe examples/dsp_demo.py
 
