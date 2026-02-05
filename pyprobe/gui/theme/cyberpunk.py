@@ -46,7 +46,7 @@ QMainWindow {
 QWidget {
     background-color: #0d0d0d;
     color: #ffffff;
-    font-family: "JetBrains Mono", "Consolas", "Monaco", monospace;
+    font-family: "Menlo", "Consolas", "Monaco", monospace;
     font-size: 11px;
 }
 
@@ -297,9 +297,9 @@ def apply_cyberpunk_theme(widget: QWidget) -> None:
     if app:
         app.setStyleSheet(STYLESHEET)
 
-        # Try to set JetBrains Mono font, fall back to monospace
+        # Set monospace font (use commonly available fonts)
         font = QFont()
-        font.setFamilies(["JetBrains Mono", "Consolas", "Monaco", "monospace"])
+        font.setFamilies(["Menlo", "Consolas", "Monaco", "monospace"])
         font.setPointSize(10)
         font.setStyleHint(QFont.StyleHint.Monospace)
         app.setFont(font)

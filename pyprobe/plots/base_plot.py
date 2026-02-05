@@ -1,17 +1,17 @@
 """
-Abstract base class for all plot widgets.
+Base class for all plot widgets.
 """
 
 from typing import Optional, Any
-from abc import ABC, abstractmethod
 from PyQt6.QtWidgets import QWidget
 
 
-class BasePlot(QWidget, ABC):
+class BasePlot(QWidget):
     """
-    Abstract base class for plot widgets.
+    Base class for plot widgets.
 
     All plot types (waveform, constellation, scalar) inherit from this.
+    Subclasses must implement update_data().
     """
 
     def __init__(self, var_name: str, parent: Optional[QWidget] = None):
@@ -23,7 +23,6 @@ class BasePlot(QWidget, ABC):
         """The name of the variable being plotted."""
         return self._var_name
 
-    @abstractmethod
     def update_data(
         self,
         value: Any,
@@ -40,4 +39,4 @@ class BasePlot(QWidget, ABC):
             shape: Shape of the data (if array)
             source_info: Source location string (e.g., "func:42")
         """
-        pass
+        raise NotImplementedError("Subclasses must implement update_data()")

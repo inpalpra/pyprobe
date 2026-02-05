@@ -2,7 +2,7 @@
 Main application window with probe panels and controls.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QSplitter,
     QStatusBar, QFileDialog, QMessageBox
@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
     script_ended = pyqtSignal()
     exception_occurred = pyqtSignal(dict)
 
-    def __init__(self, script_path: Optional[str] = None):
+    def __init__(self, script_path: Optional[str] = None, watch_variables: Optional[List[str]] = None):
         super().__init__()
 
         self._script_path: Optional[str] = script_path
@@ -67,6 +67,11 @@ class MainWindow(QMainWindow):
         # Load script if provided
         if script_path:
             self._load_script(script_path)
+
+        # Add default watch variables
+        if watch_variables:
+            for var_name in watch_variables:
+                self._watch_list.add_variable_programmatically(var_name)
 
     def _setup_ui(self):
         """Create the UI layout."""
@@ -137,7 +142,16 @@ class MainWindow(QMainWindow):
 
         # Process up to 100 messages per frame to avoid GUI freeze
         for _ in range(100):
-            msg = self._ipc.receive_data(timeout=0.001)
+            # Check again in case cleanup happened during loop
+            if self._ipc is None:
+                break
+
+            try:
+                msg = self._ipc.receive_data(timeout=0.001)
+            except (AttributeError, OSError):
+                # IPC was cleaned up or queue closed
+                break
+
             if msg is None:
                 break
 
@@ -221,20 +235,20 @@ class MainWindow(QMainWindow):
         # Create IPC channel
         self._ipc = IPCChannel(is_gui_side=True)
 
+        # Get initial watch list to pass to subprocess
+        initial_watches = list(self._watch_list.get_watched_variables())
+
         # Start runner subprocess
         self._runner_process = mp.Process(
             target=run_script_subprocess,
             args=(
                 self._script_path,
                 self._ipc.command_queue,
-                self._ipc.data_queue
+                self._ipc.data_queue,
+                initial_watches
             )
         )
         self._runner_process.start()
-
-        # Send watch list to runner
-        for var_name in self._watch_list.get_watched_variables():
-            self._ipc.send_command(make_add_watch_cmd(var_name))
 
         # Start polling timer
         self._poll_timer.start()

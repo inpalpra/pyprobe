@@ -22,7 +22,7 @@ def main():
     parser.add_argument(
         "-w", "--watch",
         action="append",
-        default=[],
+        default=["received_symbols", "signal_i", "signal_q", "snr_db"],
         help="Variable names to watch (can be specified multiple times)"
     )
 
@@ -32,7 +32,7 @@ def main():
     from .gui.app import run_app
 
     # Run the application
-    sys.exit(run_app(script_path=args.script))
+    sys.exit(run_app(script_path=args.script, watch_variables=args.watch))
 
 
 if __name__ == "__main__":

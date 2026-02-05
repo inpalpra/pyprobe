@@ -9,7 +9,7 @@ import io
 import threading
 import traceback
 from pathlib import Path
-from typing import Optional, Set
+from typing import List, Optional, Set
 import multiprocessing as mp
 
 from .tracer import VariableTracer, WatchConfig, ThrottleStrategy, CapturedVariable
@@ -35,17 +35,20 @@ class ScriptRunner:
         self,
         script_path: str,
         ipc_channel: IPCChannel,
-        script_args: Optional[list] = None
+        script_args: Optional[list] = None,
+        initial_watches: Optional[List[str]] = None
     ):
         """
         Args:
             script_path: Path to the Python script to execute
             ipc_channel: IPC channel for communication with GUI
             script_args: Optional arguments to pass to the script
+            initial_watches: Optional list of variable names to watch from start
         """
         self._script_path = Path(script_path).resolve()
         self._ipc = ipc_channel
         self._script_args = script_args or []
+        self._initial_watches = initial_watches or []
 
         self._tracer: Optional[VariableTracer] = None
         self._running = False
@@ -74,6 +77,15 @@ class ScriptRunner:
             data_callback=self._on_variable_captured,
             target_files={str(self._script_path)}  # Only trace the target script
         )
+
+        # Add initial watches before starting
+        for var_name in self._initial_watches:
+            config = WatchConfig(
+                var_name=var_name,
+                throttle_strategy=ThrottleStrategy.TIME_BASED,
+                throttle_param=50.0
+            )
+            self._tracer.add_watch(config)
 
         # Notify GUI that script is starting
         self._ipc.send_data(Message(msg_type=MessageType.DATA_SCRIPT_START))
@@ -240,7 +252,12 @@ class _TeeWriter:
         self._original.flush()
 
 
-def run_script_subprocess(script_path: str, cmd_queue: mp.Queue, data_queue: mp.Queue):
+def run_script_subprocess(
+    script_path: str,
+    cmd_queue: mp.Queue,
+    data_queue: mp.Queue,
+    initial_watches: Optional[list] = None
+):
     """
     Entry point for the subprocess.
     Called via multiprocessing.Process(target=run_script_subprocess, ...)
@@ -250,7 +267,7 @@ def run_script_subprocess(script_path: str, cmd_queue: mp.Queue, data_queue: mp.
     ipc._command_queue = cmd_queue
     ipc._data_queue = data_queue
 
-    runner = ScriptRunner(script_path, ipc)
+    runner = ScriptRunner(script_path, ipc, initial_watches=initial_watches)
     exit_code = runner.run()
 
     ipc.cleanup()
