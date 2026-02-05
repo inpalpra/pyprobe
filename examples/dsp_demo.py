@@ -15,7 +15,7 @@ import time
 
 # Simulation parameters
 NUM_SYMBOLS = 500
-NUM_FRAMES = 200
+NUM_FRAMES = 1
 
 # QAM-16 constellation points
 QAM16_CONSTELLATION = np.array([
@@ -78,10 +78,10 @@ def main():
         peak_to_avg = np.max(np.abs(received_symbols)) / np.mean(np.abs(received_symbols))
 
         # Print progress
-        print(f"Frame {frame + 1:3d}/{NUM_FRAMES}: "
-              f"SNR={snr_db:.1f} dB, "
-              f"Power={power_db:.2f} dB, "
-              f"PAPR={20*np.log10(peak_to_avg):.1f} dB")
+        # print(f"Frame {frame + 1:3d}/{NUM_FRAMES}: "
+        #       f"SNR={snr_db:.1f} dB, "
+        #       f"Power={power_db:.2f} dB, "
+        #       f"PAPR={20*np.log10(peak_to_avg):.1f} dB")
 
         # Simulate processing time
         time.sleep(0.05)  # 50ms per frame = ~20 FPS

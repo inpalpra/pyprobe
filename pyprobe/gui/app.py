@@ -7,6 +7,14 @@ from typing import List, Optional
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 
+# Configure PyQtGraph before importing any plot modules
+import pyqtgraph as pg
+pg.setConfigOptions(
+    useOpenGL=False,           # Disable OpenGL to prevent rendering issues
+    antialias=False,           # Disable antialiasing for performance
+    enableExperimental=False,  # Disable experimental features
+)
+
 from .main_window import MainWindow
 
 

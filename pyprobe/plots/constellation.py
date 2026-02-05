@@ -72,6 +72,9 @@ class ConstellationPlot(BasePlot):
         self._plot_widget.setBackground('#0d0d0d')
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
 
+        # Disable OpenGL for consistent rendering
+        self._plot_widget.useOpenGL(False)
+
         # Set equal aspect ratio for proper constellation display
         self._plot_widget.setAspectLocked(True)
 

@@ -70,6 +70,9 @@ class WaveformPlot(BasePlot):
         self._plot_widget.setBackground('#0d0d0d')
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
 
+        # Disable OpenGL for consistent rendering
+        self._plot_widget.useOpenGL(False)
+
         # Configure axes
         self._plot_widget.setLabel('left', 'Amplitude')
         self._plot_widget.setLabel('bottom', 'Sample Index')
@@ -81,10 +84,10 @@ class WaveformPlot(BasePlot):
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
 
-        # Create plot curve
+        # Create plot curve (disable antialias for performance)
         self._curve = self._plot_widget.plot(
             pen=pg.mkPen(color='#00ff00', width=1.5),  # Green
-            antialias=True
+            antialias=False
         )
 
         # Enable mouse interaction

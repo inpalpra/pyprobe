@@ -105,9 +105,16 @@ class IPCChannel:
         """
         Receive data in the GUI process.
         Automatically retrieves arrays from shared memory.
+
+        Args:
+            timeout: Seconds to wait. Use 0 for non-blocking check.
         """
         try:
-            msg = self._data_queue.get(timeout=timeout)
+            # Use block=False for timeout=0 (more efficient than timeout=0)
+            if timeout == 0:
+                msg = self._data_queue.get(block=False)
+            else:
+                msg = self._data_queue.get(timeout=timeout)
 
             # Check if we need to retrieve from shared memory
             if msg.payload and 'shm_handle' in msg.payload:
@@ -170,7 +177,35 @@ class IPCChannel:
             return arr.copy()
 
     def cleanup(self):
-        """Clean up shared memory resources."""
+        """Clean up all IPC resources."""
+        # Drain queues first (non-blocking)
+        self._drain_queue(self._data_queue)
+        self._drain_queue(self._command_queue)
+
+        # Cancel any pending joins on the feeder threads
+        # This prevents hanging on macOS when subprocess has exited
+        try:
+            self._data_queue.cancel_join_thread()
+        except Exception:
+            pass
+
+        try:
+            self._command_queue.cancel_join_thread()
+        except Exception:
+            pass
+
+        # Close queues
+        try:
+            self._data_queue.close()
+        except Exception:
+            pass
+
+        try:
+            self._command_queue.close()
+        except Exception:
+            pass
+
+        # Clean up shared memory
         with self._shm_lock:
             for name, shm in self._shm_pool.items():
                 try:
@@ -180,3 +215,13 @@ class IPCChannel:
                 except Exception:
                     pass
             self._shm_pool.clear()
+
+    def _drain_queue(self, queue: mp.Queue):
+        """Drain all messages from a queue without blocking."""
+        try:
+            while True:
+                queue.get(block=False)
+        except Empty:
+            pass
+        except Exception:
+            pass

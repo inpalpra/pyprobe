@@ -22,7 +22,7 @@ def main():
     parser.add_argument(
         "-w", "--watch",
         action="append",
-        default=["received_symbols", "signal_i", "signal_q", "snr_db"],
+        default=["received_symbols", "signal_i", "signal_q", "snr_db", "power_db","peak_to_avg"],
         help="Variable names to watch (can be specified multiple times)"
     )
 

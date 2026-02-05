@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         self._script_path: Optional[str] = script_path
         self._runner_process: Optional[mp.Process] = None
         self._ipc: Optional[IPCChannel] = None
+        self._is_running = False  # Flag to track if script is running
 
         # Probe panels by variable name
         self._probe_panels: Dict[str, ProbePanel] = {}
@@ -137,18 +138,23 @@ class MainWindow(QMainWindow):
 
     def _poll_ipc(self):
         """Poll the IPC queue for incoming data."""
-        if self._ipc is None:
+        # Fast exit if not running
+        if not self._is_running:
             return
 
-        # Process up to 100 messages per frame to avoid GUI freeze
-        for _ in range(100):
-            # Check again in case cleanup happened during loop
-            if self._ipc is None:
+        ipc = self._ipc
+        if ipc is None:
+            return
+
+        # Process available messages without blocking (timeout=0 is non-blocking)
+        # Limit to 50 messages per frame to keep GUI responsive
+        for _ in range(50):
+            if not self._is_running:
                 break
 
             try:
-                msg = self._ipc.receive_data(timeout=0.001)
-            except (AttributeError, OSError):
+                msg = ipc.receive_data(timeout=0)
+            except (AttributeError, OSError, EOFError, BrokenPipeError):
                 # IPC was cleaned up or queue closed
                 break
 
@@ -165,6 +171,10 @@ class MainWindow(QMainWindow):
             self.variable_received.emit(msg.payload)
 
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
+            # Mark as not running FIRST to stop any further polling
+            self._is_running = False
+            self._poll_timer.stop()
+            self._fps_timer.stop()
             self.script_ended.emit()
 
         elif msg.msg_type == MessageType.DATA_EXCEPTION:
@@ -250,7 +260,8 @@ class MainWindow(QMainWindow):
         )
         self._runner_process.start()
 
-        # Start polling timer
+        # Mark as running and start polling
+        self._is_running = True
         self._poll_timer.start()
         self._fps_timer.start()
 
@@ -321,13 +332,28 @@ class MainWindow(QMainWindow):
 
     def _cleanup_run(self):
         """Clean up after script run."""
+        # Stop everything first
+        self._is_running = False
         self._poll_timer.stop()
         self._fps_timer.stop()
 
-        if self._ipc:
-            self._ipc.cleanup()
-            self._ipc = None
+        # Terminate subprocess
+        proc = self._runner_process
+        if proc is not None:
+            proc.join(timeout=0.5)
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=0.5)
+                if proc.is_alive():
+                    proc.kill()
+                    proc.join(timeout=0.1)
 
+        # Clean up IPC (drains queues and closes shared memory)
+        ipc = self._ipc
+        if ipc is not None:
+            ipc.cleanup()
+
+        self._ipc = None
         self._runner_process = None
         self._control_bar.set_running(False)
 

@@ -271,4 +271,5 @@ def run_script_subprocess(
     exit_code = runner.run()
 
     ipc.cleanup()
-    sys.exit(exit_code)
+    # Use os._exit() for immediate termination without waiting for threads
+    os._exit(exit_code)
