@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyprobe"
 version = "0.1.0"
-description = "LabVIEW-style variable probe for Python DSP debugging"
+description = "Variable probing based debugger for Python DSP debugging"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "PyProbe Contributors"}
 ]
-keywords = ["dsp", "debugging", "visualization", "probe", "labview"]
+keywords = ["dsp", "debugging", "visualization", "probe"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

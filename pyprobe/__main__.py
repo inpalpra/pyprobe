@@ -12,7 +12,7 @@ import argparse
 def main():
     """Main entry point for PyProbe."""
     parser = argparse.ArgumentParser(
-        description="PyProbe - LabVIEW-style variable probe for Python DSP debugging"
+        description="PyProbe - Variable probing based debugger for Python DSP debugging"
     )
     parser.add_argument(
         "script",

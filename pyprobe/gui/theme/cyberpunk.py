@@ -1,6 +1,6 @@
 """
 Dark cyberpunk theme for PyProbe.
-Inspired by LabVIEW's dark theme with neon accents.
+Inspired by dark themes with neon accents.
 """
 
 from PyQt6.QtWidgets import QApplication, QWidget
