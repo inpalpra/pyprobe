@@ -11,6 +11,8 @@ from enum import Enum, auto
 import numpy as np
 
 from .data_classifier import classify_data
+from .anchor import ProbeAnchor
+from .anchor_matcher import AnchorMatcher
 
 
 class ThrottleStrategy(Enum):
@@ -84,6 +86,10 @@ class VariableTracer:
             '<frozen',
             '<string>',
         )
+
+        # M1: Anchor-based watching
+        self._anchor_matcher = AnchorMatcher()
+        self._anchor_watches: Dict[ProbeAnchor, WatchConfig] = {}
 
     def add_watch(self, config: WatchConfig) -> None:
         """Add a variable to the watch list."""
@@ -255,3 +261,128 @@ class VariableTracer:
             line_number=lineno,
             function_name=func_name
         )
+
+    # === M1: Anchor-based tracing methods ===
+
+    def add_anchor_watch(self, anchor: ProbeAnchor, config: Optional[WatchConfig] = None) -> None:
+        """Add anchor-based watch."""
+        if config is None:
+            config = WatchConfig(
+                var_name=anchor.symbol,
+                throttle_strategy=ThrottleStrategy.TIME_BASED,
+                throttle_param=50.0
+            )
+        self._anchor_matcher.add(anchor)
+        self._anchor_watches[anchor] = config
+
+    def remove_anchor_watch(self, anchor: ProbeAnchor) -> None:
+        """Remove anchor-based watch."""
+        self._anchor_matcher.remove(anchor)
+        self._anchor_watches.pop(anchor, None)
+
+    def _trace_func_anchored(self, frame, event: str, arg) -> Optional[Callable]:
+        """
+        Trace function with anchor-based matching.
+
+        Similar to _trace_func but uses AnchorMatcher for O(1) lookup.
+        """
+        # Fast exit if disabled
+        if not self._enabled:
+            return None
+
+        # Only process 'line' events
+        if event != 'line':
+            return self._trace_func_anchored
+
+        # Fast file filter
+        code = frame.f_code
+        filename = code.co_filename
+
+        # Skip frozen/internal modules
+        if filename.startswith(self._skip_prefixes):
+            return self._trace_func_anchored
+
+        # Fast check: does this file have any anchors?
+        if not self._anchor_matcher.has_file(filename):
+            return self._trace_func_anchored
+
+        # Fast check: does this location have any anchors?
+        lineno = frame.f_lineno
+        if not self._anchor_matcher.has_location(filename, lineno):
+            return self._trace_func_anchored
+
+        # Get local variable names
+        local_names = set(frame.f_locals.keys())
+
+        # Find matching anchors
+        matching_anchors = self._anchor_matcher.match(filename, lineno, local_names)
+
+        if not matching_anchors:
+            return self._trace_func_anchored
+
+        # Capture for each matching anchor
+        current_time = time.perf_counter()
+
+        for anchor in matching_anchors:
+            config = self._anchor_watches.get(anchor)
+            if config is None or not config.enabled:
+                continue
+
+            # Throttle check
+            if not self._should_capture(config, current_time):
+                continue
+
+            # Get the value
+            value = frame.f_locals[anchor.symbol]
+
+            # For CHANGE_DETECT, check if value changed
+            if config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
+                if not self._value_changed(value, config):
+                    continue
+
+            # Create capture with anchor context
+            captured = self._create_anchor_capture(anchor, value, current_time)
+
+            # Update throttle state
+            config.last_send_time = current_time
+            if config.throttle_strategy == ThrottleStrategy.SAMPLE_EVERY_N:
+                config.iteration_count = 0
+
+            # Send to callback
+            try:
+                self._data_callback(captured)
+            except Exception:
+                pass
+
+        return self._trace_func_anchored
+
+    def _create_anchor_capture(
+        self, anchor: ProbeAnchor, value: Any, timestamp: float
+    ) -> CapturedVariable:
+        """Create CapturedVariable with anchor context."""
+        dtype, shape = classify_data(value)
+
+        # Make a copy of numpy arrays
+        if isinstance(value, np.ndarray):
+            value = value.copy()
+
+        return CapturedVariable(
+            name=anchor.symbol,
+            value=value,
+            dtype=dtype,
+            shape=shape,
+            timestamp=timestamp,
+            source_file=anchor.file,
+            line_number=anchor.line,
+            function_name=anchor.func
+        )
+
+    def start_anchored(self) -> None:
+        """Start tracing with anchor-based matching."""
+        self._enabled = True
+        sys.settrace(self._trace_func_anchored)
+
+    @property
+    def anchor_count(self) -> int:
+        """Return the number of anchor watches."""
+        return len(self._anchor_watches)

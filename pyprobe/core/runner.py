@@ -13,6 +13,7 @@ from typing import List, Optional, Set
 import multiprocessing as mp
 
 from .tracer import VariableTracer, WatchConfig, ThrottleStrategy, CapturedVariable
+from .anchor import ProbeAnchor
 from ..ipc.channels import IPCChannel
 from ..ipc.messages import (
     Message, MessageType, make_variable_data_msg, make_exception_msg
@@ -112,8 +113,8 @@ class ScriptRunner:
             if script_dir not in sys.path:
                 sys.path.insert(0, script_dir)
 
-            # Start tracing
-            self._tracer.start()
+            # Start tracing (M1: use anchored tracer)
+            self._tracer.start_anchored()
 
             # Execute the script
             with open(self._script_path, 'r') as f:
@@ -211,6 +212,21 @@ class ScriptRunner:
             self._pause_event.set()  # Unblock if paused
             # Force exit
             os._exit(0)
+
+        # M1: Anchor-based handlers
+        elif msg.msg_type == MessageType.CMD_ADD_PROBE:
+            anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
+            throttle_ms = msg.payload.get('throttle_ms', 50.0)
+            config = WatchConfig(
+                var_name=anchor.symbol,
+                throttle_strategy=ThrottleStrategy.TIME_BASED,
+                throttle_param=throttle_ms,
+            )
+            self._tracer.add_anchor_watch(anchor, config)
+
+        elif msg.msg_type == MessageType.CMD_REMOVE_PROBE:
+            anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
+            self._tracer.remove_anchor_watch(anchor)
 
     def _on_stdout(self, text: str) -> None:
         """Send stdout to GUI."""
