@@ -19,4 +19,4 @@ DO NOT:
 - Skip INVARIANTS check before Qt/callback code
 
 IF BUG FIXED THIS SESSION:
-- Remind user: "Run @[prompts/UPDATE-LESSONS.md] before closing"
+- Remind user: "Run @[prompts/SESSION-END.md] before closing"

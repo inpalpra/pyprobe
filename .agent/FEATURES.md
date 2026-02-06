@@ -1,6 +1,6 @@
 # PyProbe Feature Backlog
 
-> Priority-ordered list of planned features. Update via `@[prompts/UPDATE-LESSONS.md]` hook.
+> Priority-ordered list of planned features. Update via `@[prompts/SESSION-END.md]` hook.
 
 ## P1 - High Priority
 
@@ -8,10 +8,6 @@
 - Plot scalar values over time across multiple runs
 - Show trend and historical values
 - Useful for convergence debugging
-
-### Fix highlight rect positioning (B2)
-- Probe highlights misplaced when window not fullscreen
-- See `.agent/BUGS.md` B2
 
 ---
 

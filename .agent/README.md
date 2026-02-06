@@ -3,7 +3,7 @@
 
 ## FIRST: READ THIS
 1. Check LESSONS section before debugging - may already be solved
-2. After fixing bug → run `@[prompts/UPDATE-LESSONS.md]` to log lesson
+2. After fixing bug → run `@[prompts/SESSION-END.md]` to log lesson
 3. If pattern discovered → add to GOTCHAS
 
 ## PROJ OVERVIEW
@@ -35,14 +35,14 @@ pyprobe/
 │   ├── channels.py      # IPCChannel: queue-based comm
 │   └── messages.py      # Message types
 └── prompts/             # AI prompt templates
-    └── UPDATE-LESSONS.md  # STAR-AR lesson format
+    └── SESSION-END.md  # STAR-AR lesson format
 ```
 
 ## KEY DOCS
 - `plans/implementation/m1/README.md` - M1 milestone overview
 - `plans/plan.md` - full impl details
 - `CONSTITUTION.md` - proj philosophy
-- `prompts/UPDATE-LESSONS.md` - lesson entry format
+- `prompts/SESSION-END.md` - lesson entry format
 - `.agent/FEATURES.md` - planned features (priority-sorted)
 - `.agent/BUGS.md` - bug backlog
 
@@ -53,7 +53,7 @@ python -m pyprobe --loglevel DEBUG examples/dsp_demo.py
 ```
 
 ## LESSONS (STAR-AR FORMAT)
-> see `prompts/UPDATE-LESSONS.md` for format spec
+> see `prompts/SESSION-END.md` for format spec
 
 ### L1 2026-02-06 anim-GC
 S: fade_out anim on probe removal
@@ -85,6 +85,26 @@ R': graceful UX, no false negatives
 Fix: remove `is_probeable()` check; add placeholder in ScalarDisplay
 File: gui/code_viewer.py, plots/scalar_display.py
 
+### L4 2026-02-06 word-wrap-default
+S: highlight rects misplaced when window resized
+T: calculate variable rect from line/col position
+A: `col_start * char_width` assumed no wrap
+R: rects in wrong place when text wraps to next visual line
+A': check QPlainTextEdit defaults, disable wrap for code viewer
+R': rects stay aligned regardless of window size
+Fix: `self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)`
+File: gui/code_viewer.py:67
+
+### L5 2026-02-06 symptom-vs-root
+S: highlight rects misplaced when window resized
+T: fix positioning bug
+A: add `documentMargin()` to x-offset (symptom-based fix)
+R: still broken, wrong hypothesis
+A': verify assumptions (is word wrap on?) before fixing
+R': find actual root cause
+Fix: question defaults before adding offsets
+File: gui/code_viewer.py
+
 ## PATTERNS
 
 ### logging pattern
@@ -115,6 +135,7 @@ anim.start()
 - code_viewer._active_probes must stay in sync w/ main_window._probe_panels
 - IPC msgs are dict-serialized, anchor.to_dict() / ProbeAnchor.from_dict()
 - func sig w/ defaults: always use kwargs for optional args after first
+- QPlainTextEdit defaults to word wrap ON, breaks `col * char_width` math
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?
@@ -123,9 +144,10 @@ anim.start()
 - [ ] callbacks: will obj exist when callback fires?
 
 ## UPDATE PROTOCOL
-1. **Bug fixed?** → `@[prompts/UPDATE-LESSONS.md]` → add STAR-AR entry
+1. **Bug fixed?** → `@[prompts/SESSION-END.md]` → add STAR-AR entry
 2. **Pattern found?** → add to PATTERNS section
 3. **Non-obvious behavior?** → add to GOTCHAS
 4. **New important file?** → update DIR STRUCT
 5. **Invariant violated?** → add to INVARIANTS TO CHECK
+6. **Fixed bug/feature?** → DELETE from BUGS.md/FEATURES.md (don't strikethrough)
 
