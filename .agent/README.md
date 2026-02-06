@@ -148,5 +148,4 @@ anim.start()
 3. **Non-obvious behavior?** → add to GOTCHAS
 4. **New important file?** → update DIR STRUCT
 5. **Invariant violated?** → add to INVARIANTS TO CHECK
-6. **Fixed bug/feature?** → DELETE from BUGS.md/FEATURES.md (don't strikethrough)
-
+6. **Fixed bug/feature?** → DELETE from BACKLOG.md (don't strikethrough)
