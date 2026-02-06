@@ -43,8 +43,7 @@ pyprobe/
 - `plans/plan.md` - full impl details
 - `CONSTITUTION.md` - proj philosophy
 - `prompts/SESSION-END.md` - lesson entry format
-- `.agent/FEATURES.md` - planned features (priority-sorted)
-- `.agent/BUGS.md` - bug backlog
+- `.agent/BACKLOG.md` - bugs + features (priority-sorted)
 
 ## DEBUG
 ```bash
