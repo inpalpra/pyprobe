@@ -3,6 +3,7 @@ PyProbe entry point.
 
 Usage:
     python -m pyprobe [script.py]
+    python -m pyprobe --loglevel DEBUG examples/dsp_demo.py
 """
 
 import sys
@@ -25,8 +26,32 @@ def main():
         default=["received_symbols", "signal_i", "signal_q", "snr_db", "power_db","peak_to_avg"],
         help="Variable names to watch (can be specified multiple times)"
     )
+    parser.add_argument(
+        "-l", "--loglevel",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="WARNING",
+        help="Set logging level (default: WARNING). DEBUG writes to /tmp/pyprobe_debug.log"
+    )
+    parser.add_argument(
+        "--logfile",
+        default="/tmp/pyprobe_debug.log",
+        help="Log file path (default: /tmp/pyprobe_debug.log)"
+    )
+    parser.add_argument(
+        "--log-console",
+        action="store_true",
+        help="Also log to console (stderr)"
+    )
 
     args = parser.parse_args()
+
+    # Setup logging before importing anything else
+    from .logging import setup_logging
+    setup_logging(
+        level=args.loglevel,
+        log_file=args.logfile,
+        console=args.log_console
+    )
 
     # Import here to avoid slow startup for --help
     from .gui.app import run_app

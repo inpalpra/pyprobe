@@ -13,15 +13,9 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QColor
 import multiprocessing as mp
 import os
-import logging
 
-# Debug logging for probe operations
-logging.basicConfig(
-    filename='/tmp/pyprobe_debug.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger('pyprobe')
+from pyprobe.logging import get_logger
+logger = get_logger(__name__)
 
 from .probe_panel import ProbePanelContainer, ProbePanel
 from .control_bar import ControlBar

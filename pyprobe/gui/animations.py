@@ -1,9 +1,9 @@
 """Animation utilities for probe lifecycle."""
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect
 from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
-import logging
+from pyprobe.logging import get_logger
 
-logger = logging.getLogger('pyprobe')
+logger = get_logger(__name__)
 
 
 class ProbeAnimations:

@@ -18,9 +18,9 @@ from PyQt6.QtGui import (
 
 from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.analysis.ast_locator import ASTLocator, VariableLocation
-import logging
+from pyprobe.logging import get_logger
 
-logger = logging.getLogger('pyprobe')
+logger = get_logger(__name__)
 
 
 class CodeViewer(QPlainTextEdit):
