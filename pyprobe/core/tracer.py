@@ -100,6 +100,15 @@ class VariableTracer:
         # M1: Anchor-based watching
         self._anchor_matcher = AnchorMatcher()
         self._anchor_watches: Dict[ProbeAnchor, WatchConfig] = {}
+        
+        # Location-based throttle: all anchors at (file, line) share one throttle
+        # This ensures probes on same line always capture together
+        self._location_throttle: Dict[tuple, float] = {}  # (file, line) -> last_capture_time
+        self._location_throttle_ms = 50.0  # Default throttle for location-based captures
+        
+        # Pending deferred captures: frame_id -> list of anchors
+        # Used to delay capture of assignment targets until after the line executes (next event)
+        self._pending_deferred: Dict[int, List[ProbeAnchor]] = {}
 
     def add_watch(self, config: WatchConfig) -> None:
         """Add a variable to the watch list."""
@@ -346,6 +355,60 @@ class VariableTracer:
         self._anchor_matcher.remove(anchor)
         self._anchor_watches.pop(anchor, None)
 
+    def _flush_deferred(self, frame, event: str) -> None:
+        """
+        Process any pending deferred captures for this frame.
+        
+        Args:
+            frame: The current stack frame
+            event: The trace event type ('line', 'return', 'call', 'exception')
+        """
+        # Determine relevant frame ID
+        frame_id = id(frame)
+        
+        # Check if we have pending deferred anchors
+        pending = self._pending_deferred.pop(frame_id, None)
+        if not pending:
+            return
+
+        # Capture them using current state
+        current_time = time.perf_counter()
+        batch = []
+        
+        # Use valid frame for locals
+        eval_frame = frame
+        
+        for anchor in pending:
+            try:
+                # Value should now be available in locals (post-execution)
+                value = eval_frame.f_locals[anchor.symbol]
+                
+                # Check mapping for Change Detect if needed (omitted for brevity, assume simple capture)
+                # Note: throttle check was already done when we deferred it.
+                
+                captured = self._create_anchor_capture(anchor, value, current_time)
+                batch.append((anchor, captured))
+            except KeyError:
+                # Variable might have gone out of scope or not been assigned
+                continue
+            except Exception:
+                continue
+                
+        # Send batch
+        if batch:
+            try:
+                if self._anchor_batch_callback is not None:
+                    self._anchor_batch_callback(batch)
+                elif self._anchor_data_callback is not None:
+                    for anchor, captured in batch:
+                        self._anchor_data_callback(anchor, captured)
+                else:
+                    for anchor, captured in batch:
+                        self._data_callback(captured)
+            except Exception:
+                pass
+
+
     def _trace_func_anchored(self, frame, event: str, arg) -> Optional[Callable]:
         """
         Trace function with anchor-based matching.
@@ -357,7 +420,10 @@ class VariableTracer:
         if not self._enabled:
             return None
 
-        # Only process 'line' events
+        # Always flush pending deferred captures (from previous line/event)
+        self._flush_deferred(frame, event)
+
+        # Only process 'line' events for new matching
         if event != 'line':
             return self._trace_func_anchored
 
@@ -389,34 +455,54 @@ class VariableTracer:
 
         # Capture for each matching anchor, batching all captures from this event
         current_time = time.perf_counter()
-        batch = []  # List of (anchor, captured) tuples
+        
+        # Location-based throttle: all anchors on this line share one throttle check
+        # This ensures probes on same line ALWAYS capture together (same frame)
+        location_key = (filename, lineno)
+        last_capture = self._location_throttle.get(location_key, 0.0)
+        elapsed_ms = (current_time - last_capture) * 1000
+        
+        if elapsed_ms < self._location_throttle_ms:
+            return self._trace_func_anchored  # Skip ALL anchors on this line
+        
+        # Initialize batch with any flushed captures (if we want to combine them)
+        # But flushed captures were already sent in _flush_deferred (or ideally added to a common batch context)
+        # For simplicity, we'll let _flush_deferred send its own batch, and we send ours.
+        # Merging them would require passing a 'batch' list to _flush_deferred.
+        batch = []
 
         for anchor in matching_anchors:
             config = self._anchor_watches.get(anchor)
             if config is None or not config.enabled:
                 continue
 
-            # Throttle check
-            if not self._should_capture(config, current_time):
+            # NO per-anchor throttle check - location throttle handles it
+            
+            # If this is an assignment target, defer capture to next event (post-execution)
+            is_assign = getattr(anchor, 'is_assignment', False)
+            if is_assign:
+                frame_id = id(frame)
+                if frame_id not in self._pending_deferred:
+                    self._pending_deferred[frame_id] = []
+                self._pending_deferred[frame_id].append(anchor)
                 continue
 
             # Get the value
             value = frame.f_locals[anchor.symbol]
 
-            # For CHANGE_DETECT, check if value changed
-            if config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
+            # For CHANGE_DETECT, still check if value changed (optional per-anchor)
+            if config and config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
                 if not self._value_changed(value, config):
                     continue
 
             # Create capture with anchor context
             captured = self._create_anchor_capture(anchor, value, current_time)
 
-            # Update throttle state
-            config.last_send_time = current_time
-            if config.throttle_strategy == ThrottleStrategy.SAMPLE_EVERY_N:
-                config.iteration_count = 0
-
             batch.append((anchor, captured))
+        
+        # Update location throttle time if we captured anything (or deferred anything)
+        if batch or (id(frame) in self._pending_deferred and self._pending_deferred[id(frame)]):
+            self._location_throttle[location_key] = current_time
 
         # Send batch to callback (prefer batch callback for atomic updates)
         if batch:

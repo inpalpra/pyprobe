@@ -14,6 +14,7 @@ class ProbeAnchor:
     col: int        # Column offset (0-indexed)
     symbol: str     # Variable name at that location
     func: str = ""  # Enclosing function name (optional)
+    is_assignment: bool = False  # True if this location is an assignment target (LHS)
 
     def identity_label(self) -> str:
         """Return human-readable identity: 'symbol @ file:line'"""
@@ -32,6 +33,7 @@ class ProbeAnchor:
             'col': self.col,
             'symbol': self.symbol,
             'func': self.func,
+            'is_assignment': self.is_assignment,
         }
 
     @classmethod
@@ -43,4 +45,5 @@ class ProbeAnchor:
             col=d['col'],
             symbol=d['symbol'],
             func=d.get('func', ''),
+            is_assignment=d.get('is_assignment', False),
         )

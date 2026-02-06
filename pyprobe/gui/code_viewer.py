@@ -203,6 +203,7 @@ class CodeViewer(QPlainTextEdit):
             col=var_loc.col_start,
             symbol=var_loc.name,
             func=func_name,
+            is_assignment=var_loc.is_lhs,
         )
 
     def _get_var_location_at_position(self, pos: QPoint) -> Optional[VariableLocation]:

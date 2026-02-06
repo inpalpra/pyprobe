@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     t0 = 0.0                 # start time
     dt = 1.0                 # sampling interval
-    N  = 100                 # number of samples
+    N  = 30                 # number of samples
 
     for frame in range(50):
         # Vary frequency over time

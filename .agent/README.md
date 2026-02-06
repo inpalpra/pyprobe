@@ -98,6 +98,29 @@ File: gui/code_viewer.py:67
 S: highlight rects misplaced when window resized
 T: fix positioning bug
 A: add `documentMargin()` to x-offset (symptom-based fix)
+R: fixed specific case, but root cause was wrap mode
+Fix: see L4 (root cause fix)
+File: gui/code_viewer.py
+
+### L6 2026-02-06 anchor-sync
+S: probing `x` and `wfm` on same line -> time async
+T: capture related vars at exact same time
+A: each anchor checks throttle independently
+R: jitter, graphs drift out of phase
+A': shared throttle per (file, line) location
+R': all anchors on line capture atomic snapshot
+Fix: `_location_throttle` dict in tracer
+File: core/tracer.py
+
+### L7 2026-02-06 tracer-pre-exec
+S: probing assignment `wfm = Waveform(...)`
+T: capture result of assignment
+A: capture on 'line' event
+R: trace event is PRE-exec, captured old value (frame N-1)
+A': defer capture to NEXT event in same scope (ignore 'call')
+R': captures post-exec value (frame N)
+Fix: `is_assignment` flag + `_pending_deferred` buffer
+File: core/tracer.py
 R: still broken, wrong hypothesis
 A': verify assumptions (is word wrap on?) before fixing
 R': find actual root cause
