@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QWidget
 from .base_plot import BasePlot
 from .waveform_plot import WaveformPlot
 from .constellation import ConstellationPlot
-from .scalar_display import ScalarDisplay
+from .scalar_history_chart import ScalarHistoryChart
 from ..core.data_classifier import (
     DTYPE_SCALAR, DTYPE_ARRAY_1D, DTYPE_ARRAY_COMPLEX,
     DTYPE_ARRAY_2D, DTYPE_UNKNOWN
@@ -39,10 +39,10 @@ def create_plot(
         # For now, use waveform plot (flattened) for 2D arrays
         return WaveformPlot(var_name, parent)
     elif dtype == DTYPE_SCALAR:
-        return ScalarDisplay(var_name, parent)
+        return ScalarHistoryChart(var_name, parent)
     else:
-        # Unknown type - default to scalar display
-        return ScalarDisplay(var_name, parent)
+        # Unknown type - default to scalar history chart
+        return ScalarHistoryChart(var_name, parent)
 
 
 def get_plot_type_name(dtype: str) -> str:

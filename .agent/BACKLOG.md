@@ -4,10 +4,7 @@
 
 ## P1 - High Priority
 
-### Scalar value history graphs
-- Plot scalar values over time across multiple runs
-- Show trend and historical values
-- Useful for convergence debugging
+(None currently)
 
 ---
 

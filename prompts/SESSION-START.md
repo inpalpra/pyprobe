@@ -4,6 +4,7 @@ TASK:
 Before any work, load project context to minimize wasted tokens.
 
 MANDATORY STEPS:
+0. Read `CONSTITUTION.md` completely
 1. Read `.agent/README.md` completely
 2. Scan LESSONS for relevant prior bugs
 3. Check INVARIANTS before writing any code
