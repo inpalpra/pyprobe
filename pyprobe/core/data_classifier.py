@@ -11,6 +11,7 @@ DTYPE_ARRAY_1D = 'array_1d'
 DTYPE_ARRAY_COMPLEX = 'array_complex'
 DTYPE_ARRAY_2D = 'array_2d'
 DTYPE_WAVEFORM_REAL = 'waveform_real'
+DTYPE_WAVEFORM_COLLECTION = 'waveform_collection'
 DTYPE_UNKNOWN = 'unknown'
 
 
@@ -127,15 +128,21 @@ def classify_data(value: Any) -> Tuple[str, Optional[tuple]]:
         Tuple of (dtype_string, shape_or_none)
 
     Classification rules:
-    1. Serialized waveform dict from IPC -> 'waveform_real'
-    2. Waveform-like objects (2 scalars + 1 array) -> 'waveform_real'
-    3. Scalar (int, float, complex single value) -> 'scalar'
-    4. 1D numpy array of complex -> 'array_complex' (constellation)
-    5. 1D numpy array of real -> 'array_1d' (waveform)
-    6. 2D numpy array -> 'array_2d' (heatmap/image)
-    7. List/tuple -> converted to numpy and re-classified
-    8. Everything else -> 'unknown'
+    1. Serialized waveform collection from IPC -> 'waveform_collection'
+    2. Serialized waveform dict from IPC -> 'waveform_real'
+    3. Waveform collection (list/tuple of waveform objects) -> 'waveform_collection'
+    4. Waveform-like objects (2 scalars + 1 array) -> 'waveform_real'
+    5. Scalar (int, float, complex single value) -> 'scalar'
+    6. 1D numpy array of complex -> 'array_complex' (constellation)
+    7. 1D numpy array of real -> 'array_1d' (waveform)
+    8. 2D numpy array -> 'array_2d' (heatmap/image)
+    9. List/tuple -> converted to numpy and re-classified
+    10. Everything else -> 'unknown'
     """
+    # Serialized waveform collection from IPC
+    if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COLLECTION:
+        waveforms = value.get('waveforms', [])
+        return DTYPE_WAVEFORM_COLLECTION, (len(waveforms),)
     # Serialized waveform from IPC
     if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_REAL:
         samples = value.get('samples')
@@ -143,7 +150,12 @@ def classify_data(value: Any) -> Tuple[str, Optional[tuple]]:
             return DTYPE_WAVEFORM_REAL, samples.shape
         return DTYPE_WAVEFORM_REAL, None
 
-    # Check for waveform-like objects (2 scalars + 1 array)
+    # Check for waveform collection (list/tuple of waveform objects)
+    collection_info = _classify_as_waveform_collection(value)
+    if collection_info is not None:
+        return DTYPE_WAVEFORM_COLLECTION, (len(collection_info['waveforms']),)
+
+    # Check for single waveform-like object (2 scalars + 1 array)
     waveform_info = _classify_as_waveform(value)
     if waveform_info is not None:
         samples = getattr(value, waveform_info['samples_attr'])
@@ -203,4 +215,35 @@ def get_array_memory_size(value: np.ndarray) -> int:
 def get_waveform_info(value: Any) -> Optional[Dict[str, Any]]:
     """Get waveform structure info if value is a waveform object."""
     return _classify_as_waveform(value)
+
+
+def _classify_as_waveform_collection(value: Any) -> Optional[Dict[str, Any]]:
+    """
+    Check if value is a collection of waveform objects.
+    
+    A waveform collection is a list/tuple where ALL elements are waveform objects.
+    
+    Returns:
+        Dict with {'waveforms': [info1, info2, ...]} if collection,
+        None otherwise.
+    """
+    if not isinstance(value, (list, tuple)):
+        return None
+    
+    if len(value) == 0:
+        return None
+    
+    waveform_infos = []
+    for item in value:
+        info = _classify_as_waveform(item)
+        if info is None:
+            return None  # Not all elements are waveforms
+        waveform_infos.append({'obj': item, 'info': info})
+    
+    return {'waveforms': waveform_infos}
+
+
+def get_waveform_collection_info(value: Any) -> Optional[Dict[str, Any]]:
+    """Get waveform collection info if value is a collection of waveform objects."""
+    return _classify_as_waveform_collection(value)
 

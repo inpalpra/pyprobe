@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
 
-from .data_classifier import classify_data, get_waveform_info, DTYPE_WAVEFORM_REAL
+from .data_classifier import (
+    classify_data, get_waveform_info, get_waveform_collection_info,
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION
+)
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
 
@@ -247,10 +250,34 @@ class VariableTracer:
         """
         Convert value to a serializable format for IPC.
         
-        Handles waveform-like objects (2 scalars + 1 array) by converting
-        to a dict that can be pickled across processes.
+        Handles waveform-like objects (2 scalars + 1 array) and waveform collections
+        by converting to dicts that can be pickled across processes.
         """
-        # Check for waveform-like objects using formal classifier
+        # Check for waveform collection first
+        collection_info = get_waveform_collection_info(value)
+        if collection_info is not None:
+            serialized_waveforms = []
+            for wf_data in collection_info['waveforms']:
+                obj = wf_data['obj']
+                info = wf_data['info']
+                samples_attr = info['samples_attr']
+                scalar_attrs = info['scalar_attrs']
+                
+                samples = np.asarray(getattr(obj, samples_attr)).copy()
+                scalars = [float(getattr(obj, attr)) for attr in scalar_attrs]
+                scalars.sort()  # [t0, dt] after sorting
+                
+                serialized_waveforms.append({
+                    'samples': samples,
+                    'scalars': scalars,
+                })
+            
+            return {
+                '__dtype__': DTYPE_WAVEFORM_COLLECTION,
+                'waveforms': serialized_waveforms,
+            }
+
+        # Check for single waveform-like object
         waveform_info = get_waveform_info(value)
         if waveform_info is not None:
             samples_attr = waveform_info['samples_attr']
@@ -258,20 +285,12 @@ class VariableTracer:
             
             samples = np.asarray(getattr(value, samples_attr)).copy()
             scalars = [float(getattr(value, attr)) for attr in scalar_attrs]
-            
-            # Sort scalars to determine t0 (smaller) and dt (larger positive)
-            # Heuristic: smaller value is t0, larger is dt
             scalars.sort()
             
             return {
                 '__dtype__': DTYPE_WAVEFORM_REAL,
                 'samples': samples,
-                'scalars': scalars,  # [t0, dt] after sorting
-                'attr_names': {
-                    'samples': samples_attr,
-                    'scalar1': scalar_attrs[0],
-                    'scalar2': scalar_attrs[1],
-                },
+                'scalars': scalars,
             }
         
         # Make a copy of numpy arrays to avoid mutation issues
