@@ -45,7 +45,7 @@ if __name__ == "__main__":
     print()
 
     t0 = 0.0                 # start time
-    dt = 0.1                 # sampling interval
+    dt = 1.0                 # sampling interval
     N  = 100                 # number of samples
 
     for frame in range(50):

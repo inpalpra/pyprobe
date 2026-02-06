@@ -31,6 +31,7 @@ class MessageType(Enum):
     CMD_ADD_PROBE = auto()      # Add probe by anchor
     CMD_REMOVE_PROBE = auto()   # Remove probe by anchor
     DATA_PROBE_VALUE = auto()   # Probe data with anchor context
+    DATA_PROBE_VALUE_BATCH = auto()  # Batched probe data from same trace event
 
 
 @dataclass
@@ -144,3 +145,27 @@ def make_probe_value_msg(
             'shape': shape,
         }
     )
+
+
+def make_probe_value_batch_msg(
+    probes: list,  # List of (anchor, value, dtype, shape) tuples
+) -> Message:
+    """
+    Create DATA_PROBE_VALUE_BATCH message.
+    
+    All probes in the batch were captured in the same trace event,
+    ensuring atomic updates in the GUI.
+    """
+    items = []
+    for anchor, value, dtype, shape in probes:
+        items.append({
+            'anchor': anchor.to_dict(),
+            'value': value,
+            'dtype': dtype,
+            'shape': shape,
+        })
+    return Message(
+        msg_type=MessageType.DATA_PROBE_VALUE_BATCH,
+        payload={'probes': items}
+    )
+

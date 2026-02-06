@@ -70,7 +70,8 @@ class VariableTracer:
         data_callback: Callable[[CapturedVariable], None],
         target_files: Optional[Set[str]] = None,
         target_functions: Optional[Set[str]] = None,
-        anchor_data_callback: Optional[Callable[[ProbeAnchor, CapturedVariable], None]] = None
+        anchor_data_callback: Optional[Callable[[ProbeAnchor, CapturedVariable], None]] = None,
+        anchor_batch_callback: Optional[Callable[[list], None]] = None
     ):
         """
         Args:
@@ -78,9 +79,11 @@ class VariableTracer:
             target_files: Only trace these files (None = all files)
             target_functions: Only trace these functions (None = all functions)
             anchor_data_callback: Called for anchor-based captures (anchor, captured_var)
+            anchor_batch_callback: Called with list of (anchor, captured_var) tuples from same trace event
         """
         self._data_callback = data_callback
         self._anchor_data_callback = anchor_data_callback
+        self._anchor_batch_callback = anchor_batch_callback
         self._target_files = target_files
         self._target_functions = target_functions
         self._watches: Dict[str, WatchConfig] = {}
@@ -348,6 +351,7 @@ class VariableTracer:
         Trace function with anchor-based matching.
 
         Similar to _trace_func but uses AnchorMatcher for O(1) lookup.
+        Batches all captures from this trace event for atomic GUI updates.
         """
         # Fast exit if disabled
         if not self._enabled:
@@ -383,8 +387,9 @@ class VariableTracer:
         if not matching_anchors:
             return self._trace_func_anchored
 
-        # Capture for each matching anchor
+        # Capture for each matching anchor, batching all captures from this event
         current_time = time.perf_counter()
+        batch = []  # List of (anchor, captured) tuples
 
         for anchor in matching_anchors:
             config = self._anchor_watches.get(anchor)
@@ -411,12 +416,21 @@ class VariableTracer:
             if config.throttle_strategy == ThrottleStrategy.SAMPLE_EVERY_N:
                 config.iteration_count = 0
 
-            # Send to callback (prefer anchor callback if available)
+            batch.append((anchor, captured))
+
+        # Send batch to callback (prefer batch callback for atomic updates)
+        if batch:
             try:
-                if self._anchor_data_callback is not None:
-                    self._anchor_data_callback(anchor, captured)
+                if self._anchor_batch_callback is not None:
+                    self._anchor_batch_callback(batch)
+                elif self._anchor_data_callback is not None:
+                    # Fallback: send individually
+                    for anchor, captured in batch:
+                        self._anchor_data_callback(anchor, captured)
                 else:
-                    self._data_callback(captured)
+                    # Ultimate fallback
+                    for anchor, captured in batch:
+                        self._data_callback(captured)
             except Exception:
                 pass
 

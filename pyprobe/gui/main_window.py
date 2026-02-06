@@ -215,6 +215,20 @@ class MainWindow(QMainWindow):
                     shape=msg.payload.get('shape'),
                 )
 
+        # === M1: Handle batched probe data for atomic updates ===
+        elif msg.msg_type == MessageType.DATA_PROBE_VALUE_BATCH:
+            self._frame_count += 1
+            # Process all probes from this batch atomically
+            for probe_data in msg.payload.get('probes', []):
+                anchor = ProbeAnchor.from_dict(probe_data['anchor'])
+                self._probe_registry.update_data_received(anchor)
+                if anchor in self._probe_panels:
+                    self._probe_panels[anchor].update_data(
+                        value=probe_data['value'],
+                        dtype=probe_data['dtype'],
+                        shape=probe_data.get('shape'),
+                    )
+
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
             # Mark as not running FIRST to stop any further polling
             self._is_running = False

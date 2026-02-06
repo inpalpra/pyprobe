@@ -16,7 +16,8 @@ from .tracer import VariableTracer, WatchConfig, ThrottleStrategy, CapturedVaria
 from .anchor import ProbeAnchor
 from ..ipc.channels import IPCChannel
 from ..ipc.messages import (
-    Message, MessageType, make_variable_data_msg, make_exception_msg, make_probe_value_msg
+    Message, MessageType, make_variable_data_msg, make_exception_msg,
+    make_probe_value_msg, make_probe_value_batch_msg
 )
 
 
@@ -74,7 +75,7 @@ class ScriptRunner:
         self._tracer = VariableTracer(
             data_callback=self._on_variable_captured,
             target_files={str(self._script_path)},  # Only trace the target script
-            anchor_data_callback=self._on_anchor_captured
+            anchor_batch_callback=self._on_anchor_batch_captured
         )
 
         # Start command listener thread (after tracer is ready)
@@ -180,6 +181,24 @@ class ScriptRunner:
             dtype=captured.dtype,
             shape=captured.shape,
         )
+        self._ipc.send_data(msg)
+
+    def _on_anchor_batch_captured(self, batch: list) -> None:
+        """
+        Callback when tracer captures multiple variables in a single trace event.
+        
+        Args:
+            batch: List of (anchor, captured) tuples from same trace event
+        """
+        # Check if paused
+        self._pause_event.wait()
+
+        # Build list of probe data tuples
+        probes = []
+        for anchor, captured in batch:
+            probes.append((anchor, captured.value, captured.dtype, captured.shape))
+
+        msg = make_probe_value_batch_msg(probes)
         self._ipc.send_data(msg)
 
     def _command_listener(self) -> None:
