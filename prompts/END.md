@@ -6,8 +6,14 @@ ROLE:
 - Goal = prevent recurrence of bugs with minimal tokens.
 
 TASK:
-When a bug is fixed, generate a LESSON entry using STAR-AR.
+When a bug is fixed OR a workflow mistake occurs, generate a LESSON entry using STAR-AR.
 Keep it compressed, lossless, and mechanical.
+
+LESSON-WORTHY MISTAKES:
+- Code bugs (logic errors, API misuse, GC issues)
+- Workflow errors (wrong env, wrong command, wrong file)
+- Environment issues (missing deps, wrong venv, path errors)
+- Repeated patterns of wasted effort
 
 FORMAT (MANDATORY):
 L<n> YYYY-MM-DD <short-tag>

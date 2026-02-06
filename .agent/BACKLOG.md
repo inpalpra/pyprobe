@@ -1,6 +1,6 @@
 # PyProbe Backlog
 
-> Priority-ordered bugs and features. Update via `@[prompts/SESSION-END.md]` hook.
+> Priority-ordered bugs and features. Update via `@[prompts/END.md]` hook.
 
 ## P1 - High Priority
 

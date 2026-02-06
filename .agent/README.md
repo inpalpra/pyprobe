@@ -3,7 +3,7 @@
 
 ## FIRST: READ THIS
 1. Check LESSONS section before debugging - may already be solved
-2. After fixing bug → run `@[prompts/SESSION-END.md]` to log lesson
+2. After fixing bug → run `@[prompts/END.md]` to log lesson
 3. If pattern discovered → add to GOTCHAS
 
 ## PROJ OVERVIEW
@@ -35,14 +35,14 @@ pyprobe/
 │   ├── channels.py      # IPCChannel: queue-based comm
 │   └── messages.py      # Message types
 └── prompts/             # AI prompt templates
-    └── SESSION-END.md  # STAR-AR lesson format
+    └── END.md  # STAR-AR lesson format
 ```
 
 ## KEY DOCS
 - `plans/implementation/m1/README.md` - M1 milestone overview
 - `plans/plan.md` - full impl details
 - `CONSTITUTION.md` - proj philosophy
-- `prompts/SESSION-END.md` - lesson entry format
+- `prompts/END.md` - lesson entry format
 - `.agent/BACKLOG.md` - bugs + features (priority-sorted)
 
 ## DEBUG
@@ -52,7 +52,7 @@ python -m pyprobe --loglevel DEBUG examples/dsp_demo.py
 ```
 
 ## LESSONS (STAR-AR FORMAT)
-> see `prompts/SESSION-END.md` for format spec
+> see `prompts/END.md` for format spec
 
 ### L1 2026-02-06 anim-GC
 S: fade_out anim on probe removal
@@ -104,6 +104,16 @@ R': find actual root cause
 Fix: question defaults before adding offsets
 File: gui/code_viewer.py
 
+### L6 2026-02-06 venv-run
+S: running `python -m pyprobe` for verification
+T: test new ScalarHistoryChart feature
+A: ran `python -m pyprobe` without activating venv
+R: ModuleNotFoundError: No module named 'PyQt6'
+A': always activate proj venv before running
+R': all deps available
+Fix: `source .venv/bin/activate && python -m pyprobe ...`
+File: (all python cmds)
+
 ## PATTERNS
 
 ### logging pattern
@@ -128,6 +138,12 @@ widget._fade_anim = anim  # store ref
 anim.start()
 ```
 
+### running python (MANDATORY)
+```bash
+# ALWAYS activate venv before running python:
+source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
+```
+
 ## GOTCHAS
 - ProbeAnchor immutable, can't modify after creation
 - animations.py: MUST parent QPropertyAnimation to prevent GC
@@ -141,9 +157,10 @@ anim.start()
 - [ ] func calls: kwargs for optional params?
 - [ ] dict keys: using hashable frozen obj?
 - [ ] callbacks: will obj exist when callback fires?
+- [ ] python cmds: activated .venv first?
 
 ## UPDATE PROTOCOL
-1. **Bug fixed?** → `@[prompts/SESSION-END.md]` → add STAR-AR entry
+1. **Bug fixed?** → `@[prompts/END.md]` → add STAR-AR entry
 2. **Pattern found?** → add to PATTERNS section
 3. **Non-obvious behavior?** → add to GOTCHAS
 4. **New important file?** → update DIR STRUCT
