@@ -18,6 +18,9 @@ from PyQt6.QtGui import (
 
 from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.analysis.ast_locator import ASTLocator, VariableLocation
+import logging
+
+logger = logging.getLogger('pyprobe')
 
 
 class CodeViewer(QPlainTextEdit):
@@ -124,7 +127,10 @@ class CodeViewer(QPlainTextEdit):
             anchor: The probe anchor to activate
             color: Color to use for highlighting
         """
+        logger.debug(f"set_probe_active called with anchor: {anchor}")
+        logger.debug(f"Before: _active_probes keys: {list(self._active_probes.keys())}")
         self._active_probes[anchor] = color
+        logger.debug(f"After: _active_probes keys: {list(self._active_probes.keys())}")
         self._invalid_probes.discard(anchor)
         self.viewport().update()
 
@@ -143,7 +149,10 @@ class CodeViewer(QPlainTextEdit):
         Args:
             anchor: The probe anchor to remove
         """
+        logger.debug(f"remove_probe called with anchor: {anchor}")
+        logger.debug(f"Before: _active_probes keys: {list(self._active_probes.keys())}")
         self._active_probes.pop(anchor, None)
+        logger.debug(f"After: _active_probes keys: {list(self._active_probes.keys())}")
         self._invalid_probes.discard(anchor)
         self.viewport().update()
 
@@ -223,12 +232,19 @@ class CodeViewer(QPlainTextEdit):
         """Handle mouse clicks for probe toggle."""
         if event.button() == Qt.MouseButton.LeftButton:
             anchor = self._get_anchor_at_position(event.pos())
+            logger.debug(f"mousePressEvent: Click at pos {event.pos()}")
+            logger.debug(f"mousePressEvent: anchor at position: {anchor}")
+            logger.debug(f"mousePressEvent: _active_probes keys: {list(self._active_probes.keys())}")
 
             if anchor is not None:
+                is_active = anchor in self._active_probes
+                logger.debug(f"mousePressEvent: anchor in _active_probes: {is_active}")
                 # Check if clicking on an active probe
-                if anchor in self._active_probes:
+                if is_active:
+                    logger.debug(f"mousePressEvent: Emitting probe_removed for {anchor}")
                     self.probe_removed.emit(anchor)
                 else:
+                    logger.debug(f"mousePressEvent: Emitting probe_requested for {anchor}")
                     self.probe_requested.emit(anchor)
 
         super().mousePressEvent(event)

@@ -13,6 +13,15 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QColor
 import multiprocessing as mp
 import os
+import logging
+
+# Debug logging for probe operations
+logging.basicConfig(
+    filename='/tmp/pyprobe_debug.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('pyprobe')
 
 from .probe_panel import ProbePanelContainer, ProbePanel
 from .control_bar import ControlBar
@@ -349,12 +358,20 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_probe_requested(self, anchor: ProbeAnchor):
         """Handle click-to-probe request from code viewer."""
+        logger.debug(f"_on_probe_requested called with anchor: {anchor}")
+        logger.debug(f"Current _probe_panels keys: {list(self._probe_panels.keys())}")
+        
         if self._probe_registry.is_full():
+            logger.debug("Registry is full, returning")
             self._status_bar.showMessage("Maximum probes reached (5)")
             return
 
         # Add to registry and get assigned color
         color = self._probe_registry.add_probe(anchor)
+        logger.debug(f"Probe added, assigned color: {color.name() if color else 'None'}")
+        logger.debug(f"After add, _probe_panels keys: {list(self._probe_panels.keys())}")
+        logger.debug(f"Active probes in code_viewer: {list(self._code_viewer._active_probes.keys())}")
+        
 
         # Update code viewer
         self._code_viewer.set_probe_active(anchor, color)
@@ -376,18 +393,27 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):
         """Handle probe removal request."""
+        logger.debug(f"_on_probe_remove_requested called with anchor: {anchor}")
+        logger.debug(f"Current _probe_panels keys: {list(self._probe_panels.keys())}")
+        logger.debug(f"anchor in _probe_panels: {anchor in self._probe_panels}")
+        logger.debug(f"Active probes in code_viewer: {list(self._code_viewer._active_probes.keys())}")
+        
         if anchor not in self._probe_panels:
+            logger.debug("Anchor not in _probe_panels, returning early")
             return
 
         panel = self._probe_panels[anchor]
 
         # Animate removal
-        ProbeAnimations.fade_out(panel, lambda: self._complete_probe_removal(anchor))
+        ProbeAnimations.fade_out(panel, on_finished=lambda: self._complete_probe_removal(anchor))
 
     def _complete_probe_removal(self, anchor: ProbeAnchor):
         """Complete probe removal after animation."""
+        logger.debug(f"_complete_probe_removal called with anchor: {anchor}")
+        
         # Remove from registry
         self._probe_registry.remove_probe(anchor)
+        logger.debug(f"Removed from registry")
 
         # Update code viewer
         self._code_viewer.remove_probe(anchor)

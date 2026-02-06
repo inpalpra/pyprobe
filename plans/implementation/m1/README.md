@@ -74,7 +74,7 @@ The plans collectively address all brutal teardown requirements:
 ## Full Implementation Details
 
 For complete code implementations, see the main plan file:
-`/Users/ppal/.claude/plans/noble-foraging-cook.md`
+`/Users/ppal/repos/pyprobe/plans/plan.md`
 
 Each plan file here contains the structure and key implementation notes.
 The full code for each class/function is in the main plan file.
