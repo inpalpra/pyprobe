@@ -30,9 +30,9 @@ if __name__ == "__main__":
     for frame in range(50):
         # Create waveforms with different time bases
         wfms = [
-            Waveform(0.0, 0.1, np.sin(2 * np.pi * 0.5 * np.arange(100) * 0.1 + frame * 0.1)),  # 100 samples, starts at 0
-            Waveform(2.0, 0.2, np.cos(2 * np.pi * 0.3 * np.arange(50) * 0.2 + frame * 0.1)),   # 50 samples, starts at t=2
-            Waveform(1.0, 0.05, np.sin(2 * np.pi * 0.8 * np.arange(200) * 0.05 + frame * 0.1)), # 200 samples, starts at t=1
+            Waveform(0.0, 1.0, np.sin(2 * np.pi * 0.5 * np.arange(100) * 0.1 + frame * 0.1)),  # 100 samples, starts at 0
+            Waveform(10, 0.2, np.cos(2 * np.pi * 0.3 * np.arange(50) * 0.2 + frame * 0.1)),   # 50 samples, starts at t=2
+            Waveform(15, 0.1, np.sin(2 * np.pi * 0.8 * np.arange(200) * 0.05 + frame * 0.1)), # 200 samples, starts at t=1
         ]
         
         time.sleep(0.1)
