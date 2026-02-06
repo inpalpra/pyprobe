@@ -188,6 +188,11 @@ class CodeViewer(QPlainTextEdit):
         var_loc = self._ast_locator.get_nearest_variable(line, col)
         if var_loc is None:
             return None
+        
+        # Check if symbol is probeable
+        if not self._ast_locator.is_probeable(var_loc):
+            logger.debug(f"_get_anchor_at_position: symbol not probeable: {var_loc}")
+            return None
 
         # Get enclosing function
         func_name = self._ast_locator.get_enclosing_function(line) or ""
@@ -347,6 +352,10 @@ class CodeViewer(QPlainTextEdit):
             painter: QPainter to draw with
             var_loc: The variable location to highlight
         """
+        # Only draw hover if probeable
+        if self._ast_locator is not None and not self._ast_locator.is_probeable(var_loc):
+            return  # No visual feedback for non-probeable
+        
         rect = self._get_rect_for_variable(var_loc)
         if rect is None:
             return

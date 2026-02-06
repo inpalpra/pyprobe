@@ -1,7 +1,21 @@
 """AST-based source code analysis for variable location."""
 import ast
+from enum import Enum
 from typing import Optional, List, Tuple, Set
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from pyprobe.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+class SymbolType(Enum):
+    """Classification of symbol types for probeability determination."""
+    DATA_VARIABLE = "data"      # LHS of assignment → PROBEABLE
+    FUNCTION_CALL = "call"      # Function being called → NOT probeable
+    MODULE_REF = "module"       # Module access (np.xyz) → NOT probeable
+    FUNCTION_DEF = "func_def"   # Function name in def → NOT probeable
+    UNKNOWN = "unknown"         # Default → NOT probeable
 
 
 @dataclass
@@ -12,6 +26,7 @@ class VariableLocation:
     col_start: int  # 0-indexed
     col_end: int    # 0-indexed, exclusive
     is_lhs: bool    # True if assignment target
+    symbol_type: SymbolType = field(default=SymbolType.UNKNOWN)
 
 
 class ASTLocator:
@@ -43,25 +58,97 @@ class ASTLocator:
         self._extract_functions()
 
     def _extract_variables(self) -> None:
-        """Extract all Name nodes with their locations."""
+        """Extract all Name nodes with their locations and symbol types."""
         if self._tree is None:
             return
 
-        # Find all assignment targets first
+        # Collect positions for each symbol type
         lhs_positions: Set[Tuple[int, int]] = set()
-        self._collect_lhs_positions_from_tree(self._tree, lhs_positions)
+        call_positions: Set[Tuple[int, int]] = set()  # Function calls
+        module_positions: Set[Tuple[int, int]] = set()  # Attribute base (e.g., np in np.sin)
+        func_def_positions: Set[Tuple[int, int]] = set()  # Function/class def names
 
-        # Now collect all Name nodes
+        self._collect_lhs_positions_from_tree(self._tree, lhs_positions)
+        self._collect_special_positions(self._tree, call_positions, module_positions, func_def_positions)
+
+        # Now collect all Name nodes and classify them
         for node in ast.walk(self._tree):
             if isinstance(node, ast.Name):
-                is_lhs = (node.lineno, node.col_offset) in lhs_positions
-                self._variables.append(VariableLocation(
+                pos = (node.lineno, node.col_offset)
+                
+                # Determine symbol type (priority order matters)
+                if pos in lhs_positions:
+                    symbol_type = SymbolType.DATA_VARIABLE
+                elif pos in func_def_positions:
+                    symbol_type = SymbolType.FUNCTION_DEF
+                elif pos in call_positions:
+                    symbol_type = SymbolType.FUNCTION_CALL
+                elif pos in module_positions:
+                    symbol_type = SymbolType.MODULE_REF
+                else:
+                    symbol_type = SymbolType.UNKNOWN
+                
+                is_lhs = pos in lhs_positions
+                var_loc = VariableLocation(
                     name=node.id,
                     line=node.lineno,
                     col_start=node.col_offset,
                     col_end=node.end_col_offset or (node.col_offset + len(node.id)),
                     is_lhs=is_lhs,
-                ))
+                    symbol_type=symbol_type,
+                )
+                self._variables.append(var_loc)
+                logger.debug(f"Classified {node.id} at L{node.lineno}:C{node.col_offset} as {symbol_type}")
+
+    def _collect_special_positions(
+        self, 
+        tree: ast.AST, 
+        call_positions: Set[Tuple[int, int]],
+        module_positions: Set[Tuple[int, int]],
+        func_def_positions: Set[Tuple[int, int]]
+    ) -> None:
+        """Collect positions of function calls, module refs, and function defs."""
+        for node in ast.walk(tree):
+            # Function definitions - the function name itself
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # Note: node.name is just a string, but we need to find corresponding Name nodes
+                # Function defs don't have Name nodes for their own name, so we track line/col
+                # Actually FunctionDef.name is a str, not a Name node, so this won't be in _variables
+                pass
+            
+            # Class definitions - similar, class name is a string attribute
+            if isinstance(node, ast.ClassDef):
+                pass
+            
+            # Function calls
+            if isinstance(node, ast.Call):
+                func = node.func
+                # Direct call: foo()
+                if isinstance(func, ast.Name):
+                    call_positions.add((func.lineno, func.col_offset))
+                # Method call: obj.method() - mark 'obj' as module ref
+                elif isinstance(func, ast.Attribute):
+                    self._collect_attribute_base_positions(func, module_positions)
+            
+            # Attribute access (not a call, just np.something)
+            if isinstance(node, ast.Attribute):
+                # If this attribute is the value of another attribute (nested: np.sin.something)
+                # or if it's part of a call (np.sin()), we handle module refs
+                self._collect_attribute_base_positions(node, module_positions)
+
+    def _collect_attribute_base_positions(
+        self, 
+        node: ast.Attribute, 
+        positions: Set[Tuple[int, int]]
+    ) -> None:
+        """Recursively collect base Name positions from attribute chains."""
+        val = node.value
+        if isinstance(val, ast.Name):
+            # This is the base of the attribute chain (e.g., 'np' in np.sin)
+            positions.add((val.lineno, val.col_offset))
+        elif isinstance(val, ast.Attribute):
+            # Nested attribute, recurse
+            self._collect_attribute_base_positions(val, positions)
 
     def _collect_lhs_positions_from_tree(self, tree: ast.AST, positions: Set[Tuple[int, int]]) -> None:
         """Walk tree and collect all assignment target positions."""
@@ -158,6 +245,16 @@ class ASTLocator:
             return closest
 
         return None
+
+    def is_probeable(self, var_loc: VariableLocation) -> bool:
+        """Return True if this variable can be probed.
+        
+        Only DATA_VARIABLE symbols (LHS of assignments) are probeable.
+        Function calls, module references, and unknown symbols are not.
+        """
+        result = var_loc.symbol_type == SymbolType.DATA_VARIABLE
+        logger.debug(f"is_probeable({var_loc.name}): type={var_loc.symbol_type}, result={result}")
+        return result
 
     @property
     def is_valid(self) -> bool:

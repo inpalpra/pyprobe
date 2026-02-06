@@ -9,6 +9,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
+from pyprobe.logging import get_logger
+logger = get_logger(__name__)
+
 from ..core.anchor import ProbeAnchor
 from ..plots.base_plot import BasePlot
 from ..plots.plot_factory import create_plot
@@ -211,6 +214,10 @@ class ProbePanelContainer(QScrollArea):
             anchor: ProbeAnchor for the probe location
             color: Assigned color for the probe
         """
+        logger.debug(f"create_panel called: var_name={var_name}, anchor={anchor}")
+        logger.debug(f"  _panels keys: {list(self._panels.keys())}")
+        logger.debug(f"  _panels_by_name keys: {list(self._panels_by_name.keys())}")
+        
         # Create anchor if not provided (backwards compatibility)
         if anchor is None:
             anchor = ProbeAnchor(
@@ -225,10 +232,12 @@ class ProbePanelContainer(QScrollArea):
             color = QColor('#00ffff')
 
         if anchor in self._panels:
+            logger.debug(f"  Returning existing panel from _panels for anchor")
             return self._panels[anchor]
 
         # Also check by var_name for legacy code
         if var_name in self._panels_by_name:
+            logger.debug(f"  Returning existing panel from _panels_by_name for var_name={var_name}")
             return self._panels_by_name[var_name]
 
         # Hide placeholder
@@ -238,6 +247,7 @@ class ProbePanelContainer(QScrollArea):
         panel = ProbePanel(anchor, color, dtype, self._content)
         self._panels[anchor] = panel
         self._panels_by_name[var_name] = panel
+        logger.debug(f"  Created new panel, added to both dicts")
 
         # Add to grid
         self._layout.addWidget(panel, self._next_row, self._next_col)
@@ -252,26 +262,42 @@ class ProbePanelContainer(QScrollArea):
 
     def remove_panel(self, var_name: str = None, anchor: ProbeAnchor = None):
         """Remove a probe panel by var_name or anchor."""
+        logger.debug(f"remove_panel called: var_name={var_name}, anchor={anchor}")
+        logger.debug(f"  Before: _panels keys: {list(self._panels.keys())}")
+        logger.debug(f"  Before: _panels_by_name keys: {list(self._panels_by_name.keys())}")
+        
         panel = None
 
         if anchor is not None and anchor in self._panels:
             panel = self._panels.pop(anchor)
+            logger.debug(f"  Popped panel from _panels for anchor")
             # Remove from name index too
+            found_name = None
             for name, p in list(self._panels_by_name.items()):
                 if p is panel:
+                    found_name = name
                     del self._panels_by_name[name]
+                    logger.debug(f"  Also removed from _panels_by_name: {name}")
                     break
+            if found_name is None:
+                logger.debug(f"  WARNING: Panel not found in _panels_by_name!")
         elif var_name is not None and var_name in self._panels_by_name:
             panel = self._panels_by_name.pop(var_name)
+            logger.debug(f"  Popped panel from _panels_by_name for var_name")
             # Remove from anchor index too
             for a, p in list(self._panels.items()):
                 if p is panel:
                     del self._panels[a]
+                    logger.debug(f"  Also removed from _panels: {a}")
                     break
 
         if panel is None:
+            logger.debug(f"  No panel found to remove")
             return
 
+        logger.debug(f"  After: _panels keys: {list(self._panels.keys())}")
+        logger.debug(f"  After: _panels_by_name keys: {list(self._panels_by_name.keys())}")
+        
         self._layout.removeWidget(panel)
         panel.deleteLater()
 
