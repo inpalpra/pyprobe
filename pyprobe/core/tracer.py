@@ -65,15 +65,18 @@ class VariableTracer:
         self,
         data_callback: Callable[[CapturedVariable], None],
         target_files: Optional[Set[str]] = None,
-        target_functions: Optional[Set[str]] = None
+        target_functions: Optional[Set[str]] = None,
+        anchor_data_callback: Optional[Callable[[ProbeAnchor, CapturedVariable], None]] = None
     ):
         """
         Args:
             data_callback: Called when a variable capture passes throttling
             target_files: Only trace these files (None = all files)
             target_functions: Only trace these functions (None = all functions)
+            anchor_data_callback: Called for anchor-based captures (anchor, captured_var)
         """
         self._data_callback = data_callback
+        self._anchor_data_callback = anchor_data_callback
         self._target_files = target_files
         self._target_functions = target_functions
         self._watches: Dict[str, WatchConfig] = {}
@@ -348,9 +351,12 @@ class VariableTracer:
             if config.throttle_strategy == ThrottleStrategy.SAMPLE_EVERY_N:
                 config.iteration_count = 0
 
-            # Send to callback
+            # Send to callback (prefer anchor callback if available)
             try:
-                self._data_callback(captured)
+                if self._anchor_data_callback is not None:
+                    self._anchor_data_callback(anchor, captured)
+                else:
+                    self._data_callback(captured)
             except Exception:
                 pass
 

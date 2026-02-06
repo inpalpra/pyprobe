@@ -1,0 +1,25 @@
+Metadata-Version: 2.4
+Name: pyprobe
+Version: 0.1.0
+Summary: Variable probing based debugger for Python DSP debugging
+Author: PyProbe Contributors
+License: MIT
+Keywords: dsp,debugging,visualization,probe
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development :: Debuggers
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: PyQt6>=6.4.0
+Requires-Dist: pyqtgraph>=0.13.0
+Requires-Dist: numpy>=1.24.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-qt>=4.0.0; extra == "dev"

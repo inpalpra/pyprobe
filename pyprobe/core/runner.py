@@ -16,7 +16,7 @@ from .tracer import VariableTracer, WatchConfig, ThrottleStrategy, CapturedVaria
 from .anchor import ProbeAnchor
 from ..ipc.channels import IPCChannel
 from ..ipc.messages import (
-    Message, MessageType, make_variable_data_msg, make_exception_msg
+    Message, MessageType, make_variable_data_msg, make_exception_msg, make_probe_value_msg
 )
 
 
@@ -69,15 +69,17 @@ class ScriptRunner:
         """
         self._running = True
 
-        # Start command listener thread
-        self._cmd_thread = threading.Thread(target=self._command_listener, daemon=True)
-        self._cmd_thread.start()
-
         # Create tracer with callback to send data to GUI
+        # MUST happen before starting command listener to avoid race condition
         self._tracer = VariableTracer(
             data_callback=self._on_variable_captured,
-            target_files={str(self._script_path)}  # Only trace the target script
+            target_files={str(self._script_path)},  # Only trace the target script
+            anchor_data_callback=self._on_anchor_captured
         )
+
+        # Start command listener thread (after tracer is ready)
+        self._cmd_thread = threading.Thread(target=self._command_listener, daemon=True)
+        self._cmd_thread.start()
 
         # Add initial watches before starting
         for var_name in self._initial_watches:
@@ -115,6 +117,15 @@ class ScriptRunner:
 
             # Start tracing (M1: use anchored tracer)
             self._tracer.start_anchored()
+
+            # Give GUI time to send initial probe commands
+            # (probes added before Run was clicked)
+            import time
+            deadline = time.time() + 0.1  # 100ms window
+            while time.time() < deadline:
+                msg = self._ipc.receive_command(timeout=0.01)
+                if msg:
+                    self._handle_command(msg)
 
             # Execute the script
             with open(self._script_path, 'r') as f:
@@ -155,6 +166,19 @@ class ScriptRunner:
             source_file=captured.source_file,
             line_number=captured.line_number,
             function_name=captured.function_name
+        )
+        self._ipc.send_data(msg)
+
+    def _on_anchor_captured(self, anchor: ProbeAnchor, captured: CapturedVariable) -> None:
+        """Callback when tracer captures a variable via anchor-based tracing."""
+        # Check if paused
+        self._pause_event.wait()
+
+        msg = make_probe_value_msg(
+            anchor=anchor,
+            value=captured.value,
+            dtype=captured.dtype,
+            shape=captured.shape,
         )
         self._ipc.send_data(msg)
 

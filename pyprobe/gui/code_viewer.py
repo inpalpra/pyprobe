@@ -89,6 +89,10 @@ class CodeViewer(QPlainTextEdit):
         Returns:
             True if file was loaded successfully
         """
+        import os
+        # Resolve to absolute path to match tracer's code.co_filename
+        file_path = os.path.abspath(file_path)
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 source = f.read()

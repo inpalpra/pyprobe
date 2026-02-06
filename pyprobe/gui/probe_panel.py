@@ -39,6 +39,7 @@ class ProbePanel(QFrame):
         self._dtype = dtype
         self._plot: Optional[BasePlot] = None
         self._removal_animation = None
+        self._layout: Optional[QVBoxLayout] = None
 
         self._setup_ui()
 
@@ -56,9 +57,9 @@ class ProbePanel(QFrame):
             }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(4, 4, 4, 4)
+        self._layout.setSpacing(4)
 
         # Header row with state indicator, identity label, and throttle indicator
         header = QHBoxLayout()
@@ -96,17 +97,28 @@ class ProbePanel(QFrame):
         self._throttle_label.hide()
         header.addWidget(self._throttle_label)
 
-        layout.addLayout(header)
+        self._layout.addLayout(header)
 
         # Create the appropriate plot widget
         self._plot = create_plot(self._anchor.symbol, self._dtype, self)
-        layout.addWidget(self._plot)
+        self._layout.addWidget(self._plot)
 
         # Set minimum size
         self.setMinimumSize(300, 250)
 
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
+        # If dtype changed from unknown, recreate the plot with correct type
+        if self._dtype == 'unknown' and dtype != 'unknown':
+            self._dtype = dtype
+            # Remove old plot
+            if self._plot:
+                self._layout.removeWidget(self._plot)
+                self._plot.deleteLater()
+            # Create new plot with correct type
+            self._plot = create_plot(self._anchor.symbol, dtype, self)
+            self._layout.addWidget(self._plot)
+
         if self._plot:
             self._plot.update_data(value, dtype, shape, source_info)
 
