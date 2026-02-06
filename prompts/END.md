@@ -51,7 +51,7 @@ Fix: widget._fade_anim = anim; parent=widget
 File: gui/animations.py
 
 OUTPUT:
-- Only the lesson entry.
+- Only the lesson entry in `.agent/README.md` in LESSONS (STAR-AR FORMAT) section
 - No explanation outside format.
 
 ALSO UPDATE `.agent/FEATURES.md`:

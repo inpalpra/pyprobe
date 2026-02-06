@@ -124,6 +124,16 @@ R': waveform plots correctly with time axis
 Fix: `_serialize_value()` in tracer converts to `{'__waveform__': True, 'x': ..., 't': ...}`
 File: core/tracer.py, plots/waveform_plot.py, core/data_classifier.py
 
+### L8 2026-02-07 scalar-sort-order
+S: waveform collection scalars [t0, dt] need semantic order
+T: serialize waveform scalars for IPC
+A: sorted scalars by value `scalars.sort()`
+R: t0=10, dt=0.2 → sorted to [0.2, 10], broke time vector calc
+A': identify t0/dt by attr name patterns, never sort by value
+R': t0 preserved at idx 0, dt at idx 1, time vector correct
+Fix: `_classify_as_waveform()` detects t0/dt patterns → order [t0,dt]; removed `.sort()`
+File: core/data_classifier.py:115-145, core/tracer.py:267,287
+
 ## PATTERNS
 
 ### logging pattern
