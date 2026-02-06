@@ -265,7 +265,6 @@ class VariableTracer:
                 
                 samples = np.asarray(getattr(obj, samples_attr)).copy()
                 scalars = [float(getattr(obj, attr)) for attr in scalar_attrs]
-                scalars.sort()  # [t0, dt] after sorting
                 
                 serialized_waveforms.append({
                     'samples': samples,
@@ -285,7 +284,6 @@ class VariableTracer:
             
             samples = np.asarray(getattr(value, samples_attr)).copy()
             scalars = [float(getattr(value, attr)) for attr in scalar_attrs]
-            scalars.sort()
             
             return {
                 '__dtype__': DTYPE_WAVEFORM_REAL,

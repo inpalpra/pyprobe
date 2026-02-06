@@ -112,9 +112,37 @@ def _classify_as_waveform(value: Any) -> Optional[Dict[str, Any]]:
         if samples_attr is None:
             samples_attr = array_attrs[0]
         
+        # Identify t0 (start time) and dt (interval) by attribute name patterns
+        # t0 patterns: t0, start, offset, begin
+        # dt patterns: dt, delta, step, interval, period
+        t0_patterns = {'t0', 'start', 'offset', 'begin', 'tstart'}
+        dt_patterns = {'dt', 'delta', 'step', 'interval', 'period', 'tstep'}
+        
+        t0_attr = None
+        dt_attr = None
+        
+        for attr in scalar_attrs:
+            attr_lower = attr.lower()
+            if any(p in attr_lower for p in t0_patterns) and t0_attr is None:
+                t0_attr = attr
+            elif any(p in attr_lower for p in dt_patterns) and dt_attr is None:
+                dt_attr = attr
+        
+        # Fallback: if patterns don't match, use first two in sorted order by name
+        remaining = [a for a in scalar_attrs if a != t0_attr and a != dt_attr]
+        if t0_attr is None and remaining:
+            t0_attr = remaining.pop(0)
+        if dt_attr is None and remaining:
+            dt_attr = remaining.pop(0)
+        
+        # If we still don't have both, just use first two
+        if t0_attr is None or dt_attr is None:
+            t0_attr = scalar_attrs[0]
+            dt_attr = scalar_attrs[1]
+        
         return {
             'samples_attr': samples_attr,
-            'scalar_attrs': scalar_attrs[:2],  # Take first 2 scalars
+            'scalar_attrs': [t0_attr, dt_attr],  # Always [t0, dt] order
         }
     
     return None

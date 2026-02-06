@@ -216,7 +216,7 @@ class WaveformPlot(BasePlot):
                     obj = wf_data['obj']
                     info = wf_data['info']
                     samples = np.asarray(getattr(obj, info['samples_attr']))
-                    scalars = sorted([float(getattr(obj, attr)) for attr in info['scalar_attrs']])
+                    scalars = [float(getattr(obj, attr)) for attr in info['scalar_attrs']]
                     serialized['waveforms'].append({'samples': samples, 'scalars': scalars})
                 self._update_waveform_collection_data(serialized, dtype, shape, source_info)
                 return
@@ -227,7 +227,7 @@ class WaveformPlot(BasePlot):
                 samples_attr = waveform_info['samples_attr']
                 scalar_attrs = waveform_info['scalar_attrs']
                 samples = np.asarray(getattr(value, samples_attr))
-                scalars = sorted([float(getattr(value, attr)) for attr in scalar_attrs])
+                scalars = [float(getattr(value, attr)) for attr in scalar_attrs]
                 t0, dt = scalars[0], scalars[1]
                 t_vector = t0 + np.arange(len(samples)) * dt
                 value = samples
