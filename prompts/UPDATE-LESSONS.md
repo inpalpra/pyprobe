@@ -47,3 +47,7 @@ File: gui/animations.py
 OUTPUT:
 - Only the lesson entry.
 - No explanation outside format.
+
+ALSO UPDATE `.agent/FEATURES.md`:
+- Add any new feature ideas discussed in session
+- Keep list priority-sorted (P1 > P2 > P3)

@@ -36,10 +36,11 @@ class ScalarDisplay(BasePlot):
         layout.addWidget(self._name_label)
 
         # Large value display
-        self._value_label = QLabel("--")
-        self._value_label.setFont(QFont("JetBrains Mono", 24, QFont.Weight.Bold))
-        self._value_label.setStyleSheet("color: #00ff00;")  # Green
+        self._value_label = QLabel("Nothing to show")
+        self._value_label.setFont(QFont("JetBrains Mono", 14))
+        self._value_label.setStyleSheet("color: #666666;")  # Gray for placeholder
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._has_data = False  # Track if we've received data
         layout.addWidget(self._value_label)
 
         # Type/info label
@@ -63,6 +64,12 @@ class ScalarDisplay(BasePlot):
     ):
         """Update the display with new scalar value."""
         self._value = value
+
+        # Switch from placeholder to active styling on first data
+        if not self._has_data:
+            self._has_data = True
+            self._value_label.setFont(QFont("JetBrains Mono", 24, QFont.Weight.Bold))
+            self._value_label.setStyleSheet("color: #00ff00;")  # Green
 
         # Format the value
         if value is None:

@@ -43,6 +43,8 @@ pyprobe/
 - `plans/plan.md` - full impl details
 - `CONSTITUTION.md` - proj philosophy
 - `prompts/UPDATE-LESSONS.md` - lesson entry format
+- `.agent/FEATURES.md` - planned features (priority-sorted)
+- `.agent/BUGS.md` - bug backlog
 
 ## DEBUG
 ```bash
@@ -72,6 +74,16 @@ A': check func sig, use kwarg `on_finished=`
 R': correct arg binding
 Fix: `fade_out(panel, on_finished=callback)`
 File: gui/main_window.py:385
+
+### L3 2026-02-06 filter-vs-degrade
+S: non-data symbols (np, print) probed by user
+T: prevent meaningless probes
+A: block probing in `_get_anchor_at_position()` → return None
+R: also blocked func args like `x` in `foo(x)`, valid use case
+A': allow all probes, show "Nothing to show" placeholder
+R': graceful UX, no false negatives
+Fix: remove `is_probeable()` check; add placeholder in ScalarDisplay
+File: gui/code_viewer.py, plots/scalar_display.py
 
 ## PATTERNS
 

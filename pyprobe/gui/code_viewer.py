@@ -63,6 +63,10 @@ class CodeViewer(QPlainTextEdit):
         # Set read-only
         self.setReadOnly(True)
 
+        # Disable word wrap - code should scroll horizontally, not wrap
+        # This ensures col_start * char_width calculation remains valid
+        self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+
         # Configure font - Menlo 11pt monospace
         font = QFont("Menlo", 11)
         font.setStyleHint(QFont.StyleHint.Monospace)
@@ -187,11 +191,6 @@ class CodeViewer(QPlainTextEdit):
         # Find nearest variable
         var_loc = self._ast_locator.get_nearest_variable(line, col)
         if var_loc is None:
-            return None
-        
-        # Check if symbol is probeable
-        if not self._ast_locator.is_probeable(var_loc):
-            logger.debug(f"_get_anchor_at_position: symbol not probeable: {var_loc}")
             return None
 
         # Get enclosing function
@@ -352,10 +351,6 @@ class CodeViewer(QPlainTextEdit):
             painter: QPainter to draw with
             var_loc: The variable location to highlight
         """
-        # Only draw hover if probeable
-        if self._ast_locator is not None and not self._ast_locator.is_probeable(var_loc):
-            return  # No visual feedback for non-probeable
-        
         rect = self._get_rect_for_variable(var_loc)
         if rect is None:
             return
@@ -385,13 +380,14 @@ class CodeViewer(QPlainTextEdit):
         # Get block geometry
         block_geom = self.blockBoundingGeometry(block)
         content_offset = self.contentOffset()
+        doc_margin = self.document().documentMargin()
 
         # Calculate character width using font metrics
         fm = QFontMetricsF(self.font())
         char_width = fm.horizontalAdvance('m')  # Monospace, so any char works
 
-        # Calculate rectangle
-        x = block_geom.x() + content_offset.x() + (var_loc.col_start * char_width)
+        # Calculate rectangle (doc_margin accounts for QTextDocument padding)
+        x = block_geom.x() + content_offset.x() + doc_margin + (var_loc.col_start * char_width)
         y = block_geom.y() + content_offset.y()
         width = (var_loc.col_end - var_loc.col_start) * char_width
         height = block_geom.height()
