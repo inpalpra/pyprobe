@@ -76,6 +76,9 @@ class MainWindow(QMainWindow):
 
         # M1: Source file content cache for anchor mapping
         self._last_source_content: Optional[str] = None
+        
+        # M2: Probe metadata tracking (including lens choice)
+        self._probe_metadata: Dict[ProbeAnchor, dict] = {}
 
         self._setup_ui()
         self._setup_signals()
@@ -209,6 +212,10 @@ class MainWindow(QMainWindow):
             anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
             self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_panels:
+                # Update metadata dtype
+                if anchor in self._probe_metadata:
+                    self._probe_metadata[anchor]['dtype'] = msg.payload['dtype']
+                
                 self._probe_panels[anchor].update_data(
                     value=msg.payload['value'],
                     dtype=msg.payload['dtype'],
@@ -378,8 +385,13 @@ class MainWindow(QMainWindow):
         color = self._probe_registry.add_probe(anchor)
         logger.debug(f"Probe added, assigned color: {color.name() if color else 'None'}")
         logger.debug(f"After add, _probe_panels keys: {list(self._probe_panels.keys())}")
-        logger.debug(f"Active probes in code_viewer: {list(self._code_viewer._active_probes.keys())}")
         
+        # Initialize metadata
+        if anchor not in self._probe_metadata:
+            self._probe_metadata[anchor] = {
+                'lens': None,
+                'dtype': None
+            }
 
         # Update code viewer
         self._code_viewer.set_probe_active(anchor, color)
@@ -390,6 +402,18 @@ class MainWindow(QMainWindow):
         # Create probe panel
         panel = self._probe_container.create_probe_panel(anchor, color)
         self._probe_panels[anchor] = panel
+        
+        # M2: Connect lens changed signal tracking
+        if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
+            from functools import partial
+            panel._lens_dropdown.lens_changed.connect(
+                partial(self._on_lens_changed, anchor)
+            )
+            
+            # If we have a stored lens preference, apply it
+            stored_lens = self._probe_metadata[anchor].get('lens')
+            if stored_lens:
+                panel._lens_dropdown.set_lens(stored_lens)
 
         # Send to runner if running
         if self._ipc and self._is_running:
@@ -440,6 +464,15 @@ class MainWindow(QMainWindow):
             self._ipc.send_command(msg)
 
         self._status_bar.showMessage(f"Probe removed: {anchor.identity_label()}")
+
+        self._status_bar.showMessage(f"Probe removed: {anchor.identity_label()}")
+
+    @pyqtSlot(object, str)
+    def _on_lens_changed(self, anchor: ProbeAnchor, lens_name: str):
+        """Handle lens change from probe panel."""
+        if anchor in self._probe_metadata:
+            self._probe_metadata[anchor]['lens'] = lens_name
+            logger.debug(f"Lens preference saved for {anchor.identity_label()}: {lens_name}")
 
     @pyqtSlot(str)
     def _on_file_changed(self, filepath: str):

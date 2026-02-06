@@ -18,6 +18,7 @@ from ..plots.plot_factory import create_plot
 from .probe_state import ProbeState
 from .probe_state_indicator import ProbeStateIndicator
 from .animations import ProbeAnimations
+from .lens_dropdown import LensDropdown
 
 
 class ProbePanel(QFrame):
@@ -41,8 +42,10 @@ class ProbePanel(QFrame):
         self._color = color
         self._dtype = dtype
         self._plot: Optional[BasePlot] = None
+        self._current_plugin: Optional['ProbePlugin'] = None
         self._removal_animation = None
         self._layout: Optional[QVBoxLayout] = None
+        self._lens_dropdown: Optional[LensDropdown] = None
 
         self._setup_ui()
 
@@ -85,6 +88,12 @@ class ProbePanel(QFrame):
         """)
         header.addWidget(self._identity_label)
 
+        # Add lens dropdown to header
+        self._lens_dropdown = LensDropdown()
+        self._lens_dropdown.update_for_dtype(self._dtype)
+        self._lens_dropdown.lens_changed.connect(self._on_lens_changed)
+        header.addWidget(self._lens_dropdown)
+
         # Spacer
         header.addStretch()
 
@@ -103,7 +112,23 @@ class ProbePanel(QFrame):
         self._layout.addLayout(header)
 
         # Create the appropriate plot widget
-        self._plot = create_plot(self._anchor.symbol, self._dtype, self)
+        from ..plugins import PluginRegistry
+        registry = PluginRegistry.instance()
+        
+        # Try to find a plugin for this dtype
+        plugin = registry.get_default_plugin(self._dtype)
+        
+        if plugin:
+            self._current_plugin = plugin
+            self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
+            if self._lens_dropdown:
+                 # Update dropdown to match if possible, though update_for_dtype usually handles this
+                 pass 
+        else:
+            # Fallback to legacy factory if no plugin (e.g. unknown dtype or not yet ported)
+            # This ensures we don't break if M2 is partial
+            self._plot = create_plot(self._anchor.symbol, self._dtype, self)
+
         self._layout.addWidget(self._plot)
 
         # Set minimum size
@@ -111,9 +136,34 @@ class ProbePanel(QFrame):
 
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
+        prev_dtype = self._dtype
+        self._dtype = dtype
+        self._shape = shape
+        self._data = value
+
+        # Update dropdown if dtype changed
+        if self._lens_dropdown is not None and (prev_dtype != dtype):
+            self._lens_dropdown.update_for_dtype(dtype, shape)
+            
+            # Since signals were blocked in dropdown update, check if we need to switch
+            current_lens_name = self._lens_dropdown.currentText()
+            
+            # If we don't have a plugin, or the current plugin doesn't match the dropdown selection
+            if not self._current_plugin or self._current_plugin.name != current_lens_name:
+                self._on_lens_changed(current_lens_name)
+                # Emit signal so listeners (MainWindow) know about the auto-switch
+                self._lens_dropdown.lens_changed.emit(current_lens_name)
+                # _on_lens_changed will update the new widget with self._data
+                return
+
+        # If we have an active plugin-based widget, update it
+        if self._current_plugin and self._plot:
+            self._current_plugin.update(self._plot, value, dtype, shape, source_info)
+            return
+
+        # FALLBACK (Legacy M1 behavior):
         # If dtype changed from unknown, recreate the plot with correct type
-        if self._dtype == 'unknown' and dtype != 'unknown':
-            self._dtype = dtype
+        if prev_dtype == 'unknown' and dtype != 'unknown':
             # Remove old plot
             if self._plot:
                 self._layout.removeWidget(self._plot)
@@ -124,6 +174,76 @@ class ProbePanel(QFrame):
 
         if self._plot:
             self._plot.update_data(value, dtype, shape, source_info)
+
+    def _on_lens_changed(self, plugin_name: str):
+        """Handle lens change - swap out the plot widget."""
+        from ..plugins import PluginRegistry
+        
+        registry = PluginRegistry.instance()
+        plugin = registry.get_plugin_by_name(plugin_name)
+        
+        if not plugin:
+            return
+        
+        # Remember current data for new widget if possible (legacy widgets store it in _data sometimes)
+        # But here we have self._data stored in update_data
+        
+        # Remove old plot widget
+        if self._plot:
+            self._layout.removeWidget(self._plot)
+            self._plot.deleteLater()
+        
+        # Create new widget from plugin
+        self._current_plugin = plugin
+        self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
+        
+        # Insert into layout (index 1, after header)
+        self._layout.insertWidget(1, self._plot)
+        
+        # Re-apply data if we had any
+        if hasattr(self, '_data') and self._data is not None:
+             plugin.update(self._plot, self._data, self._dtype, getattr(self, '_shape', None))
+
+    @property
+    def current_lens(self) -> str:
+        """Get current lens name."""
+        return self._lens_dropdown.currentText() if self._lens_dropdown else ""
+
+    def contextMenuEvent(self, event):
+        """Show context menu with View As... option."""
+        from PyQt6.QtWidgets import QMenu, QWidgetAction
+        
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #1a1a2e;
+                color: #00ffff;
+                border: 1px solid #00ffff;
+            }
+            QMenu::item:selected {
+                background-color: #00ffff;
+                color: #1a1a2e;
+            }
+            QMenu::item:disabled {
+                color: #555555;
+            }
+        """)
+        
+        view_menu = menu.addMenu("View As...")
+        
+        from ..plugins import PluginRegistry
+        registry = PluginRegistry.instance()
+        compatible = registry.get_compatible_plugins(self._dtype, getattr(self, '_shape', None))
+        
+        for plugin in registry.all_plugins:
+            action = view_menu.addAction(plugin.name)
+            action.setCheckable(True)
+            action.setChecked(plugin.name == self.current_lens)
+            action.setEnabled(plugin in compatible)
+            # Use default argument to capture loop variable
+            action.triggered.connect(lambda checked, name=plugin.name: self._lens_dropdown.set_lens(name))
+        
+        menu.exec(event.globalPos())
 
     def set_state(self, state: ProbeState):
         """Update the state indicator."""

@@ -22,15 +22,6 @@ def create_plot(
     parent: Optional[QWidget] = None
 ) -> BasePlot:
     """
-    Create the appropriate plot widget based on data type.
-
-    Args:
-        var_name: Name of the variable
-        dtype: Data type string from classifier
-        parent: Optional parent widget
-
-    Returns:
-        Appropriate plot widget for the data type
     """
     if dtype == DTYPE_ARRAY_COMPLEX:
         return ConstellationPlot(var_name, parent)

@@ -12,6 +12,8 @@ class BasePlot(QWidget):
 
     All plot types (waveform, constellation, scalar) inherit from this.
     Subclasses must implement update_data().
+    
+    DEPRECATED: Use pyprobe.plugins.base.ProbePlugin instead.
     """
 
     def __init__(self, var_name: str, parent: Optional[QWidget] = None):
