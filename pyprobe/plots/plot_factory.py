@@ -11,7 +11,8 @@ from .constellation import ConstellationPlot
 from .scalar_history_chart import ScalarHistoryChart
 from ..core.data_classifier import (
     DTYPE_SCALAR, DTYPE_ARRAY_1D, DTYPE_ARRAY_COMPLEX,
-    DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_UNKNOWN
+    DTYPE_ARRAY_2D, DTYPE_ARRAY_COLLECTION,
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_UNKNOWN
 )
 
 
@@ -39,6 +40,8 @@ def create_plot(
         return WaveformPlot(var_name, parent)
     elif dtype == DTYPE_WAVEFORM_COLLECTION:
         return WaveformPlot(var_name, parent)
+    elif dtype == DTYPE_ARRAY_COLLECTION:
+        return WaveformPlot(var_name, parent)
     elif dtype == DTYPE_ARRAY_2D:
         # For now, use waveform plot (flattened) for 2D arrays
         return WaveformPlot(var_name, parent)
@@ -56,6 +59,7 @@ def get_plot_type_name(dtype: str) -> str:
         DTYPE_ARRAY_1D: "Waveform",
         DTYPE_ARRAY_COMPLEX: "Constellation",
         DTYPE_ARRAY_2D: "2D Array",
+        DTYPE_ARRAY_COLLECTION: "Array Collection",
         DTYPE_WAVEFORM_REAL: "Waveform",
         DTYPE_WAVEFORM_COLLECTION: "Waveform Collection",
         DTYPE_UNKNOWN: "Unknown",

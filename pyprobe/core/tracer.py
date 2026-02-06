@@ -12,7 +12,8 @@ import numpy as np
 
 from .data_classifier import (
     classify_data, get_waveform_info, get_waveform_collection_info,
-    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION
+    get_array_collection_info,
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION
 )
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
@@ -274,6 +275,14 @@ class VariableTracer:
             return {
                 '__dtype__': DTYPE_WAVEFORM_COLLECTION,
                 'waveforms': serialized_waveforms,
+            }
+
+        # Check for array collection (list/tuple of 1D real arrays)
+        array_collection = get_array_collection_info(value)
+        if array_collection is not None:
+            return {
+                '__dtype__': DTYPE_ARRAY_COLLECTION,
+                'arrays': [arr.copy() for arr in array_collection['arrays']],
             }
 
         # Check for single waveform-like object

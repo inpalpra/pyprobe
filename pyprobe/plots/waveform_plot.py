@@ -9,8 +9,8 @@ import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont
 from ..core.data_classifier import (
-    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_2D,
-    get_waveform_info, get_waveform_collection_info
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_2D, DTYPE_ARRAY_COLLECTION,
+    get_waveform_info, get_waveform_collection_info, get_array_collection_info
 )
 
 from .base_plot import BasePlot
@@ -191,6 +191,11 @@ class WaveformPlot(BasePlot):
         # Handle serialized waveform collection from IPC
         if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COLLECTION:
             self._update_waveform_collection_data(value, dtype, shape, source_info)
+            return
+
+        # Handle serialized array collection from IPC
+        if isinstance(value, dict) and value.get('__dtype__') == DTYPE_ARRAY_COLLECTION:
+            self._update_array_collection_data(value, dtype, shape, source_info)
             return
 
         # Handle waveform objects (2 scalars + 1 array)
@@ -420,5 +425,49 @@ class WaveformPlot(BasePlot):
             self._stats_label.setText(
                 f"{num_waveforms} wfms | Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
             )
+
+    def _update_array_collection_data(
+        self,
+        value: dict,
+        dtype: str,
+        shape: Optional[tuple],
+        source_info: str
+    ):
+        """Update plot with array collection (list of 1D arrays, possibly different sizes)."""
+        arrays = value.get('arrays', [])
+        num_arrays = len(arrays)
+        
+        if num_arrays == 0:
+            return
+        
+        # Ensure correct number of curves
+        self._ensure_curves(num_arrays)
+
+        # Collect all data for stats
+        all_data = []
+
+        # Update each array
+        for idx, arr in enumerate(arrays):
+            samples = np.asarray(arr)
+            display_data = self._downsample(samples)
+            self._curves[idx].setData(display_data)
+            all_data.append(samples)
+
+        # Set x-axis label (Sample Index for pure arrays)
+        self._plot_widget.setLabel('bottom', 'Sample Index')
+
+        # Update info label
+        self._info_label.setText(f"[{num_arrays} arrays] {source_info}")
+
+        # Update stats (aggregate across all arrays)
+        if all_data:
+            concatenated = np.concatenate(all_data)
+            min_val = np.min(concatenated)
+            max_val = np.max(concatenated)
+            mean_val = np.mean(concatenated)
+            self._stats_label.setText(
+                f"{num_arrays} arrays | Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
+            )
+
 
 

@@ -10,6 +10,7 @@ DTYPE_SCALAR = 'scalar'
 DTYPE_ARRAY_1D = 'array_1d'
 DTYPE_ARRAY_COMPLEX = 'array_complex'
 DTYPE_ARRAY_2D = 'array_2d'
+DTYPE_ARRAY_COLLECTION = 'array_collection'
 DTYPE_WAVEFORM_REAL = 'waveform_real'
 DTYPE_WAVEFORM_COLLECTION = 'waveform_collection'
 DTYPE_UNKNOWN = 'unknown'
@@ -216,8 +217,14 @@ def classify_data(value: Any) -> Tuple[str, Optional[tuple]]:
     if isinstance(value, (complex, np.complexfloating)):
         return DTYPE_SCALAR, None  # Single complex displayed as scalar
 
-    # Handle lists/tuples - try to convert to numpy
+    # Handle lists/tuples - check for array collection first
     if isinstance(value, (list, tuple)):
+        # Check for array collection (list/tuple of 1D real arrays)
+        array_collection = _classify_as_array_collection(value)
+        if array_collection is not None:
+            return DTYPE_ARRAY_COLLECTION, (len(array_collection['arrays']),)
+        
+        # Try to convert to numpy (homogeneous array)
         try:
             arr = np.asarray(value)
             return classify_data(arr)
@@ -274,4 +281,48 @@ def _classify_as_waveform_collection(value: Any) -> Optional[Dict[str, Any]]:
 def get_waveform_collection_info(value: Any) -> Optional[Dict[str, Any]]:
     """Get waveform collection info if value is a collection of waveform objects."""
     return _classify_as_waveform_collection(value)
+
+
+def _classify_as_array_collection(value: Any) -> Optional[Dict[str, Any]]:
+    """
+    Check if value is a collection of 1D real arrays.
+    
+    An array collection is a list/tuple where ALL elements are 1D real arrays.
+    Arrays can have different sizes.
+    
+    Returns:
+        Dict with {'arrays': [np.array, ...]} if collection,
+        None otherwise.
+    """
+    if not isinstance(value, (list, tuple)):
+        return None
+    
+    if len(value) == 0:
+        return None
+    
+    arrays = []
+    for item in value:
+        # Must be a 1D real array (numpy or convertible)
+        if isinstance(item, np.ndarray):
+            if item.ndim != 1 or np.issubdtype(item.dtype, np.complexfloating):
+                return None
+            arrays.append(item)
+        elif isinstance(item, (list, tuple)):
+            try:
+                arr = np.asarray(item)
+                if arr.ndim != 1 or np.issubdtype(arr.dtype, np.complexfloating):
+                    return None
+                arrays.append(arr)
+            except (ValueError, TypeError):
+                return None
+        else:
+            return None  # Not an array-like element
+    
+    return {'arrays': arrays}
+
+
+def get_array_collection_info(value: Any) -> Optional[Dict[str, Any]]:
+    """Get array collection info if value is a collection of 1D real arrays."""
+    return _classify_as_array_collection(value)
+
 
