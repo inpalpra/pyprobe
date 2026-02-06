@@ -114,6 +114,16 @@ R': all deps available
 Fix: `source .venv/bin/activate && python -m pyprobe ...`
 File: (all python cmds)
 
+### L7 2026-02-06 ipc-pickle-custom
+S: probing custom Waveform object (user-defined class)
+T: display waveform with proper time axis
+A: sent custom object through multiprocessing queue
+R: `PicklingError: Can't pickle <class '__main__.Waveform'>`
+A': serialize to dict before IPC, deserialize on GUI side
+R': waveform plots correctly with time axis
+Fix: `_serialize_value()` in tracer converts to `{'__waveform__': True, 'x': ..., 't': ...}`
+File: core/tracer.py, plots/waveform_plot.py, core/data_classifier.py
+
 ## PATTERNS
 
 ### logging pattern
@@ -151,6 +161,7 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - IPC msgs are dict-serialized, anchor.to_dict() / ProbeAnchor.from_dict()
 - func sig w/ defaults: always use kwargs for optional args after first
 - QPlainTextEdit defaults to word wrap ON, breaks `col * char_width` math
+- custom objects can't pickle across IPC, serialize in tracer._serialize_value()
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?

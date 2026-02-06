@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
 
-from .data_classifier import classify_data
+from .data_classifier import classify_data, get_waveform_info, DTYPE_WAVEFORM_REAL
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
 
@@ -243,20 +243,54 @@ class VariableTracer:
         except (TypeError, ValueError):
             return True  # If we can't hash, always capture
 
+    def _serialize_value(self, value: Any) -> Any:
+        """
+        Convert value to a serializable format for IPC.
+        
+        Handles waveform-like objects (2 scalars + 1 array) by converting
+        to a dict that can be pickled across processes.
+        """
+        # Check for waveform-like objects using formal classifier
+        waveform_info = get_waveform_info(value)
+        if waveform_info is not None:
+            samples_attr = waveform_info['samples_attr']
+            scalar_attrs = waveform_info['scalar_attrs']
+            
+            samples = np.asarray(getattr(value, samples_attr)).copy()
+            scalars = [float(getattr(value, attr)) for attr in scalar_attrs]
+            
+            # Sort scalars to determine t0 (smaller) and dt (larger positive)
+            # Heuristic: smaller value is t0, larger is dt
+            scalars.sort()
+            
+            return {
+                '__dtype__': DTYPE_WAVEFORM_REAL,
+                'samples': samples,
+                'scalars': scalars,  # [t0, dt] after sorting
+                'attr_names': {
+                    'samples': samples_attr,
+                    'scalar1': scalar_attrs[0],
+                    'scalar2': scalar_attrs[1],
+                },
+            }
+        
+        # Make a copy of numpy arrays to avoid mutation issues
+        if isinstance(value, np.ndarray):
+            return value.copy()
+        
+        return value
+
     def _create_capture(
         self, name: str, value: Any, filename: str,
         lineno: int, func_name: str, timestamp: float
     ) -> CapturedVariable:
         """Create a CapturedVariable with proper type classification."""
         dtype, shape = classify_data(value)
-
-        # Make a copy of numpy arrays to avoid mutation issues
-        if isinstance(value, np.ndarray):
-            value = value.copy()
+        serialized_value = self._serialize_value(value)
 
         return CapturedVariable(
             name=name,
-            value=value,
+            value=serialized_value,
             dtype=dtype,
             shape=shape,
             timestamp=timestamp,
@@ -367,14 +401,11 @@ class VariableTracer:
     ) -> CapturedVariable:
         """Create CapturedVariable with anchor context."""
         dtype, shape = classify_data(value)
-
-        # Make a copy of numpy arrays
-        if isinstance(value, np.ndarray):
-            value = value.copy()
+        serialized_value = self._serialize_value(value)
 
         return CapturedVariable(
             name=anchor.symbol,
-            value=value,
+            value=serialized_value,
             dtype=dtype,
             shape=shape,
             timestamp=timestamp,

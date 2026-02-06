@@ -8,6 +8,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont
+from ..core.data_classifier import DTYPE_WAVEFORM_REAL, get_waveform_info
 
 from .base_plot import BasePlot
 
@@ -29,6 +30,7 @@ class WaveformPlot(BasePlot):
         super().__init__(var_name, parent)
 
         self._data: Optional[np.ndarray] = None
+        self._t_vector: Optional[np.ndarray] = None  # For Waveform objects
         self._setup_ui()
 
     def _setup_ui(self):
@@ -104,6 +106,28 @@ class WaveformPlot(BasePlot):
         if value is None:
             return
 
+        # Handle waveform objects (2 scalars + 1 array)
+        t_vector = None
+        
+        # Serialized waveform from IPC
+        if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_REAL:
+            samples = np.asarray(value['samples'])
+            scalars = value.get('scalars', [0.0, 1.0])  # [t0, dt] sorted
+            t0, dt = scalars[0], scalars[1]
+            t_vector = t0 + np.arange(len(samples)) * dt
+            value = samples
+        else:
+            # Check for direct waveform object
+            waveform_info = get_waveform_info(value)
+            if waveform_info is not None:
+                samples_attr = waveform_info['samples_attr']
+                scalar_attrs = waveform_info['scalar_attrs']
+                samples = np.asarray(getattr(value, samples_attr))
+                scalars = sorted([float(getattr(value, attr)) for attr in scalar_attrs])
+                t0, dt = scalars[0], scalars[1]
+                t_vector = t0 + np.arange(len(samples)) * dt
+                value = samples
+
         # Convert to numpy array if needed
         if not isinstance(value, np.ndarray):
             try:
@@ -112,12 +136,20 @@ class WaveformPlot(BasePlot):
                 return
 
         self._data = value.flatten() if value.ndim > 1 else value
+        self._t_vector = t_vector  # Store for plotting
 
         # Downsample if needed
         display_data = self._downsample(self._data)
 
-        # Update plot
-        self._curve.setData(display_data)
+        # Update plot - use time vector if available (Waveform objects)
+        if self._t_vector is not None and len(self._t_vector) == len(self._data):
+            # Downsample time vector to match
+            t_display = self._downsample(self._t_vector) if len(self._data) > self.MAX_DISPLAY_POINTS else self._t_vector
+            self._curve.setData(t_display, display_data)
+            self._plot_widget.setLabel('bottom', 'Time')
+        else:
+            self._curve.setData(display_data)
+            self._plot_widget.setLabel('bottom', 'Sample Index')
 
         # Update info label
         shape_str = f"[{value.shape}]" if shape else ""
