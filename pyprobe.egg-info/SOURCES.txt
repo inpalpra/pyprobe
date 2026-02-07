@@ -1,6 +1,8 @@
 pyproject.toml
 pyprobe/__init__.py
 pyprobe/__main__.py
+pyprobe/logging.py
+pyprobe/state_tracer.py
 pyprobe.egg-info/PKG-INFO
 pyprobe.egg-info/SOURCES.txt
 pyprobe.egg-info/dependency_links.txt
@@ -27,6 +29,7 @@ pyprobe/gui/code_viewer.py
 pyprobe/gui/color_manager.py
 pyprobe/gui/control_bar.py
 pyprobe/gui/file_watcher.py
+pyprobe/gui/lens_dropdown.py
 pyprobe/gui/main_window.py
 pyprobe/gui/probe_panel.py
 pyprobe/gui/probe_registry.py
@@ -43,4 +46,14 @@ pyprobe/plots/base_plot.py
 pyprobe/plots/constellation.py
 pyprobe/plots/plot_factory.py
 pyprobe/plots/scalar_display.py
+pyprobe/plots/scalar_history_chart.py
 pyprobe/plots/waveform_plot.py
+pyprobe/plugins/__init__.py
+pyprobe/plugins/base.py
+pyprobe/plugins/registry.py
+pyprobe/plugins/builtins/__init__.py
+pyprobe/plugins/builtins/complex_plots.py
+pyprobe/plugins/builtins/constellation.py
+pyprobe/plugins/builtins/scalar_display.py
+pyprobe/plugins/builtins/scalar_history.py
+pyprobe/plugins/builtins/waveform.py

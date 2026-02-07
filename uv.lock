@@ -219,6 +219,7 @@ dependencies = [
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pyqt6" },
     { name = "pyqtgraph" },
+    { name = "pytest" },
 ]
 
 [package.optional-dependencies]
@@ -232,6 +233,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "pyqt6", specifier = ">=6.4.0" },
     { name = "pyqtgraph", specifier = ">=0.13.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-qt", marker = "extra == 'dev'", specifier = ">=4.0.0" },
 ]
