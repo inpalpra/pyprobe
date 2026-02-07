@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
         self._runner_process: Optional[mp.Process] = None
         self._ipc: Optional[IPCChannel] = None
         self._is_running = False  # Flag to track if script is running
+        self._user_stopped = False # Flag to track if user manually stopped (prevents loop)
 
         # M1: Probe panels by anchor (not by variable name)
         self._probe_panels: Dict[ProbeAnchor, ProbePanel] = {}
@@ -141,9 +142,10 @@ class MainWindow(QMainWindow):
     def _setup_signals(self):
         """Connect signals and slots."""
         # Control bar signals
+        # Control bar signals
         self._control_bar.open_clicked.connect(self._on_open_script)
-        self._control_bar.run_clicked.connect(self._on_run_script)
-        self._control_bar.pause_clicked.connect(self._on_pause_script)
+        self._control_bar.action_clicked.connect(self._on_action_clicked)
+        # self._control_bar.pause_clicked.connect(self._on_pause_script) # Removed
         self._control_bar.stop_clicked.connect(self._on_stop_script)
 
         # === M1: Code viewer signals ===
@@ -308,10 +310,20 @@ class MainWindow(QMainWindow):
         self._last_source_content = self._code_viewer.toPlainText()
 
     @pyqtSlot()
+    def _on_action_clicked(self):
+        """Handle Run/Pause/Resume action."""
+        if not self._is_running:
+             self._on_run_script()
+        else:
+             self._on_pause_script()
+
+    @pyqtSlot()
     def _on_run_script(self):
         """Start running the loaded script."""
         if not self._script_path:
             return
+
+        self._user_stopped = False
 
         # Create IPC channel
         self._ipc = IPCChannel(is_gui_side=True)
@@ -348,17 +360,21 @@ class MainWindow(QMainWindow):
     def _on_pause_script(self):
         """Pause/resume script execution."""
         if self._ipc:
-            if self._control_bar.is_paused:
+            if not self._control_bar.is_paused:
                 self._ipc.send_command(Message(msg_type=MessageType.CMD_PAUSE))
+                self._control_bar.set_paused(True)
                 self._status_bar.showMessage("Paused")
             else:
                 self._ipc.send_command(Message(msg_type=MessageType.CMD_RESUME))
+                self._control_bar.set_paused(False)
                 self._status_bar.showMessage(f"Running: {self._script_path}")
 
     @pyqtSlot()
     def _on_stop_script(self):
         """Stop script execution."""
-        if self._ipc:
+        self._user_stopped = True
+        
+        if self._ipc and self._is_running:
             self._ipc.send_command(Message(msg_type=MessageType.CMD_STOP))
 
         if self._runner_process:
@@ -528,6 +544,11 @@ class MainWindow(QMainWindow):
         """Handle script completion."""
         self._status_bar.showMessage("Script finished")
         self._cleanup_run()
+        
+        # Auto-restart if loop is enabled and not stopped by user
+        if self._control_bar.is_loop_enabled and not self._user_stopped:
+            # Use small delay to allow cleanup to finish completely and UI to settle
+            QTimer.singleShot(100, self._on_run_script)
 
     @pyqtSlot(dict)
     def _on_exception(self, payload: dict):

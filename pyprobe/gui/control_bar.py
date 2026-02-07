@@ -17,8 +17,7 @@ class ControlBar(QToolBar):
 
     # Signals
     open_clicked = pyqtSignal()
-    run_clicked = pyqtSignal()
-    pause_clicked = pyqtSignal()
+    action_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -43,23 +42,14 @@ class ControlBar(QToolBar):
 
         self.addSeparator()
 
-        # Run button
-        self._run_btn = QToolButton()
-        self._run_btn.setText("Run")
-        self._run_btn.setObjectName("runButton")
-        self._run_btn.setToolTip("Run script (F5)")
-        self._run_btn.setEnabled(False)
-        self._run_btn.clicked.connect(self.run_clicked.emit)
-        self.addWidget(self._run_btn)
-
-        # Pause button
-        self._pause_btn = QToolButton()
-        self._pause_btn.setText("Pause")
-        self._pause_btn.setObjectName("pauseButton")
-        self._pause_btn.setToolTip("Pause/Resume execution (F6)")
-        self._pause_btn.setEnabled(False)
-        self._pause_btn.clicked.connect(self._on_pause_clicked)
-        self.addWidget(self._pause_btn)
+        # Action button (Run/Pause/Resume)
+        self._action_btn = QToolButton()
+        self._action_btn.setText("Run")
+        self._action_btn.setObjectName("runButton")
+        self._action_btn.setToolTip("Run script (F5)")
+        self._action_btn.setEnabled(False)
+        self._action_btn.clicked.connect(self.action_clicked.emit)
+        self.addWidget(self._action_btn)
 
         # Stop button
         self._stop_btn = QToolButton()
@@ -72,26 +62,43 @@ class ControlBar(QToolBar):
 
         self.addSeparator()
 
+        # Loop button
+        self._loop_btn = QToolButton()
+        self._loop_btn.setText("Loop")
+        self._loop_btn.setCheckable(True)
+        self._loop_btn.setObjectName("loopButton")
+        self._loop_btn.setToolTip("Run script continuously (Loop)")
+        self._loop_btn.setEnabled(False)
+        self.addWidget(self._loop_btn)
+
+        self.addSeparator()
+
         # Script path label
         self._script_label = QLabel("No script loaded")
         self._script_label.setStyleSheet("color: #888888; padding: 0 8px;")
         self.addWidget(self._script_label)
-
-    def _on_pause_clicked(self):
-        """Handle pause button click."""
-        self._is_paused = not self._is_paused
-        self._pause_btn.setText("Resume" if self._is_paused else "Pause")
-        self.pause_clicked.emit()
 
     @property
     def is_paused(self) -> bool:
         """Check if currently paused."""
         return self._is_paused
 
+    @property
+    def is_loop_enabled(self) -> bool:
+        """Check if loop mode is enabled."""
+        return self._loop_btn.isChecked()
+
     def set_script_loaded(self, loaded: bool, path: str = ""):
         """Update UI when script is loaded/unloaded."""
         self._script_loaded = loaded
-        self._run_btn.setEnabled(loaded and not self._is_running)
+        self._action_btn.setEnabled(loaded)
+        self._loop_btn.setEnabled(loaded)
+
+        # Reset state if unloaded
+        if not loaded:
+            self._is_running = False
+            self._is_paused = False
+            self._update_action_button()
 
         if loaded and path:
             # Show just the filename
@@ -108,8 +115,23 @@ class ControlBar(QToolBar):
         self._is_running = running
         self._is_paused = False
 
-        self._run_btn.setEnabled(self._script_loaded and not running)
-        self._pause_btn.setEnabled(running)
-        self._pause_btn.setText("Pause")
         self._stop_btn.setEnabled(running)
         self._open_btn.setEnabled(not running)
+        self._update_action_button()
+
+    def set_paused(self, paused: bool):
+        """Update UI when script is paused/resumed."""
+        self._is_paused = paused
+        self._update_action_button()
+
+    def _update_action_button(self):
+        """Update action button text/icon based on state."""
+        if not self._is_running:
+            self._action_btn.setText("Run")
+            self._action_btn.setToolTip("Run script (F5)")
+        elif self._is_paused:
+            self._action_btn.setText("Resume")
+            self._action_btn.setToolTip("Resume execution (F5)")
+        else:
+            self._action_btn.setText("Pause")
+            self._action_btn.setToolTip("Pause execution (F5)")
