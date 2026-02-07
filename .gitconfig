@@ -1,3 +1,4 @@
-git config --global alias.md '!git merge $1 && git branch -d $1'
-git config --global alias.ac '!git add . && git commit -m "$1"'
-git config --global alias.bs '!git branch $1 && git checkout $1'
+[alias]
+  md = !git merge $1 && git branch -d $1
+  ac = !git add . && git commit -m "$1"
+  bs = !git branch $1 && git checkout $1
