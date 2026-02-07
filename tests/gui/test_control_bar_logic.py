@@ -46,5 +46,57 @@ def test_control_bar_logic():
     
     print("\nExiting test successfully.")
 
+def test_loop_state_transitions():
+    """Test loop button state transitions per button-state-diagrams.md"""
+    app = QApplication.instance() or QApplication(sys.argv)
+    bar = ControlBar()
+    
+    bar.set_script_loaded(True, "/tmp/test.py")
+    
+    print("\nLoop State Tests:")
+    
+    # Test: Loop toggle in idle state
+    print("  Toggle loop in idle...")
+    assert not bar.is_loop_enabled
+    bar._loop_btn.setChecked(True)
+    assert bar.is_loop_enabled
+    print("    OK: Loop enabled")
+    
+    # Test: Start with loop enabled - button should show Pause
+    print("  Start running with loop enabled...")
+    bar.set_running(True)
+    assert bar._action_btn.text() == "Pause"
+    assert bar.is_loop_enabled  # Loop stays enabled
+    print("    OK: Action=Pause, Loop stays enabled")
+    
+    # Test: set_running(False) resets action button but loop stays enabled
+    print("  Stop running (set_running False)...")
+    bar.set_running(False)
+    assert bar._action_btn.text() == "Run"
+    assert bar.is_loop_enabled  # Loop should STAY enabled
+    print("    OK: Action=Run, Loop STILL enabled")
+    
+    # Test: Loop toggle during run should work
+    print("  Loop toggle during execution...")
+    bar.set_running(True)
+    bar._loop_btn.setChecked(False)
+    assert not bar.is_loop_enabled
+    bar._loop_btn.setChecked(True)
+    assert bar.is_loop_enabled
+    print("    OK: Loop toggle works during run")
+    
+    # Test: Pause state
+    print("  Pause state with loop...")
+    bar.set_paused(True)
+    assert bar._action_btn.text() == "Resume"
+    assert bar.is_loop_enabled  # Loop unaffected by pause
+    print("    OK: Action=Resume, Loop unaffected")
+    
+    bar.set_paused(False)
+    bar.set_running(False)
+    
+    print("\nLoop state tests passed!")
+
 if __name__ == "__main__":
     test_control_bar_logic()
+    test_loop_state_transitions()

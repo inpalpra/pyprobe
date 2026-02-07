@@ -1,3 +1,3 @@
-1. if i probe two equivalent variables, they should be displayed in sync.
+This is correct, but it is incomplete. In the problem statement, add details of the state transitions for each button. Explain in detail, what is supposed to happen in each transition. Write set of genuine automated tests to continuously validate and assert that each state transition is happening just as expected. 
 
-wfm = 
+Option B: Create a loglevel 'TRACESTATES', where every time an input action is performed, like 

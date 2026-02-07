@@ -34,6 +34,7 @@ from .probe_registry import ProbeRegistry
 from .probe_state import ProbeState
 from ..analysis.anchor_mapper import AnchorMapper
 from .animations import ProbeAnimations
+from ..state_tracer import get_tracer
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +88,11 @@ class MainWindow(QMainWindow):
 
         # Apply cyberpunk theme
         apply_cyberpunk_theme(self)
+        
+        # Initialize state tracer
+        self._tracer = get_tracer()
+        self._tracer.set_main_window(self)
+        self._loop_count = 0  # Track loop iterations for tracing
 
         # Load script if provided
         if script_path:
@@ -184,22 +190,45 @@ class MainWindow(QMainWindow):
         if ipc is None:
             return
 
+        # Check subprocess status - critical for debugging
+        proc = self._runner_process
+        subprocess_alive = proc is not None and proc.is_alive() if proc else False
+        
         # Process available messages without blocking (timeout=0 is non-blocking)
         # Limit to 50 messages per frame to keep GUI responsive
+        messages_this_poll = 0
         for _ in range(50):
             if not self._is_running:
                 break
 
             try:
                 msg = ipc.receive_data(timeout=0)
-            except (AttributeError, OSError, EOFError, BrokenPipeError):
+            except (AttributeError, OSError, EOFError, BrokenPipeError) as e:
                 # IPC was cleaned up or queue closed
+                self._tracer.trace_error(f"IPC receive error: {type(e).__name__}: {e}")
                 break
 
             if msg is None:
                 break
 
+            messages_this_poll += 1
+            # Log EVERY message type received
+            self._tracer.trace_ipc_received(
+                msg.msg_type.name, 
+                {"subprocess_alive": subprocess_alive, "msg_num": messages_this_poll}
+            )
             self._handle_message(msg)
+        
+        # If subprocess died but we didn't get DATA_SCRIPT_END, that's a bug!
+        # But only fire this once by checking _is_running
+        if not subprocess_alive and proc is not None and self._is_running:
+            exit_code = proc.exitcode
+            if exit_code is not None:
+                self._tracer.trace_error(f"Subprocess exited (code={exit_code}) but no DATA_SCRIPT_END received!")
+                # Prevent repeated firing
+                self._is_running = False
+                # Force script_ended if subprocess died
+                self.script_ended.emit()
 
     def _handle_message(self, msg: Message):
         """Handle an incoming message from the runner."""
@@ -239,10 +268,10 @@ class MainWindow(QMainWindow):
                     )
 
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
-            # Mark as not running FIRST to stop any further polling
-            self._is_running = False
-            self._poll_timer.stop()
-            self._fps_timer.stop()
+            # NOTE: Don't reset state here! Let _on_script_ended() handle it
+            # so loop logic can properly manage restarts
+            logger.debug("DATA_SCRIPT_END received, emitting script_ended signal")
+            self._tracer.trace_ipc_received("DATA_SCRIPT_END", {"subprocess_alive": self._runner_process.is_alive() if self._runner_process else False})
             self.script_ended.emit()
 
         elif msg.msg_type == MessageType.DATA_EXCEPTION:
@@ -322,8 +351,11 @@ class MainWindow(QMainWindow):
         """Start running the loaded script."""
         if not self._script_path:
             return
+        
+        self._tracer.trace_action_run_clicked()
 
         self._user_stopped = False
+        self._loop_count = 0
 
         # Create IPC channel
         self._ipc = IPCChannel(is_gui_side=True)
@@ -355,27 +387,37 @@ class MainWindow(QMainWindow):
 
         self._status_bar.showMessage(f"Running: {self._script_path}")
         self._control_bar.set_running(True)
+        self._tracer.trace_reaction_subprocess_started(self._runner_process.pid)
+        self._tracer.trace_reaction_state_changed("run started")
 
     @pyqtSlot()
     def _on_pause_script(self):
         """Pause/resume script execution."""
         if self._ipc:
             if not self._control_bar.is_paused:
+                self._tracer.trace_action_pause_clicked()
                 self._ipc.send_command(Message(msg_type=MessageType.CMD_PAUSE))
+                self._tracer.trace_ipc_sent("CMD_PAUSE")
                 self._control_bar.set_paused(True)
                 self._status_bar.showMessage("Paused")
+                self._tracer.trace_reaction_state_changed("paused")
             else:
+                self._tracer.trace_action_resume_clicked()
                 self._ipc.send_command(Message(msg_type=MessageType.CMD_RESUME))
+                self._tracer.trace_ipc_sent("CMD_RESUME")
                 self._control_bar.set_paused(False)
                 self._status_bar.showMessage(f"Running: {self._script_path}")
+                self._tracer.trace_reaction_state_changed("resumed")
 
     @pyqtSlot()
     def _on_stop_script(self):
         """Stop script execution."""
+        self._tracer.trace_action_stop_clicked()
         self._user_stopped = True
         
         if self._ipc and self._is_running:
             self._ipc.send_command(Message(msg_type=MessageType.CMD_STOP))
+            self._tracer.trace_ipc_sent("CMD_STOP")
 
         if self._runner_process:
             self._runner_process.join(timeout=2.0)
@@ -542,13 +584,26 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_script_ended(self):
         """Handle script completion."""
+        logger.debug("_on_script_ended called")
+        self._tracer.trace_ipc_received("script_ended signal", {})
         self._status_bar.showMessage("Script finished")
-        self._cleanup_run()
         
-        # Auto-restart if loop is enabled and not stopped by user
-        if self._control_bar.is_loop_enabled and not self._user_stopped:
-            # Use small delay to allow cleanup to finish completely and UI to settle
-            QTimer.singleShot(100, self._on_run_script)
+        # Check loop BEFORE cleanup to decide how to handle
+        should_loop = self._control_bar.is_loop_enabled and not self._user_stopped
+        logger.debug(f"  is_loop_enabled={self._control_bar.is_loop_enabled}, user_stopped={self._user_stopped}, should_loop={should_loop}")
+        
+        if should_loop:
+            # Soft cleanup: terminate process but don't close IPC or reset UI
+            logger.debug("  -> taking loop path")
+            self._tracer.trace_reaction_state_changed(f"script ended, looping (loop_enabled={self._control_bar.is_loop_enabled}, user_stopped={self._user_stopped})")
+            self._soft_cleanup_for_loop()
+            # Restart with small delay for process cleanup
+            QTimer.singleShot(50, self._restart_loop)
+        else:
+            # Full cleanup when not looping
+            logger.debug("  -> taking cleanup path")
+            self._tracer.trace_reaction_state_changed(f"script ended, stopping (loop_enabled={self._control_bar.is_loop_enabled}, user_stopped={self._user_stopped})")
+            self._cleanup_run()
 
     @pyqtSlot(dict)
     def _on_exception(self, payload: dict):
@@ -560,8 +615,71 @@ class MainWindow(QMainWindow):
         )
         self._cleanup_run()
 
+    def _soft_cleanup_for_loop(self):
+        """Clean up subprocess for loop restart without closing IPC."""
+        logger.debug("_soft_cleanup_for_loop called")
+        self._tracer.trace_reaction_cleanup("soft cleanup for loop")
+        self._is_running = False
+        self._poll_timer.stop()
+        self._fps_timer.stop()
+        
+        # Terminate subprocess only, keep IPC open
+        proc = self._runner_process
+        if proc is not None:
+            logger.debug(f"  waiting for process (pid={proc.pid})")
+            proc.join(timeout=0.5)
+            if proc.is_alive():
+                logger.debug("  process still alive, terminating")
+                proc.terminate()
+                proc.join(timeout=0.5)
+            logger.debug(f"  process exit code: {proc.exitcode}")
+            self._tracer.trace_reaction_subprocess_ended(proc.exitcode)
+        self._runner_process = None
+        logger.debug(f"  IPC still valid: {self._ipc is not None}")
+        # Note: IPC channel stays open, UI stays in running state
+
+    def _restart_loop(self):
+        """Restart script for loop mode with existing IPC."""
+        logger.debug("_restart_loop called")
+        if not self._script_path or not self._ipc:
+            logger.debug(f"  ABORT: script_path={self._script_path}, ipc={self._ipc}")
+            self._cleanup_run()  # Fallback to full cleanup
+            return
+        
+        logger.debug(f"  starting new subprocess for {self._script_path}")
+        # Start new subprocess with existing IPC queues
+        self._runner_process = mp.Process(
+            target=run_script_subprocess,
+            args=(
+                self._script_path,
+                self._ipc.command_queue,
+                self._ipc.data_queue,
+                []
+            )
+        )
+        self._runner_process.start()
+        logger.debug(f"  new process pid={self._runner_process.pid}")
+        self._loop_count += 1
+        self._tracer.trace_loop_restart(self._loop_count)
+        self._tracer.trace_reaction_subprocess_started(self._runner_process.pid)
+        
+        # Re-send probe commands for the new subprocess
+        for anchor in self._probe_registry.active_anchors:
+            msg = make_add_probe_cmd(anchor)
+            self._ipc.send_command(msg)
+        
+        # Resume polling
+        self._is_running = True
+        self._poll_timer.start()
+        self._fps_timer.start()
+        logger.debug(f"  loop restart complete, _is_running={self._is_running}")
+        
+        self._status_bar.showMessage(f"Looping: {self._script_path}")
+
     def _cleanup_run(self):
         """Clean up after script run."""
+        self._tracer.trace_reaction_cleanup("full cleanup started")
+        
         # Stop everything first
         self._is_running = False
         self._poll_timer.stop()
@@ -577,6 +695,7 @@ class MainWindow(QMainWindow):
                 if proc.is_alive():
                     proc.kill()
                     proc.join(timeout=0.1)
+            self._tracer.trace_reaction_subprocess_ended(proc.exitcode)
 
         # Clean up IPC (drains queues and closes shared memory)
         ipc = self._ipc
@@ -586,6 +705,8 @@ class MainWindow(QMainWindow):
         self._ipc = None
         self._runner_process = None
         self._control_bar.set_running(False)
+        self._status_bar.showMessage("Ready")
+        self._tracer.trace_reaction_state_changed("cleanup complete, now IDLE")
 
     def closeEvent(self, event):
         """Handle window close."""

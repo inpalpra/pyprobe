@@ -4,6 +4,7 @@ PyProbe entry point.
 Usage:
     python -m pyprobe [script.py]
     python -m pyprobe --loglevel DEBUG examples/dsp_demo.py
+    python -m pyprobe --trace-states examples/dsp_demo.py
 """
 
 import sys
@@ -42,8 +43,19 @@ def main():
         action="store_true",
         help="Also log to console (stderr)"
     )
+    parser.add_argument(
+        "--trace-states",
+        action="store_true",
+        help="Enable detailed state tracing. Logs all user actions and reactions to /tmp/pyprobe_state_trace.log"
+    )
 
     args = parser.parse_args()
+
+    # Initialize state tracer FIRST if requested
+    if args.trace_states:
+        from .state_tracer import init_tracer
+        init_tracer(enabled=True)
+        print("State tracing enabled. Log: /tmp/pyprobe_state_trace.log")
 
     # Setup logging before importing anything else
     from .logging import setup_logging
@@ -62,3 +74,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

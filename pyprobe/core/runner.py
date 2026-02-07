@@ -151,8 +151,20 @@ class ScriptRunner:
             sys.stdout, sys.stderr = old_stdout, old_stderr
             sys.argv = old_argv
 
-            # Notify GUI that script ended
-            self._ipc.send_data(Message(msg_type=MessageType.DATA_SCRIPT_END))
+            # Notify GUI that script ended - CRITICAL: must not fail
+            # Use blocking send with retry since this message is essential
+            end_msg = Message(msg_type=MessageType.DATA_SCRIPT_END)
+            import time
+            for attempt in range(10):  # Try up to 10 times
+                success = self._ipc.send_data(end_msg, timeout=0.5)
+                if success:
+                    print(f"[RUNNER] DATA_SCRIPT_END sent successfully on attempt {attempt + 1}", file=sys.__stderr__)
+                    break
+                else:
+                    print(f"[RUNNER] DATA_SCRIPT_END send failed (attempt {attempt + 1}), queue may be full", file=sys.__stderr__)
+                    time.sleep(0.1)
+            else:
+                print("[RUNNER] ERROR: Failed to send DATA_SCRIPT_END after 10 attempts!", file=sys.__stderr__)
 
     def _on_variable_captured(self, captured: CapturedVariable) -> None:
         """Callback when tracer captures a variable."""
@@ -329,6 +341,19 @@ def run_script_subprocess(
     runner = ScriptRunner(script_path, ipc, initial_watches=initial_watches)
     exit_code = runner.run()
 
-    ipc.cleanup()
+    # CRITICAL: Give the queue's feeder thread time to send DATA_SCRIPT_END
+    # before we call os._exit(). The feeder thread runs in background and
+    # os._exit() terminates immediately, potentially losing queued messages.
+    import time
+    time.sleep(0.1)  # 100ms should be enough for the feeder thread
+    
+    # Cancel join threads to prevent hang on exit
+    try:
+        cmd_queue.cancel_join_thread()
+        data_queue.cancel_join_thread()
+    except Exception:
+        pass
+
     # Use os._exit() for immediate termination without waiting for threads
     os._exit(exit_code)
+
