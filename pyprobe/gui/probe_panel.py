@@ -355,8 +355,10 @@ class ProbePanelContainer(QScrollArea):
             logger.debug(f"  Returning existing panel from _panels for anchor")
             return self._panels[anchor]
 
-        # Also check by var_name for legacy code
-        if var_name in self._panels_by_name:
+        # Only check by var_name for legacy code (when no real anchor provided)
+        # When a real anchor IS provided, we already checked _panels above and it wasn't found,
+        # so we need to create a new panel (even if same var_name exists on different line)
+        if anchor.file == "<unknown>" and var_name in self._panels_by_name:
             logger.debug(f"  Returning existing panel from _panels_by_name for var_name={var_name}")
             return self._panels_by_name[var_name]
 
@@ -366,7 +368,9 @@ class ProbePanelContainer(QScrollArea):
         # Create panel
         panel = ProbePanel(anchor, color, dtype, self._content)
         self._panels[anchor] = panel
-        self._panels_by_name[var_name] = panel
+        # Only add to _panels_by_name for legacy (anchor-less) panels
+        if anchor.file == "<unknown>":
+            self._panels_by_name[var_name] = panel
         logger.debug(f"  Created new panel, added to both dicts")
 
         # Add to grid
