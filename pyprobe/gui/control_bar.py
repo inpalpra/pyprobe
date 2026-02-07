@@ -6,8 +6,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QToolBar, QToolButton, QWidget, QLabel, QHBoxLayout
 )
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import pyqtSignal, QTimer
 
 
 class ControlBar(QToolBar):
@@ -26,6 +25,13 @@ class ControlBar(QToolBar):
         self._script_loaded = False
         self._is_running = False
         self._is_paused = False
+        
+        # Animation state
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(50)  # 20 FPS
+        self._pulse_timer.timeout.connect(self._update_pulse)
+        self._pulse_value = 0.0
+        self._pulse_direction = 1
 
         self._setup_ui()
 
@@ -69,6 +75,7 @@ class ControlBar(QToolBar):
         self._loop_btn.setObjectName("loopButton")
         self._loop_btn.setToolTip("Run script continuously (Loop)")
         self._loop_btn.setEnabled(False)
+        self._loop_btn.toggled.connect(self._on_loop_toggled)
         self.addWidget(self._loop_btn)
 
         self.addSeparator()
@@ -135,3 +142,54 @@ class ControlBar(QToolBar):
         else:
             self._action_btn.setText("Pause")
             self._action_btn.setToolTip("Pause execution (F5)")
+
+    def _on_loop_toggled(self, checked: bool):
+        """Handle loop button toggle."""
+        if checked:
+            self._pulse_value = 0.0
+            self._pulse_direction = 1
+            self._pulse_timer.start()
+        else:
+            self._pulse_timer.stop()
+            # Reset style to default (handled by stylesheets if empty string)
+            # Typically removing inline style reverts to qss file
+            self._loop_btn.setStyleSheet("")
+
+    def _update_pulse(self):
+        """Update the pulse animation."""
+        step = 0.05
+        if self._pulse_direction == 1:
+            self._pulse_value += step
+            if self._pulse_value >= 1.0:
+                self._pulse_value = 1.0
+                self._pulse_direction = -1
+        else:
+            self._pulse_value -= step
+            if self._pulse_value <= 0.0:
+                self._pulse_value = 0.0
+                self._pulse_direction = 1
+        
+        # User requested: "glow from dark green to bright green"
+        # We'll interpolate Green channel from ~100 to 255.
+        min_g = 100
+        max_g = 255
+        current_g = int(min_g + (max_g - min_g) * self._pulse_value)
+        
+        # Create hex color #00GG00
+        color_hex = f"#00{current_g:02x}00"
+        
+        # Also vary background alpha slightly for "glow" feel
+        min_alpha = 0.05
+        max_alpha = 0.20
+        current_alpha = min_alpha + (max_alpha - min_alpha) * self._pulse_value
+        
+        # Apply stylesheet
+        # Note: We target QToolButton by object name to ensure specificity if needed, 
+        # but inline style overrides external stylesheet usually.
+        self._loop_btn.setStyleSheet(f"""
+            QToolButton {{
+                color: {color_hex};
+                border: 1px solid {color_hex};
+                background-color: rgba(0, {current_g}, 0, {current_alpha:.2f});
+            }}
+        """)
