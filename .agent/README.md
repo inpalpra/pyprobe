@@ -64,6 +64,47 @@ R': anim completes, cleanup runs
 Fix: `widget._fade_anim = anim; parent=widget`
 File: gui/animations.py
 
+### L9 2026-02-07 queue-feeder-race
+S: subprocess sends DATA_SCRIPT_END, then os._exit()
+T: signal script completion to GUI
+A: queue.put() + os._exit() immediately
+R: feeder thread killed mid-send, msg lost, GUI stuck at PAUSE
+A': sleep 100ms before os._exit() to let feeder complete
+R': msg reliably arrives at GUI
+Fix: `time.sleep(0.1)` before `os._exit(exit_code)`
+File: core/runner.py:344-347
+
+### L10 2026-02-07 debug-observe-first
+S: GUI button stuck at PAUSE after script end
+T: fix button state bug
+A: hypothesized causes, made code changes, tested → repeated 4x
+R: wasted effort, wrong hypotheses, no progress
+A': add comprehensive state tracing FIRST, observe actual behavior
+R': trace reveals exact failure point (DATA_SCRIPT_END never received)
+Fix: created state_tracer.py with --trace-states flag
+File: pyprobe/state_tracer.py
+
+### L11 2026-02-07 gui-debug-pattern
+S: intermittent GUI state bug
+T: debug state machine logic
+A: read code, guess root cause, patch speculatively
+R: multiple failed fixes, user frustration
+A': instrument (State, Action) → (NewState) at every transition
+R': trace log pinpoints exact broken transition
+Fix: trace every IPC msg, button click, state change; log to file
+File: state_tracer.py, main_window.py
+
+### L12 2026-02-07 ipc-debug-both-sides
+S: msg sent but never received
+T: find where msg is lost
+A: added logging only on receiver (GUI) side
+R: couldn't see if msg was actually sent
+A': log on BOTH sender (subprocess) AND receiver (GUI)
+R': terminal shows "sent successfully" but trace shows not received → queue issue
+Fix: print to sys.__stderr__ in subprocess, trace in GUI
+File: runner.py, main_window.py
+
+
 ### L2 2026-02-06 kwarg-order
 S: calling fade_out w/ callback
 T: trigger cleanup after anim
@@ -159,6 +200,25 @@ File: core/data_classifier.py:115-145, core/tracer.py:267,287
 
 ## PATTERNS
 
+### DEBUG-FIRST-PATTERNS (CRITICAL - from L10, L11, L12)
+For complex/intermittent bugs, DO NOT hypothesize before observing:
+
+```
+1. GUI state bugs → add state tracer FIRST
+   python -m pyprobe --trace-states <script>
+   
+2. IPC issues → log BOTH sides
+   subprocess: print(..., file=sys.__stderr__)
+   GUI: tracer.trace_ipc_received(...)
+   
+3. State machine bugs → trace (State, Action) → (NewState)
+   - every button click
+   - every IPC message
+   - every state change
+   
+4. Only hypothesize AFTER trace shows exact failure point
+```
+
 ### logging pattern
 ```python
 from pyprobe.logging import get_logger
@@ -195,6 +255,7 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - func sig w/ defaults: always use kwargs for optional args after first
 - QPlainTextEdit defaults to word wrap ON, breaks `col * char_width` math
 - custom objects can't pickle across IPC, serialize in tracer._serialize_value()
+- mp.Queue.put() uses feeder thread; os._exit() kills it mid-send → sleep before exit
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?
