@@ -140,17 +140,21 @@ class ConstellationPlot(BasePlot):
         # Downsample if needed
         display_data = [self._downsample(d) for d in self._history]
 
-        # Update scatter plots
+        # Offset so newest data goes to brightest scatter (last scatter item has alpha=1.0)
+        offset = len(self._scatter_items) - len(display_data)
+
+        # Clear all scatter items first
+        for scatter in self._scatter_items:
+            scatter.setData(x=[], y=[])
+
+        # Update scatter plots starting from offset position
         for i, data in enumerate(display_data):
-            if i < len(self._scatter_items):
-                self._scatter_items[i].setData(
+            scatter_idx = offset + i
+            if 0 <= scatter_idx < len(self._scatter_items):
+                self._scatter_items[scatter_idx].setData(
                     x=data.real,
                     y=data.imag
                 )
-
-        # Clear unused scatter items
-        for i in range(len(display_data), len(self._scatter_items)):
-            self._scatter_items[i].setData(x=[], y=[])
 
         # Update info
         shape_str = f"[{value.shape}]" if shape else ""

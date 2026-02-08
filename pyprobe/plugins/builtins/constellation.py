@@ -98,16 +98,22 @@ class ConstellationWidget(QWidget):
 
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the constellation with new complex data."""
+        import sys
+        print(f"[CONSTELLATION DEBUG] update_data called: value type={type(value)}", file=sys.__stderr__)
+        
         if value is None:
+            print(f"[CONSTELLATION DEBUG]   value is None, returning", file=sys.__stderr__)
             return
         
         if not isinstance(value, np.ndarray):
             try:
                 value = np.asarray(value)
             except (ValueError, TypeError):
+                print(f"[CONSTELLATION DEBUG]   failed to convert to array", file=sys.__stderr__)
                 return
         
         self._data = value.flatten()
+        print(f"[CONSTELLATION DEBUG]   _data shape={self._data.shape}, dtype={self._data.dtype}", file=sys.__stderr__)
         
         if not np.issubdtype(self._data.dtype, np.complexfloating):
             self._data = self._data.astype(np.complex128)
@@ -115,20 +121,35 @@ class ConstellationWidget(QWidget):
         self._history.append(self._data.copy())
         if len(self._history) > self.HISTORY_LENGTH:
             self._history.pop(0)
+        
+        print(f"[CONSTELLATION DEBUG]   history length={len(self._history)}", file=sys.__stderr__)
             
         display_data = [self.downsample(d) for d in self._history]
         
+        # Offset so newest data goes to brightest scatter (last scatter item has alpha=1.0)
+        # e.g. with 1 item in history, put it in scatter[4] (brightest)
+        # with 3 items, put them in scatter[2], scatter[3], scatter[4]
+        offset = len(self._scatter_items) - len(display_data)
+        
+        # Clear all scatter items first
+        for scatter in self._scatter_items:
+            scatter.setData(x=[], y=[])
+        
+        # Set data starting from offset position
         for i, data in enumerate(display_data):
-            if i < len(self._scatter_items):
-                self._scatter_items[i].setData(x=data.real, y=data.imag)
-                
-        # Clear unused
-        for i in range(len(display_data), len(self._scatter_items)):
-            self._scatter_items[i].setData(x=[], y=[])
+            scatter_idx = offset + i
+            if 0 <= scatter_idx < len(self._scatter_items):
+                print(f"[CONSTELLATION DEBUG]   setting scatter[{scatter_idx}] with {len(data)} points", file=sys.__stderr__)
+                self._scatter_items[scatter_idx].setData(x=data.real, y=data.imag)
+        
+        # Force autoRange to ensure data is visible
+        self._plot_widget.autoRange()
+        print(f"[CONSTELLATION DEBUG]   autoRange() called", file=sys.__stderr__)
             
         shape_str = f"[{value.shape}]" if shape else ""
         self._info_label.setText(f"{shape_str} {source_info}")
         self._update_stats()
+        print(f"[CONSTELLATION DEBUG]   update complete", file=sys.__stderr__)
 
     def _update_stats(self):
         """Update constellation statistics."""

@@ -136,10 +136,13 @@ class ProbePanel(QFrame):
 
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
+        import sys
         prev_dtype = self._dtype
         self._dtype = dtype
         self._shape = shape
         self._data = value
+        
+        print(f"[PANEL DEBUG] update_data: symbol={self._anchor.symbol}, prev_dtype={prev_dtype}, new_dtype={dtype}", file=sys.__stderr__)
 
         # Update dropdown if dtype changed
         if self._lens_dropdown is not None and (prev_dtype != dtype):
@@ -147,23 +150,30 @@ class ProbePanel(QFrame):
             
             # Since signals were blocked in dropdown update, check if we need to switch
             current_lens_name = self._lens_dropdown.currentText()
+            print(f"[PANEL DEBUG]   dtype changed, current_lens_name={current_lens_name}", file=sys.__stderr__)
             
             # If we don't have a plugin, or the current plugin doesn't match the dropdown selection
             if not self._current_plugin or self._current_plugin.name != current_lens_name:
+                print(f"[PANEL DEBUG]   -> calling _on_lens_changed({current_lens_name})", file=sys.__stderr__)
                 self._on_lens_changed(current_lens_name)
-                # Emit signal so listeners (MainWindow) know about the auto-switch
+                # Emit signal for MainWindow to track lens preference - but block to prevent 
+                # _on_lens_changed being called again (it's already connected to this signal)
+                self._lens_dropdown.blockSignals(True)
                 self._lens_dropdown.lens_changed.emit(current_lens_name)
-                # _on_lens_changed will update the new widget with self._data
+                self._lens_dropdown.blockSignals(False)
+                # _on_lens_changed already updated the new widget with self._data
                 return
 
         # If we have an active plugin-based widget, update it
         if self._current_plugin and self._plot:
+            print(f"[PANEL DEBUG]   -> using plugin.update()", file=sys.__stderr__)
             self._current_plugin.update(self._plot, value, dtype, shape, source_info)
             return
 
         # FALLBACK (Legacy M1 behavior):
         # If dtype changed from unknown, recreate the plot with correct type
         if prev_dtype == 'unknown' and dtype != 'unknown':
+            print(f"[PANEL DEBUG]   -> legacy fallback, recreating plot", file=sys.__stderr__)
             # Remove old plot
             if self._plot:
                 self._layout.removeWidget(self._plot)
@@ -173,36 +183,56 @@ class ProbePanel(QFrame):
             self._layout.addWidget(self._plot)
 
         if self._plot:
+            print(f"[PANEL DEBUG]   -> direct plot.update_data()", file=sys.__stderr__)
             self._plot.update_data(value, dtype, shape, source_info)
 
     def _on_lens_changed(self, plugin_name: str):
         """Handle lens change - swap out the plot widget."""
         from ..plugins import PluginRegistry
+        import sys
+        
+        print(f"[LENS DEBUG] _on_lens_changed called: plugin_name={plugin_name}", file=sys.__stderr__)
         
         registry = PluginRegistry.instance()
         plugin = registry.get_plugin_by_name(plugin_name)
         
         if not plugin:
+            print(f"[LENS DEBUG]   No plugin found for {plugin_name}", file=sys.__stderr__)
             return
+        
+        print(f"[LENS DEBUG]   Found plugin: {plugin.name}", file=sys.__stderr__)
         
         # Remember current data for new widget if possible (legacy widgets store it in _data sometimes)
         # But here we have self._data stored in update_data
         
         # Remove old plot widget
         if self._plot:
+            self._plot.hide()  # Hide immediately to prevent visual overlap
             self._layout.removeWidget(self._plot)
             self._plot.deleteLater()
         
         # Create new widget from plugin
         self._current_plugin = plugin
         self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
+        print(f"[LENS DEBUG]   Created new widget: {type(self._plot).__name__}", file=sys.__stderr__)
         
         # Insert into layout (index 1, after header)
         self._layout.insertWidget(1, self._plot)
+        self._plot.show()  # Ensure new widget is visible
         
-        # Re-apply data if we had any
-        if hasattr(self, '_data') and self._data is not None:
-             plugin.update(self._plot, self._data, self._dtype, getattr(self, '_shape', None))
+        # Re-apply data if we had any - defer with QTimer to ensure widget is realized
+        has_data = hasattr(self, '_data') and self._data is not None
+        print(f"[LENS DEBUG]   Re-applying data: has_data={has_data}", file=sys.__stderr__)
+        if has_data:
+            import numpy as np
+            from PyQt6.QtCore import QTimer
+            if isinstance(self._data, np.ndarray):
+                print(f"[LENS DEBUG]     _data shape={self._data.shape}, dtype={self._data.dtype}", file=sys.__stderr__)
+            # Defer update to next event loop iteration so widget is fully in layout
+            # Capture current values in lambda closure
+            data, dtype, shape = self._data, self._dtype, getattr(self, '_shape', None)
+            QTimer.singleShot(0, lambda: plugin.update(self._plot, data, dtype, shape))
+            print(f"[LENS DEBUG]   plugin.update() scheduled via QTimer.singleShot(0)", file=sys.__stderr__)
 
     @property
     def current_lens(self) -> str:
