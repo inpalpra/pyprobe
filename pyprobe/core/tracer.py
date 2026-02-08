@@ -106,9 +106,10 @@ class VariableTracer:
         self._location_throttle: Dict[tuple, float] = {}  # (file, line) -> last_capture_time
         self._location_throttle_ms = 50.0  # Default throttle for location-based captures
         
-        # Pending deferred captures: frame_id -> list of anchors
-        # Used to delay capture of assignment targets until after the line executes (next event)
-        self._pending_deferred: Dict[int, List[ProbeAnchor]] = {}
+        # Pending deferred captures: frame_id -> list of (anchor, original_line)
+        # Used to delay capture of assignment targets until after the line executes
+        # We track original_line to only flush when on a DIFFERENT line (statement complete)
+        self._pending_deferred: Dict[int, List[tuple]] = {}  # frame_id -> [(anchor, line), ...]
 
     def add_watch(self, config: WatchConfig) -> None:
         """Add a variable to the watch list."""
@@ -359,16 +360,51 @@ class VariableTracer:
         """
         Process any pending deferred captures for this frame.
         
+        Only flushes captures when:
+        1. Event is 'line' (a new statement is starting)
+        2. We're on a DIFFERENT line than where they were deferred
+        
+        This ensures multi-line statements complete before capture.
+        
         Args:
             frame: The current stack frame
             event: The trace event type ('line', 'return', 'call', 'exception')
         """
+        # Only flush on 'line' events - this ensures the previous statement completed
+        # Non-'line' events (like 'return' from np.array) happen during expression evaluation
+        if event != 'line':
+            return
+        
         # Determine relevant frame ID
         frame_id = id(frame)
         
         # Check if we have pending deferred anchors
-        pending = self._pending_deferred.pop(frame_id, None)
+        pending = self._pending_deferred.get(frame_id)
         if not pending:
+            return
+        
+        # Check if variables are available in scope (assignment completed)
+        # Python 3.11+ generates 'line' events within multi-line expressions,
+        # so we can't rely on line numbers. Instead, check if var exists.
+        ready_to_flush = []
+        still_pending = []
+        
+        for anchor, original_line in pending:
+            symbol = anchor.symbol
+            # Variable is ready if it exists in locals OR globals
+            var_exists = symbol in frame.f_locals or symbol in frame.f_globals
+            if var_exists:
+                ready_to_flush.append(anchor)
+            else:
+                still_pending.append((anchor, original_line))
+        
+        # Update pending: remove if empty, otherwise keep still_pending items
+        if still_pending:
+            self._pending_deferred[frame_id] = still_pending
+        else:
+            self._pending_deferred.pop(frame_id, None)
+        
+        if not ready_to_flush:
             return
 
         # Capture them using current state
@@ -378,18 +414,32 @@ class VariableTracer:
         # Use valid frame for locals
         eval_frame = frame
         
-        for anchor in pending:
+        for anchor in ready_to_flush:
             try:
-                # Value should now be available in locals (post-execution)
-                value = eval_frame.f_locals[anchor.symbol]
+                # DEBUG: trace deferred capture for QAM16_CONSTELLATION
+                if anchor.symbol == 'QAM16_CONSTELLATION':
+                    import sys
+                    print(f"[DEFERRED DEBUG] Flushing {anchor.symbol} at frame L{eval_frame.f_lineno}", file=sys.__stderr__)
+                    print(f"  in_locals: {anchor.symbol in eval_frame.f_locals}", file=sys.__stderr__)
+                    print(f"  in_globals: {anchor.symbol in eval_frame.f_globals}", file=sys.__stderr__)
+                    print(f"  frame.f_code.co_name: {eval_frame.f_code.co_name}", file=sys.__stderr__)
+                
+                # Value should now be available in locals or globals (post-execution)
+                if anchor.symbol in eval_frame.f_locals:
+                    value = eval_frame.f_locals[anchor.symbol]
+                else:
+                    value = eval_frame.f_globals[anchor.symbol]
                 
                 # Check mapping for Change Detect if needed (omitted for brevity, assume simple capture)
                 # Note: throttle check was already done when we deferred it.
                 
                 captured = self._create_anchor_capture(anchor, value, current_time)
                 batch.append((anchor, captured))
-            except KeyError:
+            except KeyError as e:
                 # Variable might have gone out of scope or not been assigned
+                if anchor.symbol == 'QAM16_CONSTELLATION':
+                    import sys
+                    print(f"[DEFERRED DEBUG] KeyError for {anchor.symbol}: {e}", file=sys.__stderr__)
                 continue
             except Exception:
                 continue
@@ -444,11 +494,21 @@ class VariableTracer:
         if not self._anchor_matcher.has_location(filename, lineno):
             return self._trace_func_anchored
 
-        # Get local variable names
+        # Get local and global variable names
         local_names = set(frame.f_locals.keys())
+        global_names = set(frame.f_globals.keys())
+        all_names = local_names | global_names
 
         # Find matching anchors
-        matching_anchors = self._anchor_matcher.match(filename, lineno, local_names)
+        matching_anchors = self._anchor_matcher.match(filename, lineno, all_names)
+        
+        # DEBUG: trace QAM16_CONSTELLATION matching
+        if lineno == 21 or any(a.symbol == 'QAM16_CONSTELLATION' for a in self._anchor_matcher.all_anchors):
+            import sys
+            print(f"[TRACER DEBUG] L{lineno} in {filename.split('/')[-1]}, event={event}", file=sys.__stderr__)
+            print(f"  anchors at loc: {self._anchor_matcher.has_location(filename, lineno)}", file=sys.__stderr__)
+            print(f"  matching_anchors: {matching_anchors}", file=sys.__stderr__)
+            print(f"  'QAM16_CONSTELLATION' in all_names: {'QAM16_CONSTELLATION' in all_names}", file=sys.__stderr__)
 
         if not matching_anchors:
             return self._trace_func_anchored
@@ -478,17 +538,21 @@ class VariableTracer:
 
             # NO per-anchor throttle check - location throttle handles it
             
-            # If this is an assignment target, defer capture to next event (post-execution)
+            # If this is an assignment target, defer capture to next line (post-execution)
             is_assign = getattr(anchor, 'is_assignment', False)
             if is_assign:
                 frame_id = id(frame)
                 if frame_id not in self._pending_deferred:
                     self._pending_deferred[frame_id] = []
-                self._pending_deferred[frame_id].append(anchor)
+                # Store (anchor, original_line) so we only flush when on a different line
+                self._pending_deferred[frame_id].append((anchor, lineno))
                 continue
 
-            # Get the value
-            value = frame.f_locals[anchor.symbol]
+            # Get the value (check locals first, then globals for module-level vars)
+            if anchor.symbol in frame.f_locals:
+                value = frame.f_locals[anchor.symbol]
+            else:
+                value = frame.f_globals[anchor.symbol]
 
             # For CHANGE_DETECT, still check if value changed (optional per-anchor)
             if config and config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:

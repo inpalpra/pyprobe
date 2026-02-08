@@ -104,6 +104,16 @@ R': terminal shows "sent successfully" but trace shows not received → queue is
 Fix: print to sys.__stderr__ in subprocess, trace in GUI
 File: runner.py, main_window.py
 
+### L13 2026-02-08 gui-debug-user-interaction
+S: debugging GUI app with trace logging added to code
+T: observe trace output to understand bug
+A: launched `python -m pyprobe ...` repeatedly, waited for cmd completion
+R: GUI never completes, no output until user clicks to trigger code path, wasted time
+A': ask user to launch GUI, interact (click probe target), then share terminal output
+R': debug output appears after user triggers code path, useful data obtained
+Fix: for PyProbe GUI debugging, always instruct user to: 1) launch, 2) click to trigger, 3) share output
+File: process
+
 
 ### L2 2026-02-06 kwarg-order
 S: calling fade_out w/ callback
