@@ -863,9 +863,10 @@ class MainWindow(QMainWindow):
                     print(f"[DEBUG] _forward_overlay_data: Panel has no plot, skipping")
                     continue
                 
-                # Add overlay data to the waveform plot
+                # Add overlay data to the waveform or constellation plot
                 from pyprobe.plugins.builtins.waveform import WaveformWidget
-                print(f"[DEBUG] _forward_overlay_data: plot type={type(plot).__name__}, is WaveformWidget={isinstance(plot, WaveformWidget)}")
+                from pyprobe.plugins.builtins.constellation import ConstellationWidget
+                print(f"[DEBUG] _forward_overlay_data: plot type={type(plot).__name__}, is WaveformWidget={isinstance(plot, WaveformWidget)}, is ConstellationWidget={isinstance(plot, ConstellationWidget)}")
                 if isinstance(plot, WaveformWidget):
                     print(f"[DEBUG] _forward_overlay_data: Calling _add_overlay_to_waveform")
                     self._add_overlay_to_waveform(
@@ -875,8 +876,17 @@ class MainWindow(QMainWindow):
                         payload['dtype'],
                         payload.get('shape')
                     )
+                elif isinstance(plot, ConstellationWidget):
+                    print(f"[DEBUG] _forward_overlay_data: Calling _add_overlay_to_constellation")
+                    self._add_overlay_to_constellation(
+                        plot, 
+                        anchor.symbol,
+                        payload['value'],
+                        payload['dtype'],
+                        payload.get('shape')
+                    )
                 else:
-                    print(f"[DEBUG] _forward_overlay_data: NOT a WaveformWidget, skipping")
+                    print(f"[DEBUG] _forward_overlay_data: Unsupported plot type, skipping")
         
         if not found_any:
             print(f"[DEBUG] _forward_overlay_data: No panels have {anchor.symbol} as overlay")
@@ -892,20 +902,21 @@ class MainWindow(QMainWindow):
         """Add an overlay trace to a waveform plot.
         
         This adds a new curve to the plot for the overlay signal.
+        For complex data, creates two curves (real and imag parts).
         """
         import numpy as np
         import pyqtgraph as pg
         
         print(f"[DEBUG] _add_overlay_to_waveform: symbol={symbol}, dtype={dtype}, value type={type(value).__name__}")
         
-        # Skip if not array-like data
-        if dtype not in ('real_1d', 'complex_1d', 'array_collection', 'array_1d'):
+        # Support real and complex 1D arrays
+        if dtype not in ('real_1d', 'complex_1d', 'array_collection', 'array_1d', 'array_complex'):
             print(f"[DEBUG] _add_overlay_to_waveform: dtype {dtype} not supported, returning early")
             return
         
         try:
             data = np.asarray(value)
-            print(f"[DEBUG] _add_overlay_to_waveform: data.shape={data.shape}, data.ndim={data.ndim}")
+            print(f"[DEBUG] _add_overlay_to_waveform: data.shape={data.shape}, data.ndim={data.ndim}, dtype={data.dtype}")
             if data.ndim != 1:
                 print(f"[DEBUG] _add_overlay_to_waveform: data.ndim != 1, returning early")
                 return  # Only 1D arrays supported for overlay
@@ -917,40 +928,161 @@ class MainWindow(QMainWindow):
         if not hasattr(plot, '_overlay_curves'):
             plot._overlay_curves = {}
         
-        # Create or update the curve for this symbol
-        if symbol not in plot._overlay_curves:
-            print(f"[DEBUG] _add_overlay_to_waveform: Creating NEW curve for {symbol}")
+        from pyprobe.plugins.builtins.waveform import ROW_COLORS
+        
+        # Check if complex data - create 2 curves (real and imag)
+        is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
+        
+        if is_complex:
+            print(f"[DEBUG] _add_overlay_to_waveform: Complex data - creating real/imag curves")
+            # Create real and imag curve keys
+            real_key = f"{symbol}_real"
+            imag_key = f"{symbol}_imag"
+            
+            # Create real curve if needed
+            if real_key not in plot._overlay_curves:
+                color_idx = len(plot._overlay_curves) + 1
+                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                print(f"[DEBUG] _add_overlay_to_waveform: Creating real curve with color {color}")
+                curve = plot._plot_widget.plot(
+                    pen=pg.mkPen(color=color, width=1.5),
+                    antialias=False,
+                    name=f"{symbol} (real)"
+                )
+                plot._overlay_curves[real_key] = curve
+                if hasattr(plot, '_legend') and plot._legend is not None:
+                    plot._legend.addItem(curve, f"{symbol} (real)")
+            
+            # Create imag curve if needed
+            if imag_key not in plot._overlay_curves:
+                color_idx = len(plot._overlay_curves) + 1
+                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                print(f"[DEBUG] _add_overlay_to_waveform: Creating imag curve with color {color}")
+                curve = plot._plot_widget.plot(
+                    pen=pg.mkPen(color=color, width=1.5, style=pg.QtCore.Qt.PenStyle.DashLine),
+                    antialias=False,
+                    name=f"{symbol} (imag)"
+                )
+                plot._overlay_curves[imag_key] = curve
+                if hasattr(plot, '_legend') and plot._legend is not None:
+                    plot._legend.addItem(curve, f"{symbol} (imag)")
+            
+            # Update real curve data
+            real_data = data.real.copy()
+            imag_data = data.imag.copy()
+            x = np.arange(len(data))
+            
+            # Downsample if needed
+            if len(data) > plot.MAX_DISPLAY_POINTS:
+                real_data = plot.downsample(real_data)
+                imag_data = plot.downsample(imag_data)
+                x = np.arange(len(real_data))
+            
+            print(f"[DEBUG] _add_overlay_to_waveform: Setting complex data, len={len(real_data)}")
+            plot._overlay_curves[real_key].setData(x, real_data)
+            plot._overlay_curves[imag_key].setData(x, imag_data)
+        else:
+            # Single real curve
+            if symbol not in plot._overlay_curves:
+                print(f"[DEBUG] _add_overlay_to_waveform: Creating NEW curve for {symbol}")
+                color_idx = len(plot._overlay_curves) + 1
+                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                print(f"[DEBUG] _add_overlay_to_waveform: Using color {color} (idx={color_idx})")
+                
+                curve = plot._plot_widget.plot(
+                    pen=pg.mkPen(color=color, width=1.5),
+                    antialias=False,
+                    name=symbol
+                )
+                plot._overlay_curves[symbol] = curve
+                
+                if hasattr(plot, '_legend') and plot._legend is not None:
+                    plot._legend.addItem(curve, symbol)
+                print(f"[DEBUG] _add_overlay_to_waveform: Created curve object: {curve}")
+                logger.debug(f"Created overlay curve for {symbol}")
+            else:
+                print(f"[DEBUG] _add_overlay_to_waveform: Updating EXISTING curve for {symbol}")
+            
+            # Update the curve data
+            curve = plot._overlay_curves[symbol]
+            x = np.arange(len(data))
+            
+            # Downsample if needed
+            if len(data) > plot.MAX_DISPLAY_POINTS:
+                print(f"[DEBUG] _add_overlay_to_waveform: Downsampling from {len(data)} points")
+                data = plot.downsample(data)
+                x = np.arange(len(data))
+            
+            print(f"[DEBUG] _add_overlay_to_waveform: Setting data on curve, len={len(data)}, x range=[{x[0]}, {x[-1]}], data range=[{data.min():.4f}, {data.max():.4f}]")
+            curve.setData(x, data)
+
+    def _add_overlay_to_constellation(
+        self, 
+        plot: 'ConstellationWidget', 
+        symbol: str,
+        value, 
+        dtype: str, 
+        shape
+    ) -> None:
+        """Add an overlay scatter to a constellation plot.
+        
+        This adds new scatter plot items to the constellation for the overlay signal.
+        """
+        import numpy as np
+        import pyqtgraph as pg
+        
+        print(f"[DEBUG] _add_overlay_to_constellation: symbol={symbol}, dtype={dtype}, value type={type(value).__name__}")
+        
+        # Skip if not complex data
+        if dtype not in ('complex_1d', 'array_complex', 'array_1d'):
+            print(f"[DEBUG] _add_overlay_to_constellation: dtype {dtype} not supported, returning early")
+            return
+        
+        try:
+            data = np.asarray(value).flatten()
+            print(f"[DEBUG] _add_overlay_to_constellation: data.shape={data.shape}")
+            
+            # Convert to complex if not already
+            if not np.issubdtype(data.dtype, np.complexfloating):
+                print(f"[DEBUG] _add_overlay_to_constellation: data is not complex, returning early")
+                return
+        except (ValueError, TypeError) as e:
+            print(f"[DEBUG] _add_overlay_to_constellation: Exception converting to array: {e}")
+            return
+        
+        # Get or create overlay scatters dict on the plot
+        if not hasattr(plot, '_overlay_scatters'):
+            plot._overlay_scatters = {}
+        
+        # Create or update the scatter for this symbol
+        if symbol not in plot._overlay_scatters:
+            print(f"[DEBUG] _add_overlay_to_constellation: Creating NEW scatter for {symbol}")
             # Pick a distinct color from the palette
             from pyprobe.plugins.builtins.waveform import ROW_COLORS
-            color_idx = len(plot._overlay_curves) + 1  # +1 to skip main signal color
+            color_idx = len(plot._overlay_scatters) + 1  # +1 to skip main signal color
             color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-            print(f"[DEBUG] _add_overlay_to_waveform: Using color {color} (idx={color_idx})")
+            print(f"[DEBUG] _add_overlay_to_constellation: Using color {color} (idx={color_idx})")
             
-            curve = plot._plot_widget.plot(
-                pen=pg.mkPen(color=color, width=1.5, style=pg.mkPen(color).style()),
-                antialias=False,
+            scatter = pg.ScatterPlotItem(
+                pen=None,
+                brush=pg.mkBrush(color),
+                size=6,
                 name=symbol
             )
-            plot._overlay_curves[symbol] = curve
-            
-            # Update legend if exists
-            if hasattr(plot, '_legend') and plot._legend is not None:
-                plot._legend.addItem(curve, symbol)
-            print(f"[DEBUG] _add_overlay_to_waveform: Created curve object: {curve}")
-            logger.debug(f"Created overlay curve for {symbol}")
+            plot._plot_widget.addItem(scatter)
+            plot._overlay_scatters[symbol] = scatter
+            print(f"[DEBUG] _add_overlay_to_constellation: Created scatter object: {scatter}")
+            logger.debug(f"Created overlay scatter for {symbol}")
         else:
-            print(f"[DEBUG] _add_overlay_to_waveform: Updating EXISTING curve for {symbol}")
+            print(f"[DEBUG] _add_overlay_to_constellation: Updating EXISTING scatter for {symbol}")
         
-        # Update the curve data
-        curve = plot._overlay_curves[symbol]
-        x = np.arange(len(data))
+        # Update the scatter data
+        scatter = plot._overlay_scatters[symbol]
         
-        # Downsample if needed (use plot's downsampling)
+        # Downsample if needed
         if len(data) > plot.MAX_DISPLAY_POINTS:
-            print(f"[DEBUG] _add_overlay_to_waveform: Downsampling from {len(data)} points")
+            print(f"[DEBUG] _add_overlay_to_constellation: Downsampling from {len(data)} points")
             data = plot.downsample(data)
-            x = np.arange(len(data))
         
-        print(f"[DEBUG] _add_overlay_to_waveform: Setting data on curve, len={len(data)}, x range=[{x[0]}, {x[-1]}], data range=[{data.min():.4f}, {data.max():.4f}]")
-        curve.setData(x, data)
-
+        print(f"[DEBUG] _add_overlay_to_constellation: Setting data on scatter, len={len(data)}")
+        scatter.setData(x=data.real, y=data.imag)
