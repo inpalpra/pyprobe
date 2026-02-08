@@ -786,20 +786,16 @@ class MainWindow(QMainWindow):
         logger.debug(f"Overlay requested: {overlay_anchor.symbol} -> {target_panel._anchor.symbol}")
         
         # Check if target panel's plot supports overlays (waveform plots do)
+        # NOTE: We still allow overlay registration even if plot isn't a WaveformWidget yet,
+        # because the plot type may change once data arrives. The actual compatibility
+        # check happens at data forwarding time in _forward_overlay_data.
         plot = target_panel._plot
         print(f"[DEBUG] _on_overlay_requested: plot={type(plot).__name__ if plot else None}")
-        if plot is None:
-            print(f"[DEBUG] _on_overlay_requested: No plot, returning")
-            self._status_bar.showMessage(f"Cannot overlay: target panel has no plot")
-            return
         
-        # Check compatibility: for now, only waveform plots support overlay
+        # Just log the type, but don't block registration
         from pyprobe.plugins.builtins.waveform import WaveformWidget
-        print(f"[DEBUG] _on_overlay_requested: isinstance(plot, WaveformWidget)={isinstance(plot, WaveformWidget)}")
-        if not isinstance(plot, WaveformWidget):
-            print(f"[DEBUG] _on_overlay_requested: Not a WaveformWidget, returning")
-            self._status_bar.showMessage(f"Overlay only supported for waveform plots")
-            return
+        is_waveform = isinstance(plot, WaveformWidget) if plot else False
+        print(f"[DEBUG] _on_overlay_requested: isinstance(plot, WaveformWidget)={is_waveform}")
         
         # If overlay anchor is not already probed, we need to probe it
         print(f"[DEBUG] _on_overlay_requested: overlay_anchor in active_anchors={overlay_anchor in self._probe_registry.active_anchors}")
