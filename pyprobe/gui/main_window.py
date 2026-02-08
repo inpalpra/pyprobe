@@ -259,7 +259,6 @@ class MainWindow(QMainWindow):
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE:
             self._frame_count += 1
             anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
-            print(f"[DEBUG] _handle_message: DATA_PROBE_VALUE for {anchor.symbol}, anchor in panels={anchor in self._probe_panels}")
             self._probe_registry.update_data_received(anchor)
             
             # Update the anchor's own panel if it exists
@@ -281,7 +280,6 @@ class MainWindow(QMainWindow):
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE_BATCH:
             self._frame_count += 1
             probes = msg.payload.get('probes', [])
-            print(f"[DEBUG] _handle_message: DATA_PROBE_VALUE_BATCH with {len(probes)} probes: {[p['anchor']['symbol'] for p in probes]}")
             # Process all probes from this batch atomically
             for probe_data in probes:
                 anchor = ProbeAnchor.from_dict(probe_data['anchor'])
@@ -782,7 +780,6 @@ class MainWindow(QMainWindow):
         This adds the overlay symbol as a probe (if not already) and forwards its
         data updates to the target panel's plot widget for overlaid visualization.
         """
-        print(f"[DEBUG] _on_overlay_requested: Called! overlay={overlay_anchor.symbol} -> target={target_panel._anchor.symbol}")
         logger.debug(f"Overlay requested: {overlay_anchor.symbol} -> {target_panel._anchor.symbol}")
         
         # Check if target panel's plot supports overlays (waveform plots do)
@@ -790,28 +787,22 @@ class MainWindow(QMainWindow):
         # because the plot type may change once data arrives. The actual compatibility
         # check happens at data forwarding time in _forward_overlay_data.
         plot = target_panel._plot
-        print(f"[DEBUG] _on_overlay_requested: plot={type(plot).__name__ if plot else None}")
         
         # Just log the type, but don't block registration
         from pyprobe.plugins.builtins.waveform import WaveformWidget
         is_waveform = isinstance(plot, WaveformWidget) if plot else False
-        print(f"[DEBUG] _on_overlay_requested: isinstance(plot, WaveformWidget)={is_waveform}")
         
         # If overlay anchor is not already probed, we need to probe it
-        print(f"[DEBUG] _on_overlay_requested: overlay_anchor in active_anchors={overlay_anchor in self._probe_registry.active_anchors}")
         if overlay_anchor not in self._probe_registry.active_anchors:
             # Add to registry without creating a separate panel
             color = self._probe_registry.add_probe(overlay_anchor)
-            print(f"[DEBUG] _on_overlay_requested: Added to registry, color={color.name() if color else None}")
             if color is None:
-                print(f"[DEBUG] _on_overlay_requested: No color (max probes?), returning")
                 self._status_bar.showMessage(f"Maximum probes reached")
                 return
             
             # Update code viewer to show it's probed
             self._code_viewer.set_probe_active(overlay_anchor, color)
             self._code_gutter.set_probed_line(overlay_anchor.line, color)
-            print(f"[DEBUG] _on_overlay_requested: Updated code viewer and gutter")
             
             # Initialize metadata
             self._probe_metadata[overlay_anchor] = {
@@ -824,20 +815,14 @@ class MainWindow(QMainWindow):
             if self._ipc and self._is_running:
                 msg = make_add_probe_cmd(overlay_anchor)
                 self._ipc.send_command(msg)
-                print(f"[DEBUG] _on_overlay_requested: Sent ADD_PROBE command to runner")
-            else:
-                print(f"[DEBUG] _on_overlay_requested: NOT sending to runner (ipc={self._ipc is not None}, is_running={self._is_running})")
-        
         # Register this overlay relationship for data forwarding
         if not hasattr(target_panel, '_overlay_anchors'):
             target_panel._overlay_anchors = []
         
         if overlay_anchor not in target_panel._overlay_anchors:
             target_panel._overlay_anchors.append(overlay_anchor)
-            print(f"[DEBUG] _on_overlay_requested: Registered overlay relationship")
             logger.debug(f"Added overlay anchor: {overlay_anchor.symbol} to panel {target_panel._anchor.symbol}")
         
-        print(f"[DEBUG] _on_overlay_requested: Complete! overlay_anchors={[a.symbol for a in target_panel._overlay_anchors]}")
         self._status_bar.showMessage(f"Overlaid: {overlay_anchor.symbol} on {target_panel._anchor.symbol}")
 
     def _forward_overlay_data(self, anchor: ProbeAnchor, payload: dict) -> None:
@@ -846,29 +831,27 @@ class MainWindow(QMainWindow):
         When an overlay anchor's data arrives, we need to update the target panel's
         plot to show this data as an additional trace.
         """
-        print(f"[DEBUG] _forward_overlay_data: Called for anchor={anchor.symbol}")
         # Find all panels that have this anchor as an overlay
         found_any = False
         for panel in self._probe_panels.values():
             if not hasattr(panel, '_overlay_anchors'):
                 continue
             
-            print(f"[DEBUG] _forward_overlay_data: Panel {panel._anchor.symbol} has overlay_anchors={[a.symbol for a in panel._overlay_anchors]}")
-            if anchor in panel._overlay_anchors:
+            # Get overlay symbols for comparison (match by symbol name, not full anchor equality)
+            overlay_symbols = [a.symbol for a in panel._overlay_anchors]
+            
+            # Match by symbol name since anchors may have different metadata
+            if anchor.symbol in overlay_symbols:
                 found_any = True
-                print(f"[DEBUG] _forward_overlay_data: Found match! Forwarding to {panel._anchor.symbol}")
                 # Forward data to this panel's plot as overlay
                 plot = panel._plot
                 if plot is None:
-                    print(f"[DEBUG] _forward_overlay_data: Panel has no plot, skipping")
                     continue
                 
                 # Add overlay data to the waveform or constellation plot
                 from pyprobe.plugins.builtins.waveform import WaveformWidget
                 from pyprobe.plugins.builtins.constellation import ConstellationWidget
-                print(f"[DEBUG] _forward_overlay_data: plot type={type(plot).__name__}, is WaveformWidget={isinstance(plot, WaveformWidget)}, is ConstellationWidget={isinstance(plot, ConstellationWidget)}")
                 if isinstance(plot, WaveformWidget):
-                    print(f"[DEBUG] _forward_overlay_data: Calling _add_overlay_to_waveform")
                     self._add_overlay_to_waveform(
                         plot, 
                         anchor.symbol,
@@ -877,7 +860,6 @@ class MainWindow(QMainWindow):
                         payload.get('shape')
                     )
                 elif isinstance(plot, ConstellationWidget):
-                    print(f"[DEBUG] _forward_overlay_data: Calling _add_overlay_to_constellation")
                     self._add_overlay_to_constellation(
                         plot, 
                         anchor.symbol,
@@ -885,11 +867,10 @@ class MainWindow(QMainWindow):
                         payload['dtype'],
                         payload.get('shape')
                     )
-                else:
-                    print(f"[DEBUG] _forward_overlay_data: Unsupported plot type, skipping")
+                # else: unsupported plot type, skip silently
         
         if not found_any:
-            print(f"[DEBUG] _forward_overlay_data: No panels have {anchor.symbol} as overlay")
+            pass  # No panels have this anchor as overlay
 
     def _add_overlay_to_waveform(
         self, 
@@ -907,21 +888,16 @@ class MainWindow(QMainWindow):
         import numpy as np
         import pyqtgraph as pg
         
-        print(f"[DEBUG] _add_overlay_to_waveform: symbol={symbol}, dtype={dtype}, value type={type(value).__name__}")
         
         # Support real and complex 1D arrays
         if dtype not in ('real_1d', 'complex_1d', 'array_collection', 'array_1d', 'array_complex'):
-            print(f"[DEBUG] _add_overlay_to_waveform: dtype {dtype} not supported, returning early")
             return
         
         try:
             data = np.asarray(value)
-            print(f"[DEBUG] _add_overlay_to_waveform: data.shape={data.shape}, data.ndim={data.ndim}, dtype={data.dtype}")
             if data.ndim != 1:
-                print(f"[DEBUG] _add_overlay_to_waveform: data.ndim != 1, returning early")
                 return  # Only 1D arrays supported for overlay
         except (ValueError, TypeError) as e:
-            print(f"[DEBUG] _add_overlay_to_waveform: Exception converting to array: {e}")
             return
         
         # Get or create overlay curves dict on the plot
@@ -934,7 +910,6 @@ class MainWindow(QMainWindow):
         is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
         
         if is_complex:
-            print(f"[DEBUG] _add_overlay_to_waveform: Complex data - creating real/imag curves")
             # Create real and imag curve keys
             real_key = f"{symbol}_real"
             imag_key = f"{symbol}_imag"
@@ -943,7 +918,6 @@ class MainWindow(QMainWindow):
             if real_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
                 color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                print(f"[DEBUG] _add_overlay_to_waveform: Creating real curve with color {color}")
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False,
@@ -957,9 +931,8 @@ class MainWindow(QMainWindow):
             if imag_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
                 color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                print(f"[DEBUG] _add_overlay_to_waveform: Creating imag curve with color {color}")
                 curve = plot._plot_widget.plot(
-                    pen=pg.mkPen(color=color, width=1.5, style=pg.QtCore.Qt.PenStyle.DashLine),
+                    pen=pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine),
                     antialias=False,
                     name=f"{symbol} (imag)"
                 )
@@ -978,16 +951,13 @@ class MainWindow(QMainWindow):
                 imag_data = plot.downsample(imag_data)
                 x = np.arange(len(real_data))
             
-            print(f"[DEBUG] _add_overlay_to_waveform: Setting complex data, len={len(real_data)}")
             plot._overlay_curves[real_key].setData(x, real_data)
             plot._overlay_curves[imag_key].setData(x, imag_data)
         else:
             # Single real curve
             if symbol not in plot._overlay_curves:
-                print(f"[DEBUG] _add_overlay_to_waveform: Creating NEW curve for {symbol}")
                 color_idx = len(plot._overlay_curves) + 1
                 color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                print(f"[DEBUG] _add_overlay_to_waveform: Using color {color} (idx={color_idx})")
                 
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
@@ -998,10 +968,8 @@ class MainWindow(QMainWindow):
                 
                 if hasattr(plot, '_legend') and plot._legend is not None:
                     plot._legend.addItem(curve, symbol)
-                print(f"[DEBUG] _add_overlay_to_waveform: Created curve object: {curve}")
                 logger.debug(f"Created overlay curve for {symbol}")
-            else:
-                print(f"[DEBUG] _add_overlay_to_waveform: Updating EXISTING curve for {symbol}")
+            # else: curve already exists, just update data
             
             # Update the curve data
             curve = plot._overlay_curves[symbol]
@@ -1009,11 +977,9 @@ class MainWindow(QMainWindow):
             
             # Downsample if needed
             if len(data) > plot.MAX_DISPLAY_POINTS:
-                print(f"[DEBUG] _add_overlay_to_waveform: Downsampling from {len(data)} points")
                 data = plot.downsample(data)
                 x = np.arange(len(data))
             
-            print(f"[DEBUG] _add_overlay_to_waveform: Setting data on curve, len={len(data)}, x range=[{x[0]}, {x[-1]}], data range=[{data.min():.4f}, {data.max():.4f}]")
             curve.setData(x, data)
 
     def _add_overlay_to_constellation(
@@ -1031,23 +997,18 @@ class MainWindow(QMainWindow):
         import numpy as np
         import pyqtgraph as pg
         
-        print(f"[DEBUG] _add_overlay_to_constellation: symbol={symbol}, dtype={dtype}, value type={type(value).__name__}")
         
         # Skip if not complex data
         if dtype not in ('complex_1d', 'array_complex', 'array_1d'):
-            print(f"[DEBUG] _add_overlay_to_constellation: dtype {dtype} not supported, returning early")
             return
         
         try:
             data = np.asarray(value).flatten()
-            print(f"[DEBUG] _add_overlay_to_constellation: data.shape={data.shape}")
             
             # Convert to complex if not already
             if not np.issubdtype(data.dtype, np.complexfloating):
-                print(f"[DEBUG] _add_overlay_to_constellation: data is not complex, returning early")
                 return
         except (ValueError, TypeError) as e:
-            print(f"[DEBUG] _add_overlay_to_constellation: Exception converting to array: {e}")
             return
         
         # Get or create overlay scatters dict on the plot
@@ -1056,12 +1017,10 @@ class MainWindow(QMainWindow):
         
         # Create or update the scatter for this symbol
         if symbol not in plot._overlay_scatters:
-            print(f"[DEBUG] _add_overlay_to_constellation: Creating NEW scatter for {symbol}")
             # Pick a distinct color from the palette
             from pyprobe.plugins.builtins.waveform import ROW_COLORS
             color_idx = len(plot._overlay_scatters) + 1  # +1 to skip main signal color
             color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-            print(f"[DEBUG] _add_overlay_to_constellation: Using color {color} (idx={color_idx})")
             
             scatter = pg.ScatterPlotItem(
                 pen=None,
@@ -1071,18 +1030,14 @@ class MainWindow(QMainWindow):
             )
             plot._plot_widget.addItem(scatter)
             plot._overlay_scatters[symbol] = scatter
-            print(f"[DEBUG] _add_overlay_to_constellation: Created scatter object: {scatter}")
             logger.debug(f"Created overlay scatter for {symbol}")
-        else:
-            print(f"[DEBUG] _add_overlay_to_constellation: Updating EXISTING scatter for {symbol}")
+        # else: scatter already exists, just update data
         
         # Update the scatter data
         scatter = plot._overlay_scatters[symbol]
         
         # Downsample if needed
         if len(data) > plot.MAX_DISPLAY_POINTS:
-            print(f"[DEBUG] _add_overlay_to_constellation: Downsampling from {len(data)} points")
             data = plot.downsample(data)
         
-        print(f"[DEBUG] _add_overlay_to_constellation: Setting data on scatter, len={len(data)}")
         scatter.setData(x=data.real, y=data.imag)

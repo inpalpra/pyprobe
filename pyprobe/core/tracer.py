@@ -363,42 +363,52 @@ class VariableTracer:
         Only flushes captures when:
         1. Event is 'line' (a new statement is starting)
         2. We're on a DIFFERENT line than where they were deferred
+        3. The variable exists in scope
         
-        This ensures multi-line statements complete before capture.
+        This ensures the assignment statement completes before capture,
+        but capture happens IMMEDIATELY on the next line - not later when
+        the variable may have been modified by subsequent statements.
         
         Args:
             frame: The current stack frame
             event: The trace event type ('line', 'return', 'call', 'exception')
         """
         # Only flush on 'line' events - this ensures the previous statement completed
-        # Non-'line' events (like 'return' from np.array) happen during expression evaluation
         if event != 'line':
             return
         
-        # Determine relevant frame ID
         frame_id = id(frame)
-        
-        # Check if we have pending deferred anchors
         pending = self._pending_deferred.get(frame_id)
         if not pending:
             return
         
-        # Check if variables are available in scope (assignment completed)
-        # Python 3.11+ generates 'line' events within multi-line expressions,
-        # so we can't rely on line numbers. Instead, check if var exists.
+        current_line = frame.f_lineno
+        
+        # Separate into ready-to-flush (different line + var exists) vs still pending
         ready_to_flush = []
         still_pending = []
         
         for anchor, original_line in pending:
+            # CRITICAL: Only flush if we're on a DIFFERENT line than where registered
+            # This ensures we capture right after the assignment, not later
+            print(f"[TRACE] _flush_deferred: anchor={anchor.symbol}, original_line={original_line}, current_line={current_line}")
+            if current_line == original_line:
+                # Still on the same line - keep pending
+                print(f"[TRACE] _flush_deferred: Same line, keeping pending")
+                still_pending.append((anchor, original_line))
+                continue
+            
+            # We're on a different line - check if variable now exists
             symbol = anchor.symbol
-            # Variable is ready if it exists in locals OR globals
             var_exists = symbol in frame.f_locals or symbol in frame.f_globals
+            
             if var_exists:
                 ready_to_flush.append(anchor)
             else:
+                # Variable doesn't exist yet (shouldn't happen normally)
                 still_pending.append((anchor, original_line))
         
-        # Update pending: remove if empty, otherwise keep still_pending items
+        # Update pending list
         if still_pending:
             self._pending_deferred[frame_id] = still_pending
         else:
@@ -411,27 +421,22 @@ class VariableTracer:
         current_time = time.perf_counter()
         batch = []
         
-        # Use valid frame for locals
-        eval_frame = frame
-        
         for anchor in ready_to_flush:
             try:
-
-                
-                # Value should now be available in locals or globals (post-execution)
-                if anchor.symbol in eval_frame.f_locals:
-                    value = eval_frame.f_locals[anchor.symbol]
+                # Value should now be available (post-execution of the ORIGINAL line)
+                if anchor.symbol in frame.f_locals:
+                    value = frame.f_locals[anchor.symbol]
                 else:
-                    value = eval_frame.f_globals[anchor.symbol]
+                    value = frame.f_globals[anchor.symbol]
                 
-                # Check mapping for Change Detect if needed (omitted for brevity, assume simple capture)
-                # Note: throttle check was already done when we deferred it.
+                # Debug: print value info for complex arrays
+                import numpy as np
+                if isinstance(value, np.ndarray) and np.iscomplexobj(value):
+                    print(f"[TRACE] _flush_deferred CAPTURE: {anchor.symbol} at line {anchor.line}, current_line={current_line}, mean={value.mean():.4f}")
                 
                 captured = self._create_anchor_capture(anchor, value, current_time)
                 batch.append((anchor, captured))
-            except KeyError as e:
-                # Variable might have gone out of scope or not been assigned
-
+            except KeyError:
                 continue
             except Exception:
                 continue
@@ -531,6 +536,7 @@ class VariableTracer:
                 if frame_id not in self._pending_deferred:
                     self._pending_deferred[frame_id] = []
                 # Store (anchor, original_line) so we only flush when on a different line
+                print(f"[TRACE] DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}")
                 self._pending_deferred[frame_id].append((anchor, lineno))
                 continue
 

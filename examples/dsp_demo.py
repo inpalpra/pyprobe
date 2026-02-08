@@ -73,6 +73,8 @@ def main():
             NUM_SYMBOLS, snr_db
         )
 
+        received_symbols = received_symbols + np.complex128(-1-1j)
+
         # Compute some statistics (these can also be probed)
         power_db = 10 * np.log10(np.mean(np.abs(received_symbols) ** 2))
         peak_to_avg = np.max(np.abs(received_symbols)) / np.mean(np.abs(received_symbols))

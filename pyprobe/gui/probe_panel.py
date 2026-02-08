@@ -444,13 +444,10 @@ class ProbePanel(QFrame):
 
     def dragEnterEvent(self, event) -> None:
         """Accept anchor drags for signal overlay."""
-        print(f"[DEBUG] ProbePanel.dragEnterEvent: mimeData={event.mimeData()}, has_anchor={has_anchor_mime(event.mimeData()) if event.mimeData() else False}")
         if event.mimeData() and has_anchor_mime(event.mimeData()):
-            print(f"[DEBUG] ProbePanel.dragEnterEvent: Accepting drop!")
             event.acceptProposedAction()
             self._show_drop_highlight(True)
         else:
-            print(f"[DEBUG] ProbePanel.dragEnterEvent: Ignoring - no anchor mime")
             event.ignore()
 
     def dragLeaveEvent(self, event) -> None:
@@ -460,11 +457,9 @@ class ProbePanel(QFrame):
 
     def dropEvent(self, event) -> None:
         """Handle drop of anchor data for overlay."""
-        print(f"[DEBUG] ProbePanel.dropEvent: Called!")
         self._show_drop_highlight(False)
         if event.mimeData() and has_anchor_mime(event.mimeData()):
             data = decode_anchor_mime(event.mimeData())
-            print(f"[DEBUG] ProbePanel.dropEvent: decoded data={data}")
             if data:
                 anchor = ProbeAnchor(
                     file=data['file'],
@@ -473,14 +468,11 @@ class ProbePanel(QFrame):
                     symbol=data['symbol'],
                     func=data.get('func', ''),
                 )
-                print(f"[DEBUG] ProbePanel.dropEvent: Emitting overlay_requested for {anchor.symbol}")
                 self.overlay_requested.emit(self, anchor)
                 event.acceptProposedAction()
             else:
-                print(f"[DEBUG] ProbePanel.dropEvent: Failed to decode, ignoring")
                 event.ignore()
         else:
-            print(f"[DEBUG] ProbePanel.dropEvent: No anchor mime, ignoring")
             event.ignore()
 
     def _show_drop_highlight(self, show: bool) -> None:

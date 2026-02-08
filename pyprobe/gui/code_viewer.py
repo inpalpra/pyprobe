@@ -230,14 +230,11 @@ class CodeViewer(QPlainTextEdit):
         # M2.5: Check for drag initiation
         if self._drag_start_pos is not None and self._drag_start_anchor is not None:
             distance = (event.pos() - self._drag_start_pos).manhattanLength()
-            print(f"[DEBUG] mouseMoveEvent: drag check, distance={distance} (threshold=10)")
             if distance > 10:
-                print(f"[DEBUG] mouseMoveEvent: Threshold exceeded! Calling _start_drag()")
                 logger.debug(f"mouseMoveEvent: Threshold exceeded (distance={distance}), initiating drag")
                 self._start_drag()
                 self._drag_start_pos = None
                 self._drag_start_anchor = None
-                print(f"[DEBUG] mouseMoveEvent: After _start_drag(), cleared drag state")
                 return
 
         # Get anchor at current position
@@ -253,26 +250,20 @@ class CodeViewer(QPlainTextEdit):
 
     def mousePressEvent(self, event) -> None:
         """Handle mouse press - record position for potential drag or click."""
-        print(f"[DEBUG] mousePressEvent: button={event.button()}, pos={event.pos()}")
         if event.button() == Qt.MouseButton.LeftButton:
             anchor = self._get_anchor_at_position(event.pos())
-            print(f"[DEBUG] mousePressEvent: anchor={anchor.symbol if anchor else None}")
             if anchor is not None:
                 # Record drag start position and anchor for potential drag or click
                 self._drag_start_pos = event.pos()
                 self._drag_start_anchor = anchor
-                print(f"[DEBUG] mousePressEvent: Recorded _drag_start_pos={self._drag_start_pos}, _drag_start_anchor={anchor.symbol}")
                 logger.debug(f"mousePressEvent: Recorded start for {anchor.symbol}")
                 # Accept the event to prevent text selection
                 event.accept()
-                print(f"[DEBUG] mousePressEvent: event accepted, NOT calling super()")
                 return  # Don't call super() - prevent QPlainTextEdit from starting text selection
             else:
                 self._drag_start_pos = None
                 self._drag_start_anchor = None
-                print(f"[DEBUG] mousePressEvent: No anchor, cleared drag state")
 
-        print(f"[DEBUG] mousePressEvent: calling super()")
         super().mousePressEvent(event)
 
     def leaveEvent(self, event) -> None:
@@ -289,46 +280,34 @@ class CodeViewer(QPlainTextEdit):
 
     def mouseReleaseEvent(self, event) -> None:
         """Handle mouse release - toggle probe if no drag occurred."""
-        print(f"[DEBUG] mouseReleaseEvent: button={event.button()}, pos={event.pos()}")
-        print(f"[DEBUG] mouseReleaseEvent: _drag_start_anchor={self._drag_start_anchor.symbol if self._drag_start_anchor else None}, _drag_start_pos={self._drag_start_pos}")
         if event.button() == Qt.MouseButton.LeftButton:
             # Only toggle probe if we started on an anchor and didn't drag
             if self._drag_start_anchor is not None and self._drag_start_pos is not None:
                 distance = (event.pos() - self._drag_start_pos).manhattanLength()
-                print(f"[DEBUG] mouseReleaseEvent: distance={distance} (threshold=10)")
                 # Check if we stayed in roughly the same position (not a drag)
                 if distance <= 10:
                     anchor = self._drag_start_anchor
                     is_active = anchor in self._active_probes
-                    print(f"[DEBUG] mouseReleaseEvent: TOGGLE PROBE! anchor={anchor.symbol}, is_active={is_active}")
                     logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, is_active={is_active}")
                     
                     if is_active:
-                        print(f"[DEBUG] mouseReleaseEvent: Emitting probe_removed")
                         self.probe_removed.emit(anchor)
                     else:
-                        print(f"[DEBUG] mouseReleaseEvent: Emitting probe_requested")
                         self.probe_requested.emit(anchor)
-                else:
-                    print(f"[DEBUG] mouseReleaseEvent: distance > 10, was a drag, no toggle")
-            else:
-                print(f"[DEBUG] mouseReleaseEvent: No drag_start state, skipping toggle")
+                # else: distance > 10, was a drag, don't toggle
+            # else: no drag_start state
         
         self._drag_start_pos = None
         self._drag_start_anchor = None
-        print(f"[DEBUG] mouseReleaseEvent: cleared drag state, calling super()")
         super().mouseReleaseEvent(event)
 
     def _start_drag(self) -> None:
         """Initiate drag-and-drop for signal overlay."""
         # Use _drag_start_anchor instead of _hover_anchor
         anchor = self._drag_start_anchor
-        print(f"[DEBUG] _start_drag: Called! anchor={anchor.symbol if anchor else None}")
         if anchor is None:
-            print(f"[DEBUG] _start_drag: No anchor, returning early")
             return
 
-        print(f"[DEBUG] _start_drag: Creating QDrag for {anchor.symbol}")
         logger.debug(f"_start_drag: Starting drag for {anchor.symbol}")
         
         # Clear hover state before drag to prevent paint conflicts
@@ -344,9 +323,7 @@ class CodeViewer(QPlainTextEdit):
         )
         drag = QDrag(self)
         drag.setMimeData(mime_data)
-        print(f"[DEBUG] _start_drag: Calling drag.exec() - this will block until drop completes")
         result = drag.exec(Qt.DropAction.CopyAction)
-        print(f"[DEBUG] _start_drag: drag.exec() returned: {result}")
 
     def paintEvent(self, event) -> None:
         """Custom paint to draw variable highlights."""
