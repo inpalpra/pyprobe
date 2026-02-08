@@ -259,7 +259,10 @@ class MainWindow(QMainWindow):
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE:
             self._frame_count += 1
             anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
+            print(f"[DEBUG] _handle_message: DATA_PROBE_VALUE for {anchor.symbol}, anchor in panels={anchor in self._probe_panels}")
             self._probe_registry.update_data_received(anchor)
+            
+            # Update the anchor's own panel if it exists
             if anchor in self._probe_panels:
                 # Update metadata dtype
                 if anchor in self._probe_metadata:
@@ -270,12 +273,17 @@ class MainWindow(QMainWindow):
                     dtype=msg.payload['dtype'],
                     shape=msg.payload.get('shape'),
                 )
+            
+            # M2.5: Forward overlay data to target panels
+            self._forward_overlay_data(anchor, msg.payload)
 
         # === M1: Handle batched probe data for atomic updates ===
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE_BATCH:
             self._frame_count += 1
+            probes = msg.payload.get('probes', [])
+            print(f"[DEBUG] _handle_message: DATA_PROBE_VALUE_BATCH with {len(probes)} probes: {[p['anchor']['symbol'] for p in probes]}")
             # Process all probes from this batch atomically
-            for probe_data in msg.payload.get('probes', []):
+            for probe_data in probes:
                 anchor = ProbeAnchor.from_dict(probe_data['anchor'])
                 self._probe_registry.update_data_received(anchor)
                 if anchor in self._probe_panels:
@@ -284,6 +292,9 @@ class MainWindow(QMainWindow):
                         dtype=probe_data['dtype'],
                         shape=probe_data.get('shape'),
                     )
+                
+                # M2.5: Forward overlay data to target panels (was missing!)
+                self._forward_overlay_data(anchor, probe_data)
 
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
             # NOTE: Don't reset state here! Let _on_script_ended() handle it
@@ -765,9 +776,185 @@ class MainWindow(QMainWindow):
                 self._status_bar.showMessage(f"Restored: {anchor.symbol}")
                 break
 
-    def _on_overlay_requested(self, overlay_anchor: ProbeAnchor) -> None:
-        """Handle overlay drop request - add overlay signal to the target panel."""
-        # For now, log and status update. Full overlay routing requires
-        # knowing which panel received the drop and setting up data forwarding.
-        logger.debug(f"Overlay requested for: {overlay_anchor.symbol}")
-        self._status_bar.showMessage(f"Overlay: {overlay_anchor.symbol}")
+    def _on_overlay_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
+        """Handle overlay drop request - add overlay signal to the target panel.
+        
+        This adds the overlay symbol as a probe (if not already) and forwards its
+        data updates to the target panel's plot widget for overlaid visualization.
+        """
+        print(f"[DEBUG] _on_overlay_requested: Called! overlay={overlay_anchor.symbol} -> target={target_panel._anchor.symbol}")
+        logger.debug(f"Overlay requested: {overlay_anchor.symbol} -> {target_panel._anchor.symbol}")
+        
+        # Check if target panel's plot supports overlays (waveform plots do)
+        plot = target_panel._plot
+        print(f"[DEBUG] _on_overlay_requested: plot={type(plot).__name__ if plot else None}")
+        if plot is None:
+            print(f"[DEBUG] _on_overlay_requested: No plot, returning")
+            self._status_bar.showMessage(f"Cannot overlay: target panel has no plot")
+            return
+        
+        # Check compatibility: for now, only waveform plots support overlay
+        from pyprobe.plugins.builtins.waveform import WaveformWidget
+        print(f"[DEBUG] _on_overlay_requested: isinstance(plot, WaveformWidget)={isinstance(plot, WaveformWidget)}")
+        if not isinstance(plot, WaveformWidget):
+            print(f"[DEBUG] _on_overlay_requested: Not a WaveformWidget, returning")
+            self._status_bar.showMessage(f"Overlay only supported for waveform plots")
+            return
+        
+        # If overlay anchor is not already probed, we need to probe it
+        print(f"[DEBUG] _on_overlay_requested: overlay_anchor in active_anchors={overlay_anchor in self._probe_registry.active_anchors}")
+        if overlay_anchor not in self._probe_registry.active_anchors:
+            # Add to registry without creating a separate panel
+            color = self._probe_registry.add_probe(overlay_anchor)
+            print(f"[DEBUG] _on_overlay_requested: Added to registry, color={color.name() if color else None}")
+            if color is None:
+                print(f"[DEBUG] _on_overlay_requested: No color (max probes?), returning")
+                self._status_bar.showMessage(f"Maximum probes reached")
+                return
+            
+            # Update code viewer to show it's probed
+            self._code_viewer.set_probe_active(overlay_anchor, color)
+            self._code_gutter.set_probed_line(overlay_anchor.line, color)
+            print(f"[DEBUG] _on_overlay_requested: Updated code viewer and gutter")
+            
+            # Initialize metadata
+            self._probe_metadata[overlay_anchor] = {
+                'lens': None,
+                'dtype': None,
+                'overlay_target': target_panel._anchor  # Track that this is an overlay
+            }
+            
+            # Send probe command to runner
+            if self._ipc and self._is_running:
+                msg = make_add_probe_cmd(overlay_anchor)
+                self._ipc.send_command(msg)
+                print(f"[DEBUG] _on_overlay_requested: Sent ADD_PROBE command to runner")
+            else:
+                print(f"[DEBUG] _on_overlay_requested: NOT sending to runner (ipc={self._ipc is not None}, is_running={self._is_running})")
+        
+        # Register this overlay relationship for data forwarding
+        if not hasattr(target_panel, '_overlay_anchors'):
+            target_panel._overlay_anchors = []
+        
+        if overlay_anchor not in target_panel._overlay_anchors:
+            target_panel._overlay_anchors.append(overlay_anchor)
+            print(f"[DEBUG] _on_overlay_requested: Registered overlay relationship")
+            logger.debug(f"Added overlay anchor: {overlay_anchor.symbol} to panel {target_panel._anchor.symbol}")
+        
+        print(f"[DEBUG] _on_overlay_requested: Complete! overlay_anchors={[a.symbol for a in target_panel._overlay_anchors]}")
+        self._status_bar.showMessage(f"Overlaid: {overlay_anchor.symbol} on {target_panel._anchor.symbol}")
+
+    def _forward_overlay_data(self, anchor: ProbeAnchor, payload: dict) -> None:
+        """Forward overlay probe data to target panels that have this anchor as overlay.
+        
+        When an overlay anchor's data arrives, we need to update the target panel's
+        plot to show this data as an additional trace.
+        """
+        print(f"[DEBUG] _forward_overlay_data: Called for anchor={anchor.symbol}")
+        # Find all panels that have this anchor as an overlay
+        found_any = False
+        for panel in self._probe_panels.values():
+            if not hasattr(panel, '_overlay_anchors'):
+                continue
+            
+            print(f"[DEBUG] _forward_overlay_data: Panel {panel._anchor.symbol} has overlay_anchors={[a.symbol for a in panel._overlay_anchors]}")
+            if anchor in panel._overlay_anchors:
+                found_any = True
+                print(f"[DEBUG] _forward_overlay_data: Found match! Forwarding to {panel._anchor.symbol}")
+                # Forward data to this panel's plot as overlay
+                plot = panel._plot
+                if plot is None:
+                    print(f"[DEBUG] _forward_overlay_data: Panel has no plot, skipping")
+                    continue
+                
+                # Add overlay data to the waveform plot
+                from pyprobe.plugins.builtins.waveform import WaveformWidget
+                print(f"[DEBUG] _forward_overlay_data: plot type={type(plot).__name__}, is WaveformWidget={isinstance(plot, WaveformWidget)}")
+                if isinstance(plot, WaveformWidget):
+                    print(f"[DEBUG] _forward_overlay_data: Calling _add_overlay_to_waveform")
+                    self._add_overlay_to_waveform(
+                        plot, 
+                        anchor.symbol,
+                        payload['value'],
+                        payload['dtype'],
+                        payload.get('shape')
+                    )
+                else:
+                    print(f"[DEBUG] _forward_overlay_data: NOT a WaveformWidget, skipping")
+        
+        if not found_any:
+            print(f"[DEBUG] _forward_overlay_data: No panels have {anchor.symbol} as overlay")
+
+    def _add_overlay_to_waveform(
+        self, 
+        plot: 'WaveformWidget', 
+        symbol: str,
+        value, 
+        dtype: str, 
+        shape
+    ) -> None:
+        """Add an overlay trace to a waveform plot.
+        
+        This adds a new curve to the plot for the overlay signal.
+        """
+        import numpy as np
+        import pyqtgraph as pg
+        
+        print(f"[DEBUG] _add_overlay_to_waveform: symbol={symbol}, dtype={dtype}, value type={type(value).__name__}")
+        
+        # Skip if not array-like data
+        if dtype not in ('real_1d', 'complex_1d', 'array_collection', 'array_1d'):
+            print(f"[DEBUG] _add_overlay_to_waveform: dtype {dtype} not supported, returning early")
+            return
+        
+        try:
+            data = np.asarray(value)
+            print(f"[DEBUG] _add_overlay_to_waveform: data.shape={data.shape}, data.ndim={data.ndim}")
+            if data.ndim != 1:
+                print(f"[DEBUG] _add_overlay_to_waveform: data.ndim != 1, returning early")
+                return  # Only 1D arrays supported for overlay
+        except (ValueError, TypeError) as e:
+            print(f"[DEBUG] _add_overlay_to_waveform: Exception converting to array: {e}")
+            return
+        
+        # Get or create overlay curves dict on the plot
+        if not hasattr(plot, '_overlay_curves'):
+            plot._overlay_curves = {}
+        
+        # Create or update the curve for this symbol
+        if symbol not in plot._overlay_curves:
+            print(f"[DEBUG] _add_overlay_to_waveform: Creating NEW curve for {symbol}")
+            # Pick a distinct color from the palette
+            from pyprobe.plugins.builtins.waveform import ROW_COLORS
+            color_idx = len(plot._overlay_curves) + 1  # +1 to skip main signal color
+            color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+            print(f"[DEBUG] _add_overlay_to_waveform: Using color {color} (idx={color_idx})")
+            
+            curve = plot._plot_widget.plot(
+                pen=pg.mkPen(color=color, width=1.5, style=pg.mkPen(color).style()),
+                antialias=False,
+                name=symbol
+            )
+            plot._overlay_curves[symbol] = curve
+            
+            # Update legend if exists
+            if hasattr(plot, '_legend') and plot._legend is not None:
+                plot._legend.addItem(curve, symbol)
+            print(f"[DEBUG] _add_overlay_to_waveform: Created curve object: {curve}")
+            logger.debug(f"Created overlay curve for {symbol}")
+        else:
+            print(f"[DEBUG] _add_overlay_to_waveform: Updating EXISTING curve for {symbol}")
+        
+        # Update the curve data
+        curve = plot._overlay_curves[symbol]
+        x = np.arange(len(data))
+        
+        # Downsample if needed (use plot's downsampling)
+        if len(data) > plot.MAX_DISPLAY_POINTS:
+            print(f"[DEBUG] _add_overlay_to_waveform: Downsampling from {len(data)} points")
+            data = plot.downsample(data)
+            x = np.arange(len(data))
+        
+        print(f"[DEBUG] _add_overlay_to_waveform: Setting data on curve, len={len(data)}, x range=[{x[0]}, {x[-1]}], data range=[{data.min():.4f}, {data.max():.4f}]")
+        curve.setData(x, data)
+

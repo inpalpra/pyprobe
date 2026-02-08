@@ -11,28 +11,27 @@ class ProbeAnimations:
 
     @staticmethod
     def fade_out(widget: QWidget, duration_ms: int = 300, on_finished=None) -> QPropertyAnimation:
-        """Create fade-out animation for probe removal."""
-        logger.debug(f"fade_out called with widget: {widget}, duration_ms: {duration_ms}, on_finished: {on_finished}")
-        effect = QGraphicsOpacityEffect(widget)
-        widget.setGraphicsEffect(effect)
-
-        # Parent animation to widget to prevent garbage collection
-        anim = QPropertyAnimation(effect, b"opacity", widget)
-        anim.setDuration(duration_ms)
-        anim.setStartValue(1.0)
-        anim.setEndValue(0.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
-
-        if on_finished:
-            anim.finished.connect(on_finished)
-            anim.finished.connect(lambda: logger.debug("fade_out animation finished, callback invoked"))
-
-        # Store reference on widget to prevent garbage collection
-        widget._fade_anim = anim
+        """Create fade-out animation for probe removal.
         
-        logger.debug("fade_out: Starting animation")
-        anim.start()
-        return anim
+        Note: Using simple timer-based approach instead of QGraphicsOpacityEffect
+        to avoid QPainter conflicts that occur when the effect paints during
+        other paint events.
+        """
+        from PyQt6.QtCore import QTimer
+        
+        logger.debug(f"fade_out called with widget: {widget}, duration_ms: {duration_ms}")
+        
+        # Simple approach: just delay the callback without opacity animation
+        # This avoids QPainter conflicts from QGraphicsOpacityEffect
+        def complete():
+            logger.debug("fade_out: Timer complete, calling on_finished")
+            if on_finished:
+                on_finished()
+        
+        QTimer.singleShot(duration_ms, complete)
+        
+        # Return None since we're not using QPropertyAnimation anymore
+        return None
 
     @staticmethod
     def fade_in(widget: QWidget, duration_ms: int = 200, on_finished=None) -> QPropertyAnimation:
