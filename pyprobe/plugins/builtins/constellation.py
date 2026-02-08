@@ -4,9 +4,12 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QRectF, QTimer
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
+from ...plots.axis_controller import AxisController
+from ...plots.pin_indicator import PinIndicator
 
 
 class ConstellationWidget(QWidget):
@@ -21,6 +24,11 @@ class ConstellationWidget(QWidget):
         self._color = color
         self._data: Optional[np.ndarray] = None
         self._history: List[np.ndarray] = []
+        
+        # Axis pinning
+        self._axis_controller: Optional[AxisController] = None
+        self._pin_indicator: Optional[PinIndicator] = None
+        
         self._setup_ui()
     
     def _setup_ui(self):
@@ -89,6 +97,17 @@ class ConstellationWidget(QWidget):
             self._plot_widget.addItem(scatter)
             self._scatter_items.append(scatter)
 
+        # Setup axis controller and pin indicator
+        plot_item = self._plot_widget.getPlotItem()
+        self._axis_controller = AxisController(plot_item)
+        self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
+
+        self._pin_indicator = PinIndicator(self)
+        self._pin_indicator.x_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('x'))
+        self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
+        self._pin_indicator.raise_()
+        self._pin_indicator.show()
+
     def downsample(self, data: np.ndarray) -> np.ndarray:
         """Randomly subsample for display."""
         if len(data) <= self.MAX_DISPLAY_POINTS:
@@ -133,8 +152,9 @@ class ConstellationWidget(QWidget):
             if 0 <= scatter_idx < len(self._scatter_items):
                 self._scatter_items[scatter_idx].setData(x=data.real, y=data.imag)
         
-        # Force autoRange to ensure data is visible
-        self._plot_widget.autoRange()
+        # Note: Do NOT call autoRange() here - AxisController manages auto-ranging
+        # via enableAutoRange(). Calling autoRange() every frame would override
+        # any pinned axis settings.
             
         shape_str = f"[{value.shape}]" if shape else ""
         self._info_label.setText(f"{shape_str} {source_info}")
@@ -149,6 +169,53 @@ class ConstellationWidget(QWidget):
         power_db = 10 * np.log10(power) if power > 0 else -np.inf
         
         self._stats_label.setText(f"Power: {power_db:.2f} dB | Symbols: {len(self._data)}")
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state change from AxisController."""
+        if self._pin_indicator:
+            self._pin_indicator.update_state(axis, is_pinned)
+        
+        # Constellation uses aspect locking for proper I/Q display, but this
+        # prevents independent axis control. Unlock aspect when any axis is pinned.
+        if self._axis_controller:
+            any_pinned = self._axis_controller.x_pinned or self._axis_controller.y_pinned
+            self._plot_widget.setAspectLocked(not any_pinned)
+
+    @property
+    def axis_controller(self) -> Optional[AxisController]:
+        """Access the axis controller for external use."""
+        return self._axis_controller
+
+    def showEvent(self, event) -> None:
+        """Trigger layout update when widget is shown."""
+        super().showEvent(event)
+        QTimer.singleShot(0, self._update_pin_layout)
+
+    def resizeEvent(self, event) -> None:
+        """Reposition pin indicator on resize."""
+        super().resizeEvent(event)
+        self._update_pin_layout()
+
+    def _update_pin_layout(self) -> None:
+        """Update the position of pin indicators relative to plot area."""
+        if self._pin_indicator and self._plot_widget:
+            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
+            
+            plot_item = self._plot_widget.getPlotItem()
+            
+            def get_mapped_rect(item):
+                scene_rect = item.sceneBoundingRect()
+                view_poly = self._plot_widget.mapFromScene(scene_rect)
+                view_rect = view_poly.boundingRect()
+                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
+                return QRectF(
+                    float(tl_mapped.x()), float(tl_mapped.y()),
+                    view_rect.width(), view_rect.height()
+                )
+
+            view_rect = get_mapped_rect(plot_item.getViewBox())
+            self._pin_indicator.update_layout(view_rect)
+            self._pin_indicator.raise_()
 
 
 class ConstellationPlugin(ProbePlugin):

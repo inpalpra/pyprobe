@@ -5,9 +5,12 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QRectF, QTimer
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_SCALAR
+from ...plots.axis_controller import AxisController
+from ...plots.pin_indicator import PinIndicator
 
 
 class ScalarHistoryWidget(QWidget):
@@ -21,6 +24,11 @@ class ScalarHistoryWidget(QWidget):
         self._color = color
         self._history: deque = deque(maxlen=self.DEFAULT_HISTORY_LENGTH)
         self._has_data = False
+        
+        # Axis pinning
+        self._axis_controller: Optional[AxisController] = None
+        self._pin_indicator: Optional[PinIndicator] = None
+        
         self._setup_ui()
     
     def _setup_ui(self):
@@ -74,6 +82,17 @@ class ScalarHistoryWidget(QWidget):
         )
         self._plot_widget.setMouseEnabled(x=True, y=True)
 
+        # Setup axis controller and pin indicator
+        plot_item = self._plot_widget.getPlotItem()
+        self._axis_controller = AxisController(plot_item)
+        self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
+
+        self._pin_indicator = PinIndicator(self)
+        self._pin_indicator.x_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('x'))
+        self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
+        self._pin_indicator.raise_()
+        self._pin_indicator.show()
+
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the chart with a new scalar value."""
         if value is None:
@@ -108,6 +127,47 @@ class ScalarHistoryWidget(QWidget):
         mean_val = np.mean(data)
         
         self._stats_label.setText(f"Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}")
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state change from AxisController."""
+        if self._pin_indicator:
+            self._pin_indicator.update_state(axis, is_pinned)
+
+    @property
+    def axis_controller(self) -> Optional[AxisController]:
+        """Access the axis controller for external use."""
+        return self._axis_controller
+
+    def showEvent(self, event) -> None:
+        """Trigger layout update when widget is shown."""
+        super().showEvent(event)
+        QTimer.singleShot(0, self._update_pin_layout)
+
+    def resizeEvent(self, event) -> None:
+        """Reposition pin indicator on resize."""
+        super().resizeEvent(event)
+        self._update_pin_layout()
+
+    def _update_pin_layout(self) -> None:
+        """Update the position of pin indicators relative to plot area."""
+        if self._pin_indicator and self._plot_widget:
+            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
+            
+            plot_item = self._plot_widget.getPlotItem()
+            
+            def get_mapped_rect(item):
+                scene_rect = item.sceneBoundingRect()
+                view_poly = self._plot_widget.mapFromScene(scene_rect)
+                view_rect = view_poly.boundingRect()
+                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
+                return QRectF(
+                    float(tl_mapped.x()), float(tl_mapped.y()),
+                    view_rect.width(), view_rect.height()
+                )
+
+            view_rect = get_mapped_rect(plot_item.getViewBox())
+            self._pin_indicator.update_layout(view_rect)
+            self._pin_indicator.raise_()
 
 
 class ScalarHistoryPlugin(ProbePlugin):
