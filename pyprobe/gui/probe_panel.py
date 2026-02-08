@@ -153,6 +153,9 @@ class ProbePanel(QFrame):
         self._toolbar = PlotToolbar(self)
         self._toolbar.mode_changed.connect(self._on_toolbar_mode_changed)
         self._toolbar.reset_requested.connect(self._on_toolbar_reset)
+        
+        # Apply initial POINTER mode to disable mouse pan/zoom by default
+        self._on_toolbar_mode_changed(InteractionMode.POINTER)
 
         # Store base stylesheet for focus indicator toggling
         self._focus_style_base = self.styleSheet()
@@ -225,6 +228,10 @@ class ProbePanel(QFrame):
         # Insert into layout (index 1, after header)
         self._layout.insertWidget(1, self._plot)
         self._plot.show()  # Ensure new widget is visible
+        
+        # Re-apply current toolbar mode to new plot widget
+        if self._toolbar:
+            self._on_toolbar_mode_changed(self._toolbar.current_mode)
         
         # Re-apply data if we had any - defer with QTimer to ensure widget is realized
         if hasattr(self, '_data') and self._data is not None:
@@ -330,11 +337,18 @@ class ProbePanel(QFrame):
         if self._plot and hasattr(self._plot, '_plot_widget'):
             vb = self._plot._plot_widget.getPlotItem().getViewBox()
             if mode == InteractionMode.PAN:
+                # Enable mouse and set to pan mode
+                vb.setMouseEnabled(x=True, y=True)
                 vb.setMouseMode(vb.PanMode)
             elif mode in (InteractionMode.ZOOM, InteractionMode.ZOOM_X, InteractionMode.ZOOM_Y):
+                # Enable mouse and set to rect (zoom box) mode
+                vb.setMouseEnabled(x=True, y=True)
                 vb.setMouseMode(vb.RectMode)
             else:
+                # POINTER mode: disable mouse pan/zoom entirely
+                # Set to PanMode first (not RectMode) so rect-zoom doesn't persist
                 vb.setMouseMode(vb.PanMode)
+                vb.setMouseEnabled(x=False, y=False)
 
     def _on_toolbar_reset(self) -> None:
         """Handle reset from toolbar."""

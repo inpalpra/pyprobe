@@ -1,13 +1,14 @@
-"""Visualization plugins for complex 1D arrays."""
 from typing import Any, Optional, Tuple, List
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QRectF, QTimer
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
+from ...plots.axis_controller import AxisController
+from ...plots.pin_indicator import PinIndicator
 
 MAX_DISPLAY_POINTS = 5000
 
@@ -38,6 +39,11 @@ class ComplexWidget(QWidget):
         self._color = color
         self._plot_widget = pg.PlotWidget()
         self._info_label = QLabel("")
+        
+        # Axis pinning
+        self._axis_controller: Optional[AxisController] = None
+        self._pin_indicator: Optional[PinIndicator] = None
+        
         self._setup_ui()
         self._configure_plot()
 
@@ -64,9 +70,61 @@ class ComplexWidget(QWidget):
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self._plot_widget.setLabel('bottom', 'Sample Index')
         self._plot_legend = self._plot_widget.addLegend(offset=(10, 10))
+        
+        # Setup axis controller and pin indicator
+        plot_item = self._plot_widget.getPlotItem()
+        self._axis_controller = AxisController(plot_item)
+        self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
+
+        self._pin_indicator = PinIndicator(self)
+        self._pin_indicator.x_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('x'))
+        self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
+        self._pin_indicator.raise_()
+        self._pin_indicator.show()
 
     def update_info(self, text: str):
         self._info_label.setText(text)
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state change from AxisController."""
+        if self._pin_indicator:
+            self._pin_indicator.update_state(axis, is_pinned)
+
+    @property
+    def axis_controller(self) -> Optional[AxisController]:
+        """Access the axis controller for external use."""
+        return self._axis_controller
+
+    def showEvent(self, event) -> None:
+        """Trigger layout update when widget is shown."""
+        super().showEvent(event)
+        QTimer.singleShot(0, self._update_pin_layout)
+
+    def resizeEvent(self, event) -> None:
+        """Reposition pin indicator on resize."""
+        super().resizeEvent(event)
+        self._update_pin_layout()
+
+    def _update_pin_layout(self) -> None:
+        """Update the position of pin indicators relative to plot area."""
+        if self._pin_indicator and self._plot_widget:
+            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
+            
+            plot_item = self._plot_widget.getPlotItem()
+            
+            def get_mapped_rect(item):
+                scene_rect = item.sceneBoundingRect()
+                view_poly = self._plot_widget.mapFromScene(scene_rect)
+                view_rect = view_poly.boundingRect()
+                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
+                return QRectF(
+                    float(tl_mapped.x()), float(tl_mapped.y()),
+                    view_rect.width(), view_rect.height()
+                )
+
+            view_rect = get_mapped_rect(plot_item.getViewBox())
+            self._pin_indicator.update_layout(view_rect)
+            self._pin_indicator.raise_()
 
 class ComplexRIWidget(ComplexWidget):
     """Real & Imaginary components."""
@@ -121,6 +179,14 @@ class ComplexMAWidget(ComplexWidget):
     def _update_views(self):
         self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
         self._p2.linkedViewChanged(self._p1.vb, self._p2.XAxis)
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state - also control secondary Y axis for phase."""
+        super()._on_pin_state_changed(axis, is_pinned)
+        
+        # When Y axis is locked/unlocked, also lock/unlock the secondary ViewBox (phase)
+        if axis == 'y':
+            self._p2.enableAutoRange(axis='y', enable=not is_pinned)
 
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
