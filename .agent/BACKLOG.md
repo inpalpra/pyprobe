@@ -4,11 +4,6 @@
 
 ## P1 - High Priority
 
-### [M2.5] Axis pinning does not work
-- Pinning X, Y, or both axes has no effect
-- No lock symbol visible in the UI when pinned
-- **File**: `graph_control_bar.py`, `waveform_plot.py`
-
 ### [M2.5] Default pan behavior interferes with zoom modes
 - Click-and-drag PANs the graph (default PyQt behavior)
 - Happens even when interaction button is simple mouse pointer

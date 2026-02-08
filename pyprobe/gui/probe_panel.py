@@ -506,6 +506,10 @@ class ProbePanelContainer(QScrollArea):
         self._next_row = 0
         self._next_col = 0
         self._cols = 2  # 2 columns by default
+        
+        # Ensure equal column width
+        for c in range(self._cols):
+            self._layout.setColumnStretch(c, 1)
 
     def create_panel(
         self,
@@ -566,14 +570,8 @@ class ProbePanelContainer(QScrollArea):
         panel.maximize_requested.connect(lambda p=panel: self._layout_manager.toggle_maximize(p))
         self._focus_manager.register_panel(panel)
 
-        # Add to grid
-        self._layout.addWidget(panel, self._next_row, self._next_col)
-
-        # Advance position
-        self._next_col += 1
-        if self._next_col >= self._cols:
-            self._next_col = 0
-            self._next_row += 1
+        # Add to grid via relayout to handle spanning logic
+        self._relayout_panels()
 
         return panel
 
@@ -629,16 +627,30 @@ class ProbePanelContainer(QScrollArea):
             self._placeholder.show()
 
     def _relayout_panels(self):
-        """Re-layout panels after removal."""
+        """Re-layout panels after changes."""
         # Remove all panels from layout
-        for panel in self._panels.values():
-            self._layout.removeWidget(panel)
+        # (We iterate a copy of keys or values if needed, but removeWidget is safe)
+        for i in reversed(range(self._layout.count())):
+            item = self._layout.itemAt(i)
+            if item.widget() and item.widget() != self._placeholder:
+                self._layout.removeWidget(item.widget())
 
-        # Re-add in order
+        panels = list(self._panels.values())
+        if not panels:
+            return
+
         self._next_row = 0
         self._next_col = 0
+        
+        # If only one panel, span full width
+        if len(panels) == 1:
+            self._layout.addWidget(panels[0], 0, 0, 1, self._cols)
+            self._next_row = 1
+            self._next_col = 0
+            return
 
-        for panel in self._panels.values():
+        # Otherwise grid layout
+        for panel in panels:
             self._layout.addWidget(panel, self._next_row, self._next_col)
             self._next_col += 1
             if self._next_col >= self._cols:

@@ -4,6 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QRectF
 
 from ..base import ProbePlugin
 from ...core.data_classifier import (
@@ -111,6 +112,8 @@ class WaveformWidget(QWidget):
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
         
         self._pin_indicator = PinIndicator(self)  # Parent to WaveformWidget
+        self._pin_indicator.x_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('x'))
+        self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
     
@@ -124,12 +127,39 @@ class WaveformWidget(QWidget):
         """Access the axis controller for external use (e.g., keyboard shortcuts)."""
         return self._axis_controller
     
+    def showEvent(self, event) -> None:
+        """Trigger layout update when widget is shown."""
+        super().showEvent(event)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._update_pin_layout)
+
     def resizeEvent(self, event) -> None:
-        """Reposition pin indicator on resize."""
+        """Reposition pin indicator buttons on resize."""
         super().resizeEvent(event)
-        if self._pin_indicator:
-            # Position over the plot area (below header, offset from left)
-            self._pin_indicator.move(15, 35)
+        self._update_pin_layout()
+
+    def _update_pin_layout(self) -> None:
+        """Update the position of pin indicators."""
+        if self._pin_indicator and self._plot_widget:
+            # Resize indicator overlay to cover full widget
+            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
+            
+            plot_item = self._plot_widget.getPlotItem()
+            
+            def get_mapped_rect(item):
+                scene_rect = item.sceneBoundingRect()
+                view_poly = self._plot_widget.mapFromScene(scene_rect)
+                view_rect = view_poly.boundingRect()
+                # Map top-left to self (WaveformWidget) coordinates
+                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
+                return QRectF(
+                    float(tl_mapped.x()), float(tl_mapped.y()),
+                    view_rect.width(), view_rect.height()
+                )
+
+            view_rect = get_mapped_rect(plot_item.getViewBox())
+            
+            self._pin_indicator.update_layout(view_rect)
             self._pin_indicator.raise_()
         
     def _get_row_color(self, row_index: int) -> str:

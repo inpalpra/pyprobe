@@ -137,6 +137,8 @@ class WaveformPlot(BasePlot):
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
 
         self._pin_indicator = PinIndicator(self)  # Parent to WaveformPlot, not _plot_widget
+        self._pin_indicator.x_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('x'))
+        self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()  # Ensure above plot content
         self._pin_indicator.show()    # Make widget visible (labels hidden until pinned)
 
@@ -631,14 +633,39 @@ class WaveformPlot(BasePlot):
         else:
             curve.setData(display_data)
 
+    def showEvent(self, event) -> None:
+        """Trigger layout update when widget is shown."""
+        super().showEvent(event)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._update_pin_layout)
+
     def resizeEvent(self, event) -> None:
         """Reposition pin indicator on resize."""
         super().resizeEvent(event)
-        if self._pin_indicator:
-            # Position over the plot area (below header, offset from left)
-            # Header is about 25px, so start indicator at ~35px from top
-            self._pin_indicator.move(15, 35)
-            self._pin_indicator.raise_()  # Maintain z-order
+        self._update_pin_layout()
 
+    def _update_pin_layout(self) -> None:
+        """Update the position of pin indicators relative to plot area."""
+        if self._pin_indicator and self._plot_widget:
+            from PyQt6.QtCore import QRectF
+            # Resize indicator overlay to cover full widget
+            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
+            
+            plot_item = self._plot_widget.getPlotItem()
+            
+            def get_mapped_rect(item):
+                scene_rect = item.sceneBoundingRect()
+                view_poly = self._plot_widget.mapFromScene(scene_rect)
+                view_rect = view_poly.boundingRect()
+                # Map top-left to self (WaveformPlot) coordinates
+                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
+                return QRectF(
+                    float(tl_mapped.x()), float(tl_mapped.y()),
+                    view_rect.width(), view_rect.height()
+                )
 
+            view_rect = get_mapped_rect(plot_item.getViewBox())
+            
+            self._pin_indicator.update_layout(view_rect)
+            self._pin_indicator.raise_()
 

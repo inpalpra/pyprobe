@@ -1,22 +1,85 @@
 """
-Lock icon indicator for pinned axes.
-Positioned inside the plot area, near the axis labels.
+Lock icon buttons for pinned axes.
+- X lock positioned near X axis (bottom-left of plot)
+- Y lock positioned near Y axis (top-left of plot)
+- Always visible: translucent when inactive, opaque when active
+- Clickable to toggle pin state
 """
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+import os
+from PyQt6.QtWidgets import QWidget, QPushButton, QGraphicsOpacityEffect
+from PyQt6.QtCore import Qt, pyqtSignal, QRectF
+from PyQt6.QtGui import QIcon, QRegion
 
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
 
 
-class PinIndicator(QWidget):
-    """Lock icon overlay showing axis pin state.
+class PinButton(QPushButton):
+    """A single pin button with opacity toggle."""
     
-    Shows 🔒X and/or 🔒Y when axes are pinned.
-    Positioned at top-left of plot area.
+    def __init__(self, icon_path: str, tooltip: str, parent: QWidget = None):
+        super().__init__(parent)
+        self._pinned = False
+        
+        # Setup appearance
+        self.setFixedSize(20, 20)
+        self.setCheckable(True)
+        self.setToolTip(tooltip)
+        
+        if os.path.exists(icon_path):
+            self.setIcon(QIcon(icon_path))
+        
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(13, 13, 13, 180);
+                border: 1px solid #00ffff;
+                border-radius: 3px;
+                padding: 2px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 255, 255, 60);
+            }
+            QPushButton:checked {
+                background-color: rgba(0, 255, 255, 100);
+                border: 2px solid #00ffff;
+            }
+        """)
+        
+        # Setup opacity effect
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self._opacity_effect)
+        self._set_opacity(False)
+    
+    def _set_opacity(self, active: bool) -> None:
+        """Set opacity based on pin state."""
+        self._opacity_effect.setOpacity(1.0 if active else 0.4)
+    
+    def set_pinned(self, pinned: bool) -> None:
+        """Update the button's pinned visual state."""
+        self._pinned = pinned
+        self.setChecked(pinned)
+        self._set_opacity(pinned)
+    
+    @property
+    def is_pinned(self) -> bool:
+        return self._pinned
+
+
+class PinIndicator(QWidget):
+    """Lock icon buttons showing axis pin state.
+    
+    - X lock near bottom-left (near X axis)
+    - Y lock near top-left (near Y axis)
+    - Always visible, clickable to toggle
+    
+    Signals:
+        x_pin_clicked(): Emitted when X lock button clicked
+        y_pin_clicked(): Emitted when Y lock button clicked
     """
+    
+    x_pin_clicked = pyqtSignal()
+    y_pin_clicked = pyqtSignal()
     
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
@@ -25,45 +88,79 @@ class PinIndicator(QWidget):
         self._setup_ui()
     
     def _setup_ui(self) -> None:
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # Don't block mouse events - we want buttons to be clickable
         self.setStyleSheet("background: transparent;")
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        # Get icon paths
+        icon_dir = os.path.join(os.path.dirname(__file__), '..', 'gui', 'icons')
+        # If we're already in gui/icons parent, adjust path
+        if not os.path.exists(icon_dir):
+            icon_dir = os.path.join(os.path.dirname(__file__), 'icons')
+        if not os.path.exists(icon_dir):
+            # Fallback for plugin context
+            icon_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'gui', 'icons')
         
-        font = QFont("JetBrains Mono", 9)
+        x_icon = os.path.join(icon_dir, 'icon_lock_x.svg')
+        y_icon = os.path.join(icon_dir, 'icon_lock_y.svg')
         
-        self._x_label = QLabel("🔒X")
-        self._x_label.setFont(font)
-        self._x_label.setStyleSheet("color: #00ffff; background: rgba(13, 13, 13, 180); border-radius: 3px; padding: 1px 3px;")
-        self._x_label.hide()
-        layout.addWidget(self._x_label)
+        # Create X pin button
+        self._x_btn = PinButton(x_icon, "Lock X axis (X key)", self)
+        self._x_btn.clicked.connect(self._on_x_clicked)
         
-        self._y_label = QLabel("🔒Y")
-        self._y_label.setFont(font)
-        self._y_label.setStyleSheet("color: #00ffff; background: rgba(13, 13, 13, 180); border-radius: 3px; padding: 1px 3px;")
-        self._y_label.hide()
-        layout.addWidget(self._y_label)
+        # Create Y pin button
+        self._y_btn = PinButton(y_icon, "Lock Y axis (Y key)", self)
+        self._y_btn.clicked.connect(self._on_y_clicked)
         
-        layout.addStretch()
-        self.adjustSize()
+        # Set minimum size to contain both buttons with some margin
+        self.setMinimumSize(100, 100)
+    
+    def _on_x_clicked(self) -> None:
+        logger.debug("X pin button clicked")
+        self.x_pin_clicked.emit()
+    
+    def _on_y_clicked(self) -> None:
+        logger.debug("Y pin button clicked")
+        self.y_pin_clicked.emit()
+    
+    def update_layout(self, view_rect: QRectF) -> None:
+        """Position buttons relative to the plot area.
+        
+        Args:
+            view_rect: The main plot area (ViewBox) in parent coordinates.
+        """
+        # Y lock: Inside plot area at top-left
+        # view_rect.left() is the left edge of the plot area
+        y_x = view_rect.left() + 4
+        y_y = view_rect.top() + 4
+        self._y_btn.move(int(y_x), int(y_y))
+        
+        # X lock: Inside plot area at bottom-right, but clear of toolbar
+        # "Near X axis, on the right side"
+        # Toolbar is ~130px wide at bottom-right
+        TOOLBAR_WIDTH_CLEARANCE = 130
+        x_x = view_rect.right() - self._x_btn.width() - TOOLBAR_WIDTH_CLEARANCE
+        x_y = view_rect.bottom() - self._x_btn.height() - 4
+        self._x_btn.move(int(x_x), int(x_y))
+        
+        self._x_btn.raise_()
+        self._y_btn.raise_()
+        
+        self._update_mask()
+
+    def _update_mask(self) -> None:
+        """Update mask to only allow input on buttons."""
+        mask = QRegion(self._x_btn.geometry()) + QRegion(self._y_btn.geometry())
+        self.setMask(mask)
     
     def set_x_pinned(self, pinned: bool) -> None:
         logger.debug(f"PinIndicator.set_x_pinned({pinned})")
         self._x_pinned = pinned
-        self._x_label.setVisible(pinned)
-        self.adjustSize()
-        self.raise_()  # Ensure on top
-        logger.debug(f"  _x_label visible: {self._x_label.isVisible()}, indicator visible: {self.isVisible()}")
+        self._x_btn.set_pinned(pinned)
     
     def set_y_pinned(self, pinned: bool) -> None:
         logger.debug(f"PinIndicator.set_y_pinned({pinned})")
         self._y_pinned = pinned
-        self._y_label.setVisible(pinned)
-        self.adjustSize()
-        self.raise_()  # Ensure on top
-        logger.debug(f"  _y_label visible: {self._y_label.isVisible()}, indicator visible: {self.isVisible()}")
+        self._y_btn.set_pinned(pinned)
     
     def update_state(self, axis: str, is_pinned: bool) -> None:
         logger.debug(f"PinIndicator.update_state(axis={axis}, is_pinned={is_pinned})")
