@@ -55,6 +55,7 @@ class CodeViewer(QPlainTextEdit):
 
         # M2.5: Drag state for signal overlay
         self._drag_start_pos: Optional[QPoint] = None
+        self._drag_start_anchor: Optional[ProbeAnchor] = None
 
         self._setup_ui()
 
@@ -245,26 +246,17 @@ class CodeViewer(QPlainTextEdit):
             self.viewport().update()
 
     def mousePressEvent(self, event) -> None:
-        """Handle mouse clicks for probe toggle and drag start."""
+        """Handle mouse press - record position for potential drag or click."""
         if event.button() == Qt.MouseButton.LeftButton:
             anchor = self._get_anchor_at_position(event.pos())
-            logger.debug(f"mousePressEvent: Click at pos {event.pos()}")
-            logger.debug(f"mousePressEvent: anchor at position: {anchor}")
-            logger.debug(f"mousePressEvent: _active_probes keys: {list(self._active_probes.keys())}")
-
             if anchor is not None:
-                is_active = anchor in self._active_probes
-                logger.debug(f"mousePressEvent: anchor in _active_probes: {is_active}")
-                # Check if clicking on an active probe
-                if is_active:
-                    logger.debug(f"mousePressEvent: Emitting probe_removed for {anchor}")
-                    self.probe_removed.emit(anchor)
-                else:
-                    logger.debug(f"mousePressEvent: Emitting probe_requested for {anchor}")
-                    self.probe_requested.emit(anchor)
-
-                # M2.5: Record drag start position for potential overlay drag
+                # Record drag start position and anchor for potential drag or click
                 self._drag_start_pos = event.pos()
+                self._drag_start_anchor = anchor
+                logger.debug(f"mousePressEvent: Started potential drag/click at {event.pos()}")
+            else:
+                self._drag_start_pos = None
+                self._drag_start_anchor = None
 
         super().mousePressEvent(event)
 
@@ -272,6 +264,7 @@ class CodeViewer(QPlainTextEdit):
         """Handle mouse leaving the widget."""
         super().leaveEvent(event)
         self._drag_start_pos = None
+        self._drag_start_anchor = None
 
         if self._hover_anchor is not None:
             self._hover_anchor = None
@@ -280,8 +273,26 @@ class CodeViewer(QPlainTextEdit):
             self.viewport().update()
 
     def mouseReleaseEvent(self, event) -> None:
-        """Clear drag start on mouse release."""
+        """Handle mouse release - toggle probe if no drag occurred."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Only toggle probe if we started on an anchor and didn't drag
+            if self._drag_start_anchor is not None and self._drag_start_pos is not None:
+                # Check if we stayed in roughly the same position (not a drag)
+                if (event.pos() - self._drag_start_pos).manhattanLength() <= 10:
+                    anchor = self._drag_start_anchor
+                    is_active = anchor in self._active_probes
+                    logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}")
+                    logger.debug(f"mouseReleaseEvent: anchor in _active_probes: {is_active}")
+                    
+                    if is_active:
+                        logger.debug(f"mouseReleaseEvent: Emitting probe_removed for {anchor}")
+                        self.probe_removed.emit(anchor)
+                    else:
+                        logger.debug(f"mouseReleaseEvent: Emitting probe_requested for {anchor}")
+                        self.probe_requested.emit(anchor)
+        
         self._drag_start_pos = None
+        self._drag_start_anchor = None
         super().mouseReleaseEvent(event)
 
     def _start_drag(self) -> None:
