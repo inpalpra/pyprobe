@@ -55,6 +55,11 @@ class ProbePanel(QFrame):
         self._lens_dropdown: Optional[LensDropdown] = None
         self._toolbar: Optional[PlotToolbar] = None
         self._focus_style_base = ""
+        
+        # Track interaction mode and saved ranges for axis-constrained zoom
+        self._current_interaction_mode = InteractionMode.POINTER
+        self._saved_x_range = None
+        self._saved_y_range = None
 
         self._setup_ui()
 
@@ -334,21 +339,91 @@ class ProbePanel(QFrame):
 
     def _on_toolbar_mode_changed(self, mode: InteractionMode) -> None:
         """Handle interaction mode change from toolbar."""
+        self._current_interaction_mode = mode
+        logger.debug(f"Toolbar mode changed to {mode.name}")
+        
         if self._plot and hasattr(self._plot, '_plot_widget'):
             vb = self._plot._plot_widget.getPlotItem().getViewBox()
+            
+            # Restore original setRange if we had patched it
+            if hasattr(vb, '_original_setRange'):
+                vb.setRange = vb._original_setRange
+                del vb._original_setRange
+                logger.debug("  Restored original setRange")
+            
+            # Get current ranges for constraining
+            x_range, y_range = vb.viewRange()
+            self._saved_x_range = list(x_range)
+            self._saved_y_range = list(y_range)
+            
             if mode == InteractionMode.PAN:
-                # Enable mouse and set to pan mode
                 vb.setMouseEnabled(x=True, y=True)
                 vb.setMouseMode(vb.PanMode)
-            elif mode in (InteractionMode.ZOOM, InteractionMode.ZOOM_X, InteractionMode.ZOOM_Y):
-                # Enable mouse and set to rect (zoom box) mode
+            elif mode == InteractionMode.ZOOM:
                 vb.setMouseEnabled(x=True, y=True)
                 vb.setMouseMode(vb.RectMode)
+            elif mode == InteractionMode.ZOOM_X:
+                # X-only zoom: patch setRange to ignore Y changes
+                vb.setMouseEnabled(x=True, y=True)
+                vb.setMouseMode(vb.RectMode)
+                self._plot._plot_widget.setAspectLocked(False)
+                self._patch_setrange_for_axis(vb, 'x')
+                logger.debug(f"  ZOOM_X: Patched setRange to lock Y at {self._saved_y_range}")
+            elif mode == InteractionMode.ZOOM_Y:
+                # Y-only zoom: patch setRange to ignore X changes
+                vb.setMouseEnabled(x=True, y=True)
+                vb.setMouseMode(vb.RectMode)
+                self._plot._plot_widget.setAspectLocked(False)
+                self._patch_setrange_for_axis(vb, 'y')
+                logger.debug(f"  ZOOM_Y: Patched setRange to lock X at {self._saved_x_range}")
             else:
                 # POINTER mode: disable mouse pan/zoom entirely
-                # Set to PanMode first (not RectMode) so rect-zoom doesn't persist
                 vb.setMouseMode(vb.PanMode)
                 vb.setMouseEnabled(x=False, y=False)
+    
+    def _patch_setrange_for_axis(self, vb, allowed_axis: str):
+        """Monkey-patch ViewBox.setRange to constrain zoom to one axis."""
+        import types
+        from PyQt6.QtCore import QRectF
+        
+        # Store original method
+        vb._original_setRange = vb.setRange
+        saved_x = self._saved_x_range
+        saved_y = self._saved_y_range
+        
+        def constrained_setRange(rect=None, xRange=None, yRange=None, padding=None,
+                                  update=True, disableAutoRange=True):
+            # If rect is provided (from RectMode zoom), extract and constrain
+            if rect is not None:
+                if isinstance(rect, QRectF):
+                    if allowed_axis == 'x':
+                        # Keep Y fixed, only apply X from rect
+                        xRange = [rect.left(), rect.right()]
+                        yRange = saved_y
+                        rect = None
+                    else:  # allowed_axis == 'y'
+                        # Keep X fixed, only apply Y from rect
+                        xRange = saved_x
+                        yRange = [rect.top(), rect.bottom()]
+                        rect = None
+            else:
+                # For explicit xRange/yRange calls, constrain appropriately
+                if allowed_axis == 'x' and yRange is not None:
+                    yRange = saved_y
+                elif allowed_axis == 'y' and xRange is not None:
+                    xRange = saved_x
+            
+            # Update saved range for the moving axis
+            if allowed_axis == 'x' and xRange is not None:
+                saved_x[0], saved_x[1] = xRange[0], xRange[1]
+            elif allowed_axis == 'y' and yRange is not None:
+                saved_y[0], saved_y[1] = yRange[0], yRange[1]
+            
+            return vb._original_setRange(rect=rect, xRange=xRange, yRange=yRange,
+                                          padding=padding, update=update,
+                                          disableAutoRange=disableAutoRange)
+        
+        vb.setRange = types.MethodType(lambda self, *args, **kwargs: constrained_setRange(*args, **kwargs), vb)
 
     def _on_toolbar_reset(self) -> None:
         """Handle reset from toolbar."""
