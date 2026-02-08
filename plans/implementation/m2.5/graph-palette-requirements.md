@@ -1,8 +1,8 @@
 # PyProbe M2.5: Graph Palette Requirements
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Last Updated**: 2026-02-08  
-**Status**: Draft for Review
+**Status**: Approved
 
 ---
 
@@ -166,6 +166,7 @@ PARKED ──────────────────────> ACTIV
 | R5.6 | Removing last signal clears graph | P0 |
 | R5.7 | Valid drop targets highlight on drag | P1 |
 | R5.8 | Invalid drops show rejection feedback | P1 |
+| R5.9 | **No limit** on number of overlaid signals per graph | P0 |
 
 ---
 
@@ -188,20 +189,35 @@ PARKED ──────────────────────> ACTIV
 
 #### Button Semantics
 
-| Button | Icon | Behavior |
-|--------|------|----------|
-| Pointer | 🖱️ | Default, click-through to traces |
-| Pan | ✋ | Drag to pan (auto-pins affected axes) |
-| Zoom | 🔍 | Drag rectangle to zoom both axes |
-| Zoom-X | ↔️ | Drag to zoom X only |
-| Zoom-Y | ↕️ | Drag to zoom Y only |
-| Reset | ⟲ | Unpin + autoscale both axes |
+| Button | Icon Style | Behavior |
+|--------|------------|----------|
+| Pointer | Custom SVG | Default, click-through to traces |
+| Pan | Custom SVG (hand) | Drag to pan (auto-pins affected axes) |
+| Zoom | Custom SVG (magnifier) | Drag rectangle to zoom both axes |
+| Zoom-X | Custom SVG (horizontal arrows) | Drag to zoom X only |
+| Zoom-Y | Custom SVG (vertical arrows) | Drag to zoom Y only |
+| Reset | Custom SVG (reset arrow) | Unpin + autoscale both axes |
+
+> [!NOTE]
+> All icons use custom SVG matching PyProbe's dark cyberpunk aesthetic. No Unicode emoji.
 
 ---
 
-### R7: Keyboard Shortcuts
+### R7: Keyboard Shortcuts & Focus Model
 
 **Original Intent**: Implied by wanting discoverable control surface.
+
+#### Focus Model (Click-to-Focus)
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| R7.1 | Click anywhere on plot to give it keyboard focus | P0 |
+| R7.2 | Focused plot shows subtle visual indicator (border glow) | P1 |
+| R7.3 | Only one plot can have focus at a time | P0 |
+| R7.4 | Hover does NOT transfer focus (too erratic) | P0 |
+| R7.5 | Tab cycles through plots in grid order | P2 |
+
+#### Keyboard Shortcuts
 
 | Key | Action | Scope |
 |-----|--------|-------|
@@ -209,6 +225,7 @@ PARKED ──────────────────────> ACTIV
 | `Y` | Toggle Y-axis pin | Focused plot |
 | `R` | Reset view (unpin + autoscale) | Focused plot |
 | `Escape` | Return to Pointer mode | Any plot |
+| `Tab` | Cycle focus to next plot | Global |
 
 ---
 
@@ -293,12 +310,14 @@ Violations require redesign, not documentation workarounds.
 
 ---
 
-## Open Questions
+## Design Decisions (Resolved)
 
-1. **Park bar location**: Bottom vs collapsible sidebar?
-2. **Overlay limit**: Max signals per graph (5? 10? unlimited)?
-3. **Icon style**: Unicode emoji vs custom SVG icons?
-4. **Focus model**: How does a plot gain keyboard focus?
+| Question | Decision | Rationale |
+|----------|----------|----------|
+| Park bar location | **Bottom** | Matches minimize-to-taskbar mental model |
+| Overlay limit | **Unlimited** | Let users manage complexity themselves |
+| Icon style | **Custom SVG** | Match PyProbe's dark cyberpunk aesthetic |
+| Focus model | **Click-to-focus** | Predictable, avoids erratic hover-focus |
 
 ---
 
