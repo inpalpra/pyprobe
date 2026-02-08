@@ -138,6 +138,8 @@ class WaveformPlot(BasePlot):
 
         self._pin_indicator = PinIndicator(self._plot_widget)
         self._pin_indicator.move(10, 10)
+        self._pin_indicator.raise_()  # Ensure above plot content
+        self._pin_indicator.show()    # Make widget visible (labels hidden until pinned)
 
         # M2.5: Setup editable axes
         self._setup_editable_axes()
@@ -635,6 +637,7 @@ class WaveformPlot(BasePlot):
         super().resizeEvent(event)
         if self._pin_indicator:
             self._pin_indicator.move(10, 10)
+            self._pin_indicator.raise_()  # Maintain z-order
 
 
 

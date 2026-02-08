@@ -48,12 +48,12 @@ class PlotToolbar(QWidget):
             QPushButton {
                 background-color: rgba(26, 26, 46, 200);
                 border: 1px solid #00ffff;
-                border-radius: 4px;
-                padding: 4px;
-                min-width: 28px;
-                min-height: 28px;
-                max-width: 28px;
-                max-height: 28px;
+                border-radius: 3px;
+                padding: 2px;
+                min-width: 20px;
+                min-height: 20px;
+                max-width: 20px;
+                max-height: 20px;
             }
             QPushButton:hover {
                 background-color: rgba(0, 255, 255, 60);
@@ -65,8 +65,8 @@ class PlotToolbar(QWidget):
         """)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(2)
 
         icon_dir = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -139,6 +139,7 @@ class PlotToolbar(QWidget):
     def show_on_hover(self) -> None:
         """Fade in to 40% opacity."""
         self.show()
+        self.raise_()  # Ensure topmost z-order
         self._fade_anim.stop()
         self._fade_anim.setStartValue(self._opacity_effect.opacity())
         self._fade_anim.setEndValue(0.4)
@@ -162,3 +163,19 @@ class PlotToolbar(QWidget):
     @property
     def current_mode(self) -> InteractionMode:
         return self._current_mode
+
+    def enterEvent(self, event) -> None:
+        """Full opacity when hovering directly over toolbar."""
+        super().enterEvent(event)
+        self._fade_anim.stop()
+        self._fade_anim.setStartValue(self._opacity_effect.opacity())
+        self._fade_anim.setEndValue(1.0)
+        self._fade_anim.start()
+
+    def leaveEvent(self, event) -> None:
+        """Return to 40% opacity when leaving toolbar."""
+        super().leaveEvent(event)
+        self._fade_anim.stop()
+        self._fade_anim.setStartValue(self._opacity_effect.opacity())
+        self._fade_anim.setEndValue(0.4)
+        self._fade_anim.start()

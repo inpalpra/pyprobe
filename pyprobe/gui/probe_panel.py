@@ -316,11 +316,12 @@ class ProbePanel(QFrame):
         """Reposition toolbar on resize."""
         super().resizeEvent(event)
         if self._toolbar:
-            # Position at top-right of panel
+            # Position at bottom-right of panel
             self._toolbar.move(
                 self.width() - self._toolbar.sizeHint().width() - 8,
-                8
+                self.height() - self._toolbar.sizeHint().height() - 8
             )
+            self._toolbar.raise_()  # Ensure topmost z-order
 
     # === M2.5: Toolbar mode handling ===
 
