@@ -427,12 +427,19 @@ class ProbePanel(QFrame):
     def keyPressEvent(self, event) -> None:
         """Handle keyboard shortcuts for focused panel."""
         key = event.key()
+        logger.debug(f"ProbePanel.keyPressEvent: key={key}, Qt.Key.Key_X={Qt.Key.Key_X}, Qt.Key.Key_Y={Qt.Key.Key_Y}")
         if key == Qt.Key.Key_X:
+            logger.debug("  X key pressed, toggling X axis pin")
             if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
                 self._plot.axis_controller.toggle_pin('x')
+            else:
+                logger.debug("  No axis_controller found!")
         elif key == Qt.Key.Key_Y:
+            logger.debug("  Y key pressed, toggling Y axis pin")
             if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
                 self._plot.axis_controller.toggle_pin('y')
+            else:
+                logger.debug("  No axis_controller found!")
         elif key == Qt.Key.Key_R:
             if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
                 self._plot.axis_controller.reset()

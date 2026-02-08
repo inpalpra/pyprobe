@@ -50,16 +50,23 @@ class PinIndicator(QWidget):
         self.adjustSize()
     
     def set_x_pinned(self, pinned: bool) -> None:
+        logger.debug(f"PinIndicator.set_x_pinned({pinned})")
         self._x_pinned = pinned
         self._x_label.setVisible(pinned)
         self.adjustSize()
+        self.raise_()  # Ensure on top
+        logger.debug(f"  _x_label visible: {self._x_label.isVisible()}, indicator visible: {self.isVisible()}")
     
     def set_y_pinned(self, pinned: bool) -> None:
+        logger.debug(f"PinIndicator.set_y_pinned({pinned})")
         self._y_pinned = pinned
         self._y_label.setVisible(pinned)
         self.adjustSize()
+        self.raise_()  # Ensure on top
+        logger.debug(f"  _y_label visible: {self._y_label.isVisible()}, indicator visible: {self.isVisible()}")
     
     def update_state(self, axis: str, is_pinned: bool) -> None:
+        logger.debug(f"PinIndicator.update_state(axis={axis}, is_pinned={is_pinned})")
         if axis == 'x':
             self.set_x_pinned(is_pinned)
         elif axis == 'y':

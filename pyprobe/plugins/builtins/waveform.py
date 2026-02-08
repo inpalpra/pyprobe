@@ -11,6 +11,8 @@ from ...core.data_classifier import (
     DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION,
     get_waveform_info, get_waveform_collection_info
 )
+from ...plots.axis_controller import AxisController
+from ...plots.pin_indicator import PinIndicator
 
 # Deterministic color palette for multi-row plots (10 colors, cycling)
 ROW_COLORS = [
@@ -41,6 +43,11 @@ class WaveformWidget(QWidget):
         self._curves: List[pg.PlotDataItem] = []
         self._row_visible: List[bool] = []
         self._legend: Optional[pg.LegendItem] = None
+        
+        # M2.5: Axis controller and pin indicator
+        self._axis_controller: Optional[AxisController] = None
+        self._pin_indicator: Optional[PinIndicator] = None
+        
         self._setup_ui()
     
     def _setup_ui(self):
@@ -97,6 +104,33 @@ class WaveformWidget(QWidget):
         self._row_visible = [True]
         
         self._plot_widget.setMouseEnabled(x=True, y=True)
+        
+        # M2.5: Setup axis controller and pin indicator
+        plot_item = self._plot_widget.getPlotItem()
+        self._axis_controller = AxisController(plot_item)
+        self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
+        
+        self._pin_indicator = PinIndicator(self)  # Parent to WaveformWidget
+        self._pin_indicator.raise_()
+        self._pin_indicator.show()
+    
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state change from AxisController."""
+        if self._pin_indicator:
+            self._pin_indicator.update_state(axis, is_pinned)
+    
+    @property
+    def axis_controller(self) -> Optional[AxisController]:
+        """Access the axis controller for external use (e.g., keyboard shortcuts)."""
+        return self._axis_controller
+    
+    def resizeEvent(self, event) -> None:
+        """Reposition pin indicator on resize."""
+        super().resizeEvent(event)
+        if self._pin_indicator:
+            # Position over the plot area (below header, offset from left)
+            self._pin_indicator.move(15, 35)
+            self._pin_indicator.raise_()
         
     def _get_row_color(self, row_index: int) -> str:
         """Get deterministic color for row index (cycles after 10)."""

@@ -136,8 +136,7 @@ class WaveformPlot(BasePlot):
         self._axis_controller = AxisController(plot_item)
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
 
-        self._pin_indicator = PinIndicator(self._plot_widget)
-        self._pin_indicator.move(10, 10)
+        self._pin_indicator = PinIndicator(self)  # Parent to WaveformPlot, not _plot_widget
         self._pin_indicator.raise_()  # Ensure above plot content
         self._pin_indicator.show()    # Make widget visible (labels hidden until pinned)
 
@@ -636,7 +635,9 @@ class WaveformPlot(BasePlot):
         """Reposition pin indicator on resize."""
         super().resizeEvent(event)
         if self._pin_indicator:
-            self._pin_indicator.move(10, 10)
+            # Position over the plot area (below header, offset from left)
+            # Header is about 25px, so start indicator at ~35px from top
+            self._pin_indicator.move(15, 35)
             self._pin_indicator.raise_()  # Maintain z-order
 
 
