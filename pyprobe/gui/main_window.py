@@ -242,12 +242,6 @@ class MainWindow(QMainWindow):
             self._frame_count += 1
             anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
             self._probe_registry.update_data_received(anchor)
-            # DEBUG: trace data reception
-            import sys
-            panel_found = anchor in self._probe_panels
-            print(f"[GUI DEBUG] DATA_PROBE_VALUE for {anchor.symbol}: panel_found={panel_found}", file=sys.__stderr__)
-            if panel_found:
-                print(f"  dtype={msg.payload['dtype']}, shape={msg.payload.get('shape')}", file=sys.__stderr__)
             if anchor in self._probe_panels:
                 # Update metadata dtype
                 if anchor in self._probe_metadata:
@@ -266,12 +260,6 @@ class MainWindow(QMainWindow):
             for probe_data in msg.payload.get('probes', []):
                 anchor = ProbeAnchor.from_dict(probe_data['anchor'])
                 self._probe_registry.update_data_received(anchor)
-                # DEBUG: trace batch data reception
-                import sys
-                panel_found = anchor in self._probe_panels
-                print(f"[GUI DEBUG] DATA_PROBE_VALUE_BATCH for {anchor.symbol}: panel_found={panel_found}", file=sys.__stderr__)
-                if panel_found:
-                    print(f"  dtype={probe_data['dtype']}, shape={probe_data.get('shape')}", file=sys.__stderr__)
                 if anchor in self._probe_panels:
                     self._probe_panels[anchor].update_data(
                         value=probe_data['value'],

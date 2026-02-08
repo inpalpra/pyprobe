@@ -416,13 +416,7 @@ class VariableTracer:
         
         for anchor in ready_to_flush:
             try:
-                # DEBUG: trace deferred capture for QAM16_CONSTELLATION
-                if anchor.symbol == 'QAM16_CONSTELLATION':
-                    import sys
-                    print(f"[DEFERRED DEBUG] Flushing {anchor.symbol} at frame L{eval_frame.f_lineno}", file=sys.__stderr__)
-                    print(f"  in_locals: {anchor.symbol in eval_frame.f_locals}", file=sys.__stderr__)
-                    print(f"  in_globals: {anchor.symbol in eval_frame.f_globals}", file=sys.__stderr__)
-                    print(f"  frame.f_code.co_name: {eval_frame.f_code.co_name}", file=sys.__stderr__)
+
                 
                 # Value should now be available in locals or globals (post-execution)
                 if anchor.symbol in eval_frame.f_locals:
@@ -437,9 +431,7 @@ class VariableTracer:
                 batch.append((anchor, captured))
             except KeyError as e:
                 # Variable might have gone out of scope or not been assigned
-                if anchor.symbol == 'QAM16_CONSTELLATION':
-                    import sys
-                    print(f"[DEFERRED DEBUG] KeyError for {anchor.symbol}: {e}", file=sys.__stderr__)
+
                 continue
             except Exception:
                 continue
@@ -502,13 +494,7 @@ class VariableTracer:
         # Find matching anchors
         matching_anchors = self._anchor_matcher.match(filename, lineno, all_names)
         
-        # DEBUG: trace QAM16_CONSTELLATION matching
-        if lineno == 21 or any(a.symbol == 'QAM16_CONSTELLATION' for a in self._anchor_matcher.all_anchors):
-            import sys
-            print(f"[TRACER DEBUG] L{lineno} in {filename.split('/')[-1]}, event={event}", file=sys.__stderr__)
-            print(f"  anchors at loc: {self._anchor_matcher.has_location(filename, lineno)}", file=sys.__stderr__)
-            print(f"  matching_anchors: {matching_anchors}", file=sys.__stderr__)
-            print(f"  'QAM16_CONSTELLATION' in all_names: {'QAM16_CONSTELLATION' in all_names}", file=sys.__stderr__)
+
 
         if not matching_anchors:
             return self._trace_func_anchored

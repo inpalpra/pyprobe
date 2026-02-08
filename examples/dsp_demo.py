@@ -51,18 +51,18 @@ def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
 
 def main():
     """Main processing loop."""
-    # print("=" * 50)
-    # print("PyProbe DSP Demo")
-    # print("=" * 50)
-    # print()
-    # print("Add these variables to the watch list:")
-    # print("  - received_symbols (constellation diagram)")
-    # print("  - signal_i (waveform)")
-    # print("  - signal_q (waveform)")
-    # print("  - snr_db (scalar)")
-    # print()
-    # print("Starting signal generation...")
-    # print()
+    print("=" * 50)
+    print("PyProbe DSP Demo")
+    print("=" * 50)
+    print()
+    print("Add these variables to the watch list:")
+    print("  - received_symbols (constellation diagram)")
+    print("  - signal_i (waveform)")
+    print("  - signal_q (waveform)")
+    print("  - snr_db (scalar)")
+    print()
+    print("Starting signal generation...")
+    print()
 
     for frame in range(NUM_FRAMES):
         # Vary SNR over time (15-25 dB)
