@@ -4,9 +4,9 @@ Container widget for probe panels with flow layout.
 
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel
+    QWidget, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QMenu
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from pyprobe.logging import get_logger
@@ -19,6 +19,8 @@ from .probe_state import ProbeState
 from .probe_state_indicator import ProbeStateIndicator
 from .animations import ProbeAnimations
 from .lens_dropdown import LensDropdown
+from .plot_toolbar import PlotToolbar, InteractionMode
+from .drag_helpers import has_anchor_mime, decode_anchor_mime
 
 
 class ProbePanel(QFrame):
@@ -28,6 +30,11 @@ class ProbePanel(QFrame):
     Provides a bordered frame around the plot with consistent sizing,
     state indicator, identity label, and animation support.
     """
+
+    # M2.5: Signals
+    maximize_requested = pyqtSignal()
+    park_requested = pyqtSignal()
+    overlay_requested = pyqtSignal(object)  # ProbeAnchor
 
     def __init__(
         self,
@@ -46,8 +53,16 @@ class ProbePanel(QFrame):
         self._removal_animation = None
         self._layout: Optional[QVBoxLayout] = None
         self._lens_dropdown: Optional[LensDropdown] = None
+        self._toolbar: Optional[PlotToolbar] = None
+        self._focus_style_base = ""
 
         self._setup_ui()
+
+        # M2.5: Focus policy for keyboard shortcuts
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+        # M2.5: Accept drops for signal overlay
+        self.setAcceptDrops(True)
 
     def _setup_ui(self):
         """Create the panel UI."""
@@ -134,6 +149,14 @@ class ProbePanel(QFrame):
         # Set minimum size
         self.setMinimumSize(300, 250)
 
+        # M2.5: Toolbar overlay (positioned at top-right)
+        self._toolbar = PlotToolbar(self)
+        self._toolbar.mode_changed.connect(self._on_toolbar_mode_changed)
+        self._toolbar.reset_requested.connect(self._on_toolbar_reset)
+
+        # Store base stylesheet for focus indicator toggling
+        self._focus_style_base = self.styleSheet()
+
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
         prev_dtype = self._dtype
@@ -215,9 +238,7 @@ class ProbePanel(QFrame):
         return self._lens_dropdown.currentText() if self._lens_dropdown else ""
 
     def contextMenuEvent(self, event):
-        """Show context menu with View As... option."""
-        from PyQt6.QtWidgets import QMenu, QWidgetAction
-        
+        """Show context menu with View As... and Park options."""
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
@@ -248,6 +269,11 @@ class ProbePanel(QFrame):
             # Use default argument to capture loop variable
             action.triggered.connect(lambda checked, name=plugin.name: self._lens_dropdown.set_lens(name))
         
+        # M2.5: Park to bar action
+        menu.addSeparator()
+        park_action = menu.addAction("Park to Bar")
+        park_action.triggered.connect(lambda: self.park_requested.emit())
+        
         menu.exec(event.globalPos())
 
     def set_state(self, state: ProbeState):
@@ -272,6 +298,149 @@ class ProbePanel(QFrame):
         """Flash state indicator red to show invalid click."""
         self._state_indicator.show_invalid_feedback()
 
+    # === M2.5: Hover toolbar show/hide ===
+
+    def enterEvent(self, event) -> None:
+        """Show toolbar on mouse enter."""
+        super().enterEvent(event)
+        if self._toolbar:
+            self._toolbar.show_on_hover()
+
+    def leaveEvent(self, event) -> None:
+        """Hide toolbar on mouse leave."""
+        super().leaveEvent(event)
+        if self._toolbar:
+            self._toolbar.hide_on_leave()
+
+    def resizeEvent(self, event) -> None:
+        """Reposition toolbar on resize."""
+        super().resizeEvent(event)
+        if self._toolbar:
+            # Position at top-right of panel
+            self._toolbar.move(
+                self.width() - self._toolbar.sizeHint().width() - 8,
+                8
+            )
+
+    # === M2.5: Toolbar mode handling ===
+
+    def _on_toolbar_mode_changed(self, mode: InteractionMode) -> None:
+        """Handle interaction mode change from toolbar."""
+        if self._plot and hasattr(self._plot, '_plot_widget'):
+            vb = self._plot._plot_widget.getPlotItem().getViewBox()
+            if mode == InteractionMode.PAN:
+                vb.setMouseMode(vb.PanMode)
+            elif mode in (InteractionMode.ZOOM, InteractionMode.ZOOM_X, InteractionMode.ZOOM_Y):
+                vb.setMouseMode(vb.RectMode)
+            else:
+                vb.setMouseMode(vb.PanMode)
+
+    def _on_toolbar_reset(self) -> None:
+        """Handle reset from toolbar."""
+        if self._plot and hasattr(self._plot, 'axis_controller'):
+            ac = self._plot.axis_controller
+            if ac:
+                ac.reset()
+
+    # === M2.5: Double-click maximize ===
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        """Toggle maximize on double-click of plot background."""
+        # Only trigger on empty background, not axis/trace areas
+        self.maximize_requested.emit()
+        event.accept()
+
+    # === M2.5: Drag-and-drop overlay ===
+
+    def dragEnterEvent(self, event) -> None:
+        """Accept anchor drags for signal overlay."""
+        if event.mimeData() and has_anchor_mime(event.mimeData()):
+            event.acceptProposedAction()
+            self._show_drop_highlight(True)
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:
+        """Remove drop highlight on drag leave."""
+        self._show_drop_highlight(False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event) -> None:
+        """Handle drop of anchor data for overlay."""
+        self._show_drop_highlight(False)
+        if event.mimeData() and has_anchor_mime(event.mimeData()):
+            data = decode_anchor_mime(event.mimeData())
+            if data:
+                anchor = ProbeAnchor(
+                    file=data['file'],
+                    line=data['line'],
+                    col=data['col'],
+                    symbol=data['symbol'],
+                    func=data.get('func', ''),
+                )
+                self.overlay_requested.emit(anchor)
+                event.acceptProposedAction()
+            else:
+                event.ignore()
+        else:
+            event.ignore()
+
+    def _show_drop_highlight(self, show: bool) -> None:
+        """Show or hide green drop target highlight."""
+        if show:
+            self.setStyleSheet("""
+                ProbePanel {
+                    border: 2px solid #00ff7f;
+                    border-radius: 6px;
+                    background-color: #0d0d0d;
+                }
+            """)
+        else:
+            self.setStyleSheet(self._focus_style_base)
+
+    # === M2.5: Focus indicator + keyboard shortcuts ===
+
+    def focusInEvent(self, event) -> None:
+        """Show focus glow when panel gains keyboard focus."""
+        self._show_focus_indicator(True)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        """Remove focus glow when panel loses keyboard focus."""
+        self._show_focus_indicator(False)
+        super().focusOutEvent(event)
+
+    def _show_focus_indicator(self, focused: bool) -> None:
+        """Toggle cyan border glow for focused state."""
+        if focused:
+            self.setStyleSheet("""
+                ProbePanel {
+                    border: 1px solid #00ffff;
+                    border-radius: 6px;
+                    background-color: #0d0d0d;
+                }
+            """)
+        else:
+            self.setStyleSheet(self._focus_style_base)
+
+    def keyPressEvent(self, event) -> None:
+        """Handle keyboard shortcuts for focused panel."""
+        key = event.key()
+        if key == Qt.Key.Key_X:
+            if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
+                self._plot.axis_controller.toggle_pin('x')
+        elif key == Qt.Key.Key_Y:
+            if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
+                self._plot.axis_controller.toggle_pin('y')
+        elif key == Qt.Key.Key_R:
+            if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
+                self._plot.axis_controller.reset()
+        elif key == Qt.Key.Key_Escape:
+            if self._toolbar:
+                self._toolbar.set_mode(InteractionMode.POINTER)
+        else:
+            super().keyPressEvent(event)
+
     @property
     def anchor(self) -> ProbeAnchor:
         """Return the probe anchor."""
@@ -295,6 +464,13 @@ class ProbePanelContainer(QScrollArea):
 
         self._panels: Dict[ProbeAnchor, ProbePanel] = {}
         self._panels_by_name: Dict[str, ProbePanel] = {}  # For legacy access
+
+        # M2.5: Layout manager and focus manager
+        from .layout_manager import LayoutManager
+        from .focus_manager import FocusManager
+        self._layout_manager = LayoutManager(self)
+        self._focus_manager = FocusManager(self)
+
         self._setup_ui()
 
     def _setup_ui(self):
@@ -378,6 +554,10 @@ class ProbePanelContainer(QScrollArea):
             self._panels_by_name[var_name] = panel
         logger.debug(f"  Created new panel, added to both dicts")
 
+        # M2.5: Connect maximize/park signals and register with focus manager
+        panel.maximize_requested.connect(lambda p=panel: self._layout_manager.toggle_maximize(p))
+        self._focus_manager.register_panel(panel)
+
         # Add to grid
         self._layout.addWidget(panel, self._next_row, self._next_col)
 
@@ -427,6 +607,9 @@ class ProbePanelContainer(QScrollArea):
         logger.debug(f"  After: _panels keys: {list(self._panels.keys())}")
         logger.debug(f"  After: _panels_by_name keys: {list(self._panels_by_name.keys())}")
         
+        # M2.5: Unregister from focus manager
+        self._focus_manager.unregister_panel(panel)
+
         self._layout.removeWidget(panel)
         panel.deleteLater()
 
@@ -476,3 +659,27 @@ class ProbePanelContainer(QScrollArea):
     def remove_probe_panel(self, anchor: ProbeAnchor):
         """Remove a probe panel by anchor (M1 API)."""
         self.remove_panel(anchor=anchor)
+
+    # === M2.5: Tab navigation ===
+
+    def keyPressEvent(self, event) -> None:
+        """Handle Tab to cycle focus between panels."""
+        if event.key() == Qt.Key.Key_Tab:
+            self._focus_manager.focus_next()
+            # Actually give Qt focus to the panel
+            panel = self._focus_manager.focused_panel
+            if panel is not None:
+                panel.setFocus()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    @property
+    def layout_manager(self):
+        """Access the layout manager."""
+        return self._layout_manager
+
+    @property
+    def focus_manager(self):
+        """Access the focus manager."""
+        return self._focus_manager

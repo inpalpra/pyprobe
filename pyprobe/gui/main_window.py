@@ -36,6 +36,9 @@ from ..analysis.anchor_mapper import AnchorMapper
 from .animations import ProbeAnimations
 from ..state_tracer import get_tracer
 
+# === M2.5 IMPORTS ===
+from .dock_bar import DockBar
+
 
 class MainWindow(QMainWindow):
     """
@@ -109,8 +112,15 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # M2.5: Wrap splitter + dock bar in a vertical layout
+        from PyQt6.QtWidgets import QVBoxLayout as _QVBox
+        main_vlayout = _QVBox()
+        main_vlayout.setContentsMargins(0, 0, 0, 0)
+        main_vlayout.setSpacing(0)
+        layout.addLayout(main_vlayout)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        layout.addWidget(splitter)
+        main_vlayout.addWidget(splitter)
 
         # === M1: Code viewer with gutter (replaces watch list) ===
         code_container = QWidget()
@@ -131,6 +141,11 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._probe_container)
 
         splitter.setSizes([400, 800])
+
+        # M2.5: Dock bar at bottom (hidden when empty)
+        self._dock_bar = DockBar(self)
+        self._dock_bar.setVisible(False)
+        main_vlayout.addWidget(self._dock_bar)
 
         # === M1: File watcher and probe registry ===
         self._file_watcher = FileWatcher(self)
@@ -168,6 +183,9 @@ class MainWindow(QMainWindow):
         self.variable_received.connect(self._on_variable_data)
         self.script_ended.connect(self._on_script_ended)
         self.exception_occurred.connect(self._on_exception)
+
+        # M2.5: Dock bar restore
+        self._dock_bar.panel_restore_requested.connect(self._on_dock_bar_restore)
 
     def _setup_polling_timer(self):
         """Set up timer to poll IPC queue."""
@@ -473,6 +491,10 @@ class MainWindow(QMainWindow):
             if stored_lens:
                 panel._lens_dropdown.set_lens(stored_lens)
 
+        # M2.5: Connect park and overlay signals
+        panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
+        panel.overlay_requested.connect(self._on_overlay_requested)
+
         # Send to runner if running
         if self._ipc and self._is_running:
             msg = make_add_probe_cmd(anchor)
@@ -712,3 +734,40 @@ class MainWindow(QMainWindow):
         """Handle window close."""
         self._on_stop_script()
         super().closeEvent(event)
+
+    # === M2.5: Park / Restore / Overlay ===
+
+    def _on_panel_park_requested(self, anchor: ProbeAnchor) -> None:
+        """Park a panel to the dock bar."""
+        if anchor not in self._probe_panels:
+            return
+
+        panel = self._probe_panels[anchor]
+        panel.hide()
+
+        # Add to dock bar
+        anchor_key = anchor.identity_label()
+        color = self._probe_registry.get_color(anchor)
+        self._dock_bar.add_panel(anchor_key, anchor.symbol, color or QColor('#00ffff'))
+        self._dock_bar.setVisible(True)
+
+        logger.debug(f"Panel parked: {anchor_key}")
+        self._status_bar.showMessage(f"Parked: {anchor.symbol}")
+
+    def _on_dock_bar_restore(self, anchor_key: str) -> None:
+        """Restore a panel from the dock bar."""
+        # Find the panel matching this anchor_key
+        for anchor, panel in self._probe_panels.items():
+            if anchor.identity_label() == anchor_key:
+                panel.show()
+                self._dock_bar.remove_panel(anchor_key)
+                logger.debug(f"Panel restored: {anchor_key}")
+                self._status_bar.showMessage(f"Restored: {anchor.symbol}")
+                break
+
+    def _on_overlay_requested(self, overlay_anchor: ProbeAnchor) -> None:
+        """Handle overlay drop request - add overlay signal to the target panel."""
+        # For now, log and status update. Full overlay routing requires
+        # knowing which panel received the drop and setting up data forwarding.
+        logger.debug(f"Overlay requested for: {overlay_anchor.symbol}")
+        self._status_bar.showMessage(f"Overlay: {overlay_anchor.symbol}")

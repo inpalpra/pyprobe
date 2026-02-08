@@ -13,11 +13,12 @@ from PyQt6.QtWidgets import QPlainTextEdit, QWidget
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 from PyQt6.QtGui import (
     QTextCursor, QPainter, QColor, QPen, QBrush,
-    QFont, QFontMetricsF, QTextCharFormat
+    QFont, QFontMetricsF, QTextCharFormat, QDrag
 )
 
 from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.analysis.ast_locator import ASTLocator, VariableLocation
+from pyprobe.gui.drag_helpers import encode_anchor_mime
 from pyprobe.logging import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +52,9 @@ class CodeViewer(QPlainTextEdit):
         # Hover state
         self._hover_anchor: Optional[ProbeAnchor] = None
         self._hover_var_location: Optional[VariableLocation] = None
+
+        # M2.5: Drag state for signal overlay
+        self._drag_start_pos: Optional[QPoint] = None
 
         self._setup_ui()
 
@@ -219,8 +223,15 @@ class CodeViewer(QPlainTextEdit):
         return self._ast_locator.get_nearest_variable(line, col)
 
     def mouseMoveEvent(self, event) -> None:
-        """Handle mouse movement for hover detection."""
+        """Handle mouse movement for hover detection and drag initiation."""
         super().mouseMoveEvent(event)
+
+        # M2.5: Check for drag initiation
+        if self._drag_start_pos is not None:
+            if (event.pos() - self._drag_start_pos).manhattanLength() > 10:
+                self._start_drag()
+                self._drag_start_pos = None
+                return
 
         # Get anchor at current position
         new_anchor = self._get_anchor_at_position(event.pos())
@@ -234,7 +245,7 @@ class CodeViewer(QPlainTextEdit):
             self.viewport().update()
 
     def mousePressEvent(self, event) -> None:
-        """Handle mouse clicks for probe toggle."""
+        """Handle mouse clicks for probe toggle and drag start."""
         if event.button() == Qt.MouseButton.LeftButton:
             anchor = self._get_anchor_at_position(event.pos())
             logger.debug(f"mousePressEvent: Click at pos {event.pos()}")
@@ -252,17 +263,42 @@ class CodeViewer(QPlainTextEdit):
                     logger.debug(f"mousePressEvent: Emitting probe_requested for {anchor}")
                     self.probe_requested.emit(anchor)
 
+                # M2.5: Record drag start position for potential overlay drag
+                self._drag_start_pos = event.pos()
+
         super().mousePressEvent(event)
 
     def leaveEvent(self, event) -> None:
         """Handle mouse leaving the widget."""
         super().leaveEvent(event)
+        self._drag_start_pos = None
 
         if self._hover_anchor is not None:
             self._hover_anchor = None
             self._hover_var_location = None
             self.hover_changed.emit(None)
             self.viewport().update()
+
+    def mouseReleaseEvent(self, event) -> None:
+        """Clear drag start on mouse release."""
+        self._drag_start_pos = None
+        super().mouseReleaseEvent(event)
+
+    def _start_drag(self) -> None:
+        """Initiate drag-and-drop for signal overlay."""
+        if self._hover_anchor is None:
+            return
+
+        mime_data = encode_anchor_mime(
+            file=self._hover_anchor.file,
+            line=self._hover_anchor.line,
+            col=self._hover_anchor.col,
+            symbol=self._hover_anchor.symbol,
+            func=self._hover_anchor.func or "",
+        )
+        drag = QDrag(self)
+        drag.setMimeData(mime_data)
+        drag.exec(Qt.DropAction.CopyAction)
 
     def paintEvent(self, event) -> None:
         """Custom paint to draw variable highlights."""

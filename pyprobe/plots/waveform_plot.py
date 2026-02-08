@@ -3,17 +3,22 @@ PyQtGraph-based waveform plot for 1D and 2D arrays.
 Optimized for real-time DSP visualization.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QPoint
 from ..core.data_classifier import (
     DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_2D, DTYPE_ARRAY_COLLECTION,
     get_waveform_info, get_waveform_collection_info, get_array_collection_info
 )
 
 from .base_plot import BasePlot
+from .axis_controller import AxisController
+from .pin_indicator import PinIndicator
+from .editable_axis import EditableAxisItem
+from pyprobe.gui.axis_editor import AxisEditor
 
 
 # Deterministic color palette for multi-row plots (10 colors, cycling)
@@ -54,6 +59,13 @@ class WaveformPlot(BasePlot):
         self._curves: List[pg.PlotDataItem] = []  # Multiple curves for 2D
         self._row_visible: List[bool] = []  # Track visibility per row
         self._legend: Optional[pg.LegendItem] = None
+
+        # M2.5: Axis controller, pin indicator, overlay curves
+        self._axis_controller: Optional[AxisController] = None
+        self._pin_indicator: Optional[PinIndicator] = None
+        self._axis_editor: Optional[AxisEditor] = None
+        self._overlay_curves: Dict[str, pg.PlotDataItem] = {}  # anchor_key -> curve
+
         self._setup_ui()
 
     def _setup_ui(self):
@@ -118,6 +130,22 @@ class WaveformPlot(BasePlot):
 
         # Enable mouse interaction
         self._plot_widget.setMouseEnabled(x=True, y=True)
+
+        # M2.5: Setup axis controller and pin indicator
+        plot_item = self._plot_widget.getPlotItem()
+        self._axis_controller = AxisController(plot_item)
+        self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
+
+        self._pin_indicator = PinIndicator(self._plot_widget)
+        self._pin_indicator.move(10, 10)
+
+        # M2.5: Setup editable axes
+        self._setup_editable_axes()
+
+        # M2.5: Axis editor (inline text editor)
+        self._axis_editor = AxisEditor(self._plot_widget)
+        self._axis_editor.value_committed.connect(self._on_axis_value_committed)
+        self._axis_editor.editing_cancelled.connect(self._on_axis_edit_cancelled)
 
     def _get_row_color(self, row_index: int) -> str:
         """Get deterministic color for row index (cycles after 10)."""
@@ -468,6 +496,145 @@ class WaveformPlot(BasePlot):
             self._stats_label.setText(
                 f"{num_arrays} arrays | Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
             )
+
+    # === M2.5: Axis Pinning ===
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        """Handle axis pin state change from AxisController."""
+        if self._pin_indicator:
+            self._pin_indicator.update_state(axis, is_pinned)
+
+    @property
+    def axis_controller(self) -> Optional[AxisController]:
+        """Access the axis controller for external use (e.g., keyboard shortcuts)."""
+        return self._axis_controller
+
+    # === M2.5: Editable Axes ===
+
+    def _setup_editable_axes(self) -> None:
+        """Replace standard axes with editable ones that support double-click editing."""
+        plot_item = self._plot_widget.getPlotItem()
+
+        # Create editable axes
+        bottom_axis = EditableAxisItem('bottom')
+        left_axis = EditableAxisItem('left')
+
+        # Style them to match
+        axis_pen = pg.mkPen(color='#00ffff', width=1)
+        bottom_axis.setPen(axis_pen)
+        bottom_axis.setTextPen(axis_pen)
+        left_axis.setPen(axis_pen)
+        left_axis.setTextPen(axis_pen)
+
+        # Replace existing axes
+        plot_item.setAxisItems({'bottom': bottom_axis, 'left': left_axis})
+
+        # Connect edit signals
+        bottom_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('x', 'min', val))
+        bottom_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('x', 'max', val))
+        left_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y', 'min', val))
+        left_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y', 'max', val))
+
+    def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
+        """Start inline editing of an axis min/max value."""
+        if self._axis_editor is None:
+            return
+
+        # Store context for commit
+        self._axis_editor.setProperty('edit_axis', axis)
+        self._axis_editor.setProperty('edit_endpoint', endpoint)
+
+        # Position near the axis
+        if axis == 'x':
+            x = 40 if endpoint == 'min' else self._plot_widget.width() - 60
+            y = self._plot_widget.height() - 20
+        else:
+            x = 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
+
+        self._axis_editor.show_at(x, y, current_value)
+
+    def _on_axis_value_committed(self, value: float) -> None:
+        """Handle axis editor value committed."""
+        axis = self._axis_editor.property('edit_axis')
+        endpoint = self._axis_editor.property('edit_endpoint')
+        plot_item = self._plot_widget.getPlotItem()
+        view_box = plot_item.getViewBox()
+
+        if axis == 'x':
+            current_range = view_box.viewRange()[0]
+            if endpoint == 'min':
+                plot_item.setXRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setXRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('x', True)
+        elif axis == 'y':
+            current_range = view_box.viewRange()[1]
+            if endpoint == 'min':
+                plot_item.setYRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setYRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('y', True)
+
+    def _on_axis_edit_cancelled(self) -> None:
+        """Handle axis editor cancelled. Nothing to do."""
+        pass
+
+    # === M2.5: Signal Overlay ===
+
+    def add_overlay(self, anchor_key: str, color: QColor) -> None:
+        """Add an overlaid signal curve to this plot.
+
+        Args:
+            anchor_key: Unique key identifying the overlay signal
+            color: Color for the overlay curve
+        """
+        if anchor_key in self._overlay_curves:
+            return
+
+        curve = self._plot_widget.plot(
+            pen=pg.mkPen(color=color, width=1.5),
+            antialias=False,
+            name=anchor_key
+        )
+        self._overlay_curves[anchor_key] = curve
+
+    def remove_overlay(self, anchor_key: str) -> None:
+        """Remove an overlaid signal curve.
+
+        Args:
+            anchor_key: Key of the overlay to remove
+        """
+        curve = self._overlay_curves.pop(anchor_key, None)
+        if curve is not None:
+            self._plot_widget.removeItem(curve)
+
+    def update_overlay(self, anchor_key: str, data: np.ndarray, t_vector: Optional[np.ndarray] = None) -> None:
+        """Update data for an overlay curve.
+
+        Args:
+            anchor_key: Key of the overlay
+            data: 1D array of values
+            t_vector: Optional time vector
+        """
+        if anchor_key not in self._overlay_curves:
+            return
+
+        curve = self._overlay_curves[anchor_key]
+        display_data = self._downsample(data)
+        if t_vector is not None and len(t_vector) == len(data):
+            t_display = self._downsample(t_vector) if len(data) > self.MAX_DISPLAY_POINTS else t_vector
+            curve.setData(t_display, display_data)
+        else:
+            curve.setData(display_data)
+
+    def resizeEvent(self, event) -> None:
+        """Reposition pin indicator on resize."""
+        super().resizeEvent(event)
+        if self._pin_indicator:
+            self._pin_indicator.move(10, 10)
 
 
 
