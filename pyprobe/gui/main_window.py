@@ -756,6 +756,9 @@ class MainWindow(QMainWindow):
         panel = self._probe_panels[anchor]
         panel.hide()
 
+        # Mark panel as parked and relayout remaining panels
+        self._probe_container.park_panel(anchor)
+
         # Add to dock bar
         anchor_key = anchor.identity_label()
         color = self._probe_registry.get_color(anchor)
@@ -772,6 +775,8 @@ class MainWindow(QMainWindow):
             if anchor.identity_label() == anchor_key:
                 panel.show()
                 self._dock_bar.remove_panel(anchor_key)
+                # Unpark and relayout all panels including restored one
+                self._probe_container.unpark_panel(anchor)
                 logger.debug(f"Panel restored: {anchor_key}")
                 self._status_bar.showMessage(f"Restored: {anchor.symbol}")
                 break

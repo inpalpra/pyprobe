@@ -4,14 +4,25 @@
 
 ## P1 - High Priority
 
-### [M2.5] Drag-and-drop symbols to graph not working
-- Mouse-down immediately creates/removes a probe (no time to drag)
-- **Root cause**: Using mouse-down event instead of mouse-up
-- **Expected behavior**:
-  - Mouse-down on symbol: start drag operation
-  - Mouse-up on code area: toggle probe (existing behavior)
-  - Mouse-up on graph area: add symbol to that graph
-- **File**: `code_panel.py`, `graph_area.py`
+### BUG: Parked graph doesn't release space to remaining graphs
+- When multiple variables are probed (e.g., `signal_i` and `signal_q`) and one is parked, the remaining graph doesn't expand to occupy the full graphing area automatically.
+- **Ref**: `examples/dsp_demo.py` line 72
+
+### BUG: Multiple graphs don't auto-arrange when one is parked
+- Similar to above: if there are multiple graph panels and one is parked, the remaining graphs should auto-resize to fill the available graphing area.
+
+### BUG: No way to remove a variable from an overlaid graph
+- Once a variable is dragged and dropped into an existing graph, there is no way to remove it from that graph.
+- Clicking the overlaid variable does not remove it.
+- Clicking it also does not create a new dedicated graph window for it.
+
+### BUG: Cannot overlay onto graph if both variables already have dedicated graphs
+- If two signals (e.g., `signal_i` and `signal_q`) are probed in separate graphs, dragging `signal_i` from code area to `signal_q`'s graph does not overlay them.
+- However, if `signal_i` is probed first, then `signal_q` is drag-dropped onto `signal_i`'s graph (without creating a dedicated graph for `signal_q` first), overlay works correctly.
+
+### BUG: Missing plot legends after drag-drop overlay
+- After drag-dropping a variable onto an existing graph, no plot legend is created for the newly added traces.
+- Example: dragging `received_symbols` to `signal_i`'s graph shows real/imag parts plotted, but without corresponding legend entries.
 
 ---
 

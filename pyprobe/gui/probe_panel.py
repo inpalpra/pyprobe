@@ -562,6 +562,7 @@ class ProbePanelContainer(QScrollArea):
 
         self._panels: Dict[ProbeAnchor, ProbePanel] = {}
         self._panels_by_name: Dict[str, ProbePanel] = {}  # For legacy access
+        self._parked_panels: set = set()  # Track parked panel anchors
 
         # M2.5: Layout manager and focus manager
         from .layout_manager import LayoutManager
@@ -725,7 +726,8 @@ class ProbePanelContainer(QScrollArea):
             if item.widget() and item.widget() != self._placeholder:
                 self._layout.removeWidget(item.widget())
 
-        panels = list(self._panels.values())
+        # Only layout non-parked panels
+        panels = [p for a, p in self._panels.items() if a not in self._parked_panels]
         if not panels:
             return
 
@@ -754,6 +756,20 @@ class ProbePanelContainer(QScrollArea):
         if var_name is not None:
             return self._panels_by_name.get(var_name)
         return None
+
+    def relayout(self) -> None:
+        """Trigger a relayout of visible panels (public API for park/restore)."""
+        self._relayout_panels()
+
+    def park_panel(self, anchor: ProbeAnchor) -> None:
+        """Mark a panel as parked (excluded from layout)."""
+        self._parked_panels.add(anchor)
+        self._relayout_panels()
+
+    def unpark_panel(self, anchor: ProbeAnchor) -> None:
+        """Mark a panel as unparked (included in layout)."""
+        self._parked_panels.discard(anchor)
+        self._relayout_panels()
 
     # === M1 CONVENIENCE METHODS ===
 
