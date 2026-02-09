@@ -4,18 +4,10 @@
 
 ## P1 - High Priority
 
-### UX is everything. If it does not look good, it is not acceptable. Right now, probe watch window looks ugly
-- 
 
-### BUG: If a scalar is in watch window, clicking that symbol again does NOT create graphical probe
-- It should create a new graphical probe for that symbol
-- If a scalar is in graphical probe, alt+click does add it to watch window -- as expected
+---
 
-
-### BUG: Double click to edit axis max min does not work for constellation and other complex data probes
-- Double click on axis max min does not work for constellation and other complex data probes
-- works for waveform probes
-
+## P2 - Medium Priority
 
 ### Drag graph with Alt key pressed to move to a different position
 - When graph is click-dragged with Alt key pressed, the graph should move to a different position
@@ -29,22 +21,13 @@
 ### Manually Rearrange Graphs
 - In right click menu, graph should be allowed to expand to full width & shrink back to half width
 
----
-
-## P2 - Medium Priority
+### BUG: Double click to edit axis max min does not work for constellation and other complex data probes
+- Double click on axis max min does not work for constellation and other complex data probes
+- works for waveform probes
 
 ### Press P to Park
 - When P is pressed, the active graph is parked.
 
-
-### Custom probes per symbol type
-- **Function calls**: Display return value
-- **Module refs**: Display module name/path
-- **Class refs**: Display class info
-
-### Symbol type indicator in probe panel
-- Show icon/badge indicating if symbol is DATA_VARIABLE, FUNCTION_CALL, etc.
-- Help user understand why "Nothing to show" appears
 
 ---
 
@@ -57,3 +40,12 @@
 ### Probe persistence
 - Save/restore probe configurations across sessions
 - Remember which variables user typically watches
+
+### Custom probes per symbol type
+- **Function calls**: Display return value
+- **Module refs**: Display module name/path
+- **Class refs**: Display class info
+
+### Symbol type indicator in probe panel
+- Show icon/badge indicating if symbol is DATA_VARIABLE, FUNCTION_CALL, etc.
+- Help user understand why "Nothing to show" appears
