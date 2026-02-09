@@ -416,6 +416,8 @@ class MainWindow(QMainWindow):
         """Handle click-to-probe request from code viewer."""
         panel = self._probe_controller.add_probe(anchor)
         if panel:
+            # Mark as graphical probe in code viewer
+            self._code_viewer.set_probe_graphical(anchor)
             # M2.5: Connect park and overlay signals
             panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
             panel.overlay_requested.connect(self._on_overlay_requested)
@@ -476,6 +478,8 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):
         """Handle probe removal request."""
+        # Mark as no longer graphical in code viewer
+        self._code_viewer.unset_probe_graphical(anchor)
         self._probe_controller.remove_probe(anchor)
 
     def _complete_probe_removal(self, anchor: ProbeAnchor):

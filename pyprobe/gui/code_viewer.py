@@ -47,7 +47,10 @@ class CodeViewer(QPlainTextEdit):
         self._ast_locator: Optional[ASTLocator] = None
 
         # Probe state
-        self._active_probes: Dict[ProbeAnchor, QColor] = {}  # anchor -> color
+        # anchor -> (color, ref_count) for visual highlights with reference counting
+        # Ref count tracks how many probes (graphical + watch) are watching this symbol
+        self._active_probes: Dict[ProbeAnchor, tuple] = {}  # tuple[QColor, int]
+        self._graphical_probes: Set[ProbeAnchor] = set()  # probes with actual panels
         self._invalid_probes: Set[ProbeAnchor] = set()
 
         # Hover state
@@ -133,13 +136,26 @@ class CodeViewer(QPlainTextEdit):
     def set_probe_active(self, anchor: ProbeAnchor, color: QColor) -> None:
         """Mark a probe as active with the given color.
 
+        Increments reference count if already active. Only removes highlight
+        when all probe types (graphical, watch) have been removed.
+
         Args:
             anchor: The probe anchor to activate
             color: Color to use for highlighting
         """
         logger.debug(f"set_probe_active called with anchor: {anchor}")
         logger.debug(f"Before: _active_probes keys: {list(self._active_probes.keys())}")
-        self._active_probes[anchor] = color
+        
+        if anchor in self._active_probes:
+            # Increment reference count, keep existing color
+            existing_color, ref_count = self._active_probes[anchor]
+            self._active_probes[anchor] = (existing_color, ref_count + 1)
+            logger.debug(f"Incremented ref count for {anchor.symbol} to {ref_count + 1}")
+        else:
+            # New probe, start with ref count = 1
+            self._active_probes[anchor] = (color, 1)
+            logger.debug(f"Added new probe {anchor.symbol} with ref count 1")
+        
         logger.debug(f"After: _active_probes keys: {list(self._active_probes.keys())}")
         self._invalid_probes.discard(anchor)
         self.viewport().update()
@@ -154,17 +170,47 @@ class CodeViewer(QPlainTextEdit):
         self.viewport().update()
 
     def remove_probe(self, anchor: ProbeAnchor) -> None:
-        """Remove a probe from the active set.
+        """Decrement reference count and remove probe highlight when count reaches 0.
 
         Args:
             anchor: The probe anchor to remove
         """
         logger.debug(f"remove_probe called with anchor: {anchor}")
         logger.debug(f"Before: _active_probes keys: {list(self._active_probes.keys())}")
-        self._active_probes.pop(anchor, None)
+        
+        if anchor in self._active_probes:
+            color, ref_count = self._active_probes[anchor]
+            if ref_count > 1:
+                # Decrement reference count, keep highlight
+                self._active_probes[anchor] = (color, ref_count - 1)
+                logger.debug(f"Decremented ref count for {anchor.symbol} to {ref_count - 1}")
+            else:
+                # Last reference, remove highlight entirely
+                self._active_probes.pop(anchor, None)
+                self._graphical_probes.discard(anchor)
+                self._invalid_probes.discard(anchor)
+                logger.debug(f"Removed last reference for {anchor.symbol}")
+        else:
+            logger.debug(f"remove_probe called for unknown anchor: {anchor}")
+        
         logger.debug(f"After: _active_probes keys: {list(self._active_probes.keys())}")
-        self._invalid_probes.discard(anchor)
         self.viewport().update()
+
+    def set_probe_graphical(self, anchor: ProbeAnchor) -> None:
+        """Mark a probe as having a graphical panel.
+
+        Args:
+            anchor: The probe anchor with a panel
+        """
+        self._graphical_probes.add(anchor)
+
+    def unset_probe_graphical(self, anchor: ProbeAnchor) -> None:
+        """Mark a probe as no longer having a graphical panel.
+
+        Args:
+            anchor: The probe anchor without a panel
+        """
+        self._graphical_probes.discard(anchor)
 
     def clear_all_probes(self) -> None:
         """Remove all active probes."""
@@ -288,23 +334,20 @@ class CodeViewer(QPlainTextEdit):
                 # Check if we stayed in roughly the same position (not a drag)
                 if distance <= 10:
                     anchor = self._drag_start_anchor
-                    is_active = anchor in self._active_probes
-                    logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, is_active={is_active}")
+                    has_graphical_panel = anchor in self._graphical_probes
+                    is_highlighted = anchor in self._active_probes
+                    logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, has_panel={has_graphical_panel}, is_highlighted={is_highlighted}")
                     
-                    if is_active:
-                        # Check if Alt is pressed - if so, it's a watch toggle
-                        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
-                            # Alt+click on active probe -> toggle watch off
-                            self.watch_probe_requested.emit(anchor)
-                        else:
-                            # Regular click on active probe -> remove graph probe
-                            self.probe_removed.emit(anchor)
+                    # Check for Alt modifier -> watch window toggle
+                    if event.modifiers() & Qt.KeyboardModifier.AltModifier:
+                        self.watch_probe_requested.emit(anchor)
+                    elif has_graphical_panel:
+                        # Regular click on graphical probe -> remove it
+                        self.probe_removed.emit(anchor)
                     else:
-                        # Check for Alt modifier -> watch window
-                        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
-                            self.watch_probe_requested.emit(anchor)
-                        else:
-                            self.probe_requested.emit(anchor)
+                        # Regular click on non-graphical symbol -> create graphical probe
+                        # This includes: unhighlighted symbols AND watch-only symbols
+                        self.probe_requested.emit(anchor)
                 # else: distance > 10, was a drag, don't toggle
             # else: no drag_start state
         
@@ -351,7 +394,7 @@ class CodeViewer(QPlainTextEdit):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Draw active probe highlights
-        for anchor, color in self._active_probes.items():
+        for anchor, (color, ref_count) in self._active_probes.items():
             is_invalid = anchor in self._invalid_probes
             self._draw_probe_highlight(painter, anchor, color, is_invalid)
 
