@@ -4,6 +4,9 @@
 
 ## P1 - High Priority
 
+### UX is everything. If it does not look good, it is not acceptable. Right now, probe watch window looks ugly
+- 
+
 ### BUG: If a scalar is in watch window, clicking that symbol again does NOT create graphical probe
 - It should create a new graphical probe for that symbol
 - If a scalar is in graphical probe, alt+click does add it to watch window -- as expected

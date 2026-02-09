@@ -3,10 +3,10 @@ Floating scalar watch window - displays all Alt+clicked scalars in one place.
 """
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QWidget, QVBoxLayout, QLabel, 
     QPushButton, QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QEvent
 from PyQt6.QtGui import QColor
 
 from pyprobe.core.anchor import ProbeAnchor
@@ -16,20 +16,20 @@ class ScalarWatchWindow(QWidget):
     """
     Floating, always-on-top window for displaying scalars probed with Alt+click.
     
-    Shows each scalar as a row with symbol name and current value.
+    Shows each scalar vertically stacked: label above value.
     """
     
     # Signal when a scalar is removed from watch
     scalar_removed = pyqtSignal(object)  # ProbeAnchor
     
     def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
         
         self.setWindowTitle("Scalar Watch")
-        self.setMinimumSize(250, 150)
-        self.resize(300, 200)
+        self.setMinimumSize(200, 120)
+        self.resize(220, 200)
         
-        # Track scalars: anchor -> (label_widget, value_widget, color)
+        # Track scalars: anchor -> (card_widget, value_widget)
         self._scalars: Dict[ProbeAnchor, tuple] = {}
         
         self._setup_ui()
@@ -38,13 +38,8 @@ class ScalarWatchWindow(QWidget):
     def _setup_ui(self):
         """Build the UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
-        
-        # Header
-        header = QLabel("Scalar Watch (Alt+Click)")
-        header.setStyleSheet("color: #00ffff; font-weight: bold; font-size: 12px;")
-        layout.addWidget(header)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
         
         # Scroll area for scalars
         scroll = QScrollArea()
@@ -54,15 +49,19 @@ class ScalarWatchWindow(QWidget):
         self._content = QWidget()
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(0, 0, 0, 0)
-        self._content_layout.setSpacing(2)
+        self._content_layout.setSpacing(12)
         self._content_layout.addStretch()  # Push items to top
         
         scroll.setWidget(self._content)
         layout.addWidget(scroll)
         
+        # Install event filter on viewport to allow dragging from inside scroll area
+        scroll.viewport().installEventFilter(self)
+        self._scroll = scroll
+        
         # Placeholder when empty
-        self._placeholder = QLabel("Alt+click scalars in code to watch them here")
-        self._placeholder.setStyleSheet("color: #666666; font-style: italic;")
+        self._placeholder = QLabel("Alt+click scalars to watch")
+        self._placeholder.setObjectName("placeholder")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._content_layout.insertWidget(0, self._placeholder)
     
@@ -70,14 +69,74 @@ class ScalarWatchWindow(QWidget):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QWidget {
-                background-color: #1a1a2e;
+                background-color: #16162a;
                 color: #e0e0e0;
-                font-family: 'JetBrains Mono', 'Consolas', monospace;
             }
             QScrollArea {
                 background-color: transparent;
             }
+            QLabel#placeholder {
+                color: #555555;
+                font-style: italic;
+                font-size: 11px;
+            }
+            QLabel#scalarLabel {
+                color: #888888;
+                font-size: 11px;
+                font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+            }
+            QLabel#scalarValue {
+                color: #ffffff;
+                font-size: 20px;
+                font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+                font-weight: 500;
+            }
+            QWidget#scalarCard {
+                background-color: #1e1e32;
+                border-radius: 4px;
+            }
+            QPushButton#removeBtn {
+                background-color: transparent;
+                color: #555555;
+                border: none;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton#removeBtn:hover {
+                color: #ff6666;
+            }
         """)
+    
+
+    
+    def eventFilter(self, obj, event):
+        """Handle mouse events from scroll area viewport manually."""
+        if hasattr(self, '_scroll') and obj == self._scroll.viewport():
+            if event.type() == QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                    # We don't accept/return True so scroll area still gets it (e.g. for focus)
+            elif event.type() == QEvent.Type.MouseMove:
+                if event.buttons() & Qt.MouseButton.LeftButton and hasattr(self, '_drag_offset'):
+                    self.move(event.globalPosition().toPoint() - self._drag_offset)
+                    # Don't consume so we don't block other behaviors?
+                    # But if we move, maybe we *shouldn't* scroll. 
+                    # If we return True, we block it.
+        return super().eventFilter(obj, event)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press to start dragging."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = event.pos()
+            event.accept()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move to drag window."""
+        if event.buttons() & Qt.MouseButton.LeftButton and hasattr(self, '_drag_offset'):
+            self.move(self.mapToGlobal(event.pos()) - self._drag_offset)
+            event.accept()
+        super().mouseMoveEvent(event)
     
     def add_scalar(self, anchor: ProbeAnchor, color: QColor) -> None:
         """Add a scalar to the watch window."""
@@ -87,46 +146,47 @@ class ScalarWatchWindow(QWidget):
         # Hide placeholder
         self._placeholder.hide()
         
-        # Create row widget
-        row = QWidget()
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(4, 2, 4, 2)
-        row_layout.setSpacing(8)
+        # Create card widget with vertical layout
+        card = QWidget()
+        card.setObjectName("scalarCard")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(10, 8, 10, 10)
+        card_layout.setSpacing(2)
         
-        # Symbol name
+        # Top row: label + remove button
+        top_row = QWidget()
+        top_layout = QVBoxLayout(top_row)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(0)
+        
+        # Label (small, muted)
         name_label = QLabel(anchor.symbol)
-        name_label.setStyleSheet(f"color: {color.name()}; font-weight: bold;")
-        name_label.setMinimumWidth(100)
-        row_layout.addWidget(name_label)
+        name_label.setObjectName("scalarLabel")
+        card_layout.addWidget(name_label)
         
-        # Value display
+        # Value (large, bright)
         value_label = QLabel("--")
-        value_label.setStyleSheet("color: #e0e0e0; font-family: monospace;")
-        value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        row_layout.addWidget(value_label, 1)
+        value_label.setObjectName("scalarValue")
+        card_layout.addWidget(value_label)
         
-        # Remove button
+        # Remove button (positioned at top-right corner)
         remove_btn = QPushButton("×")
+        remove_btn.setObjectName("removeBtn")
         remove_btn.setFixedSize(20, 20)
-        remove_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #ff6666;
-                border: none;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #333;
-            }
-        """)
         remove_btn.clicked.connect(lambda: self._remove_scalar(anchor))
-        row_layout.addWidget(remove_btn)
+        remove_btn.setParent(card)
+        remove_btn.move(card.width() - 24, 4)
+        
+        # Re-position button on resize
+        def reposition_btn():
+            remove_btn.move(card.width() - 24, 4)
+        card.resizeEvent = lambda e: reposition_btn()
         
         # Add to layout (before the stretch)
-        self._content_layout.insertWidget(self._content_layout.count() - 1, row)
+        self._content_layout.insertWidget(self._content_layout.count() - 1, card)
         
         # Track
-        self._scalars[anchor] = (row, name_label, value_label, color)
+        self._scalars[anchor] = (card, value_label)
         
         # Show window if hidden
         if not self.isVisible():
@@ -137,7 +197,7 @@ class ScalarWatchWindow(QWidget):
         if anchor not in self._scalars:
             return
         
-        _, _, value_label, _ = self._scalars[anchor]
+        _, value_label = self._scalars[anchor]
         
         # Format value
         if isinstance(value, float):
@@ -146,7 +206,7 @@ class ScalarWatchWindow(QWidget):
             else:
                 text = f"{value:.4f}"
         elif isinstance(value, complex):
-            text = f"{value.real:.2f} + {value.imag:.2f}j"
+            text = f"{value.real:.2f}+{value.imag:.2f}j"
         else:
             text = str(value)
         
@@ -157,8 +217,8 @@ class ScalarWatchWindow(QWidget):
         if anchor not in self._scalars:
             return
         
-        row, _, _, _ = self._scalars.pop(anchor)
-        row.deleteLater()
+        card, _ = self._scalars.pop(anchor)
+        card.deleteLater()
         
         # Show placeholder if empty
         if not self._scalars:
