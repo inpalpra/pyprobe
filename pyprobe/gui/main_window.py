@@ -17,7 +17,8 @@ import os
 from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
 
-from .probe_panel import ProbePanelContainer, ProbePanel
+from .probe_panel import ProbePanel
+from .panel_container import ProbePanelContainer
 from .control_bar import ControlBar
 from .theme.cyberpunk import apply_cyberpunk_theme
 from ..ipc.channels import IPCChannel
