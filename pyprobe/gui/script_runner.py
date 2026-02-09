@@ -119,6 +119,11 @@ class ScriptRunner(QObject):
                 msg = make_add_probe_cmd(anchor)
                 self._ipc.send_command(msg)
         
+        # Send START command to begin execution
+        self._ipc.send_command(Message(msg_type=MessageType.CMD_START))
+        
+
+        
         self._is_running = True
         self._is_paused = False
         
@@ -223,6 +228,9 @@ class ScriptRunner(QObject):
             for anchor in self._get_active_anchors():
                 msg = make_add_probe_cmd(anchor)
                 self._ipc.send_command(msg)
+        
+        # Send START command to begin execution
+        self._ipc.send_command(Message(msg_type=MessageType.CMD_START))
         
         self._is_running = True
         self._is_paused = False

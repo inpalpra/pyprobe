@@ -18,6 +18,7 @@ class MessageType(Enum):
     CMD_PAUSE = auto()          # Pause script execution
     CMD_RESUME = auto()         # Resume script execution
     CMD_STOP = auto()           # Stop script execution
+    CMD_START = auto()          # Start script execution (synchronization)
 
     # Runner -> GUI data
     DATA_VARIABLE = auto()      # Variable value update

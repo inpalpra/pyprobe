@@ -22,10 +22,24 @@ def main():
         help="Python script to probe (optional, can be loaded from GUI)"
     )
     parser.add_argument(
+        "--auto-run",
+        action="store_true",
+        help="Automatically run the script after loading"
+    )
+    parser.add_argument(
+        "--auto-quit",
+        action="store_true",
+        help="Automatically quit the application when the script finishes"
+    )
+    parser.add_argument(
+        "-p", "--probe",
+        action="append",
+        help="Add graphical probe. Format: line:symbol:instance (e.g., 4:x:1)"
+    )
+    parser.add_argument(
         "-w", "--watch",
         action="append",
-        default=["received_symbols", "signal_i", "signal_q", "snr_db", "power_db","peak_to_avg"],
-        help="Variable names to watch (can be specified multiple times)"
+        help="Add scalar watch. Format: line:symbol:instance (e.g., 4:x:1)"
     )
     parser.add_argument(
         "-l", "--loglevel",
@@ -43,6 +57,7 @@ def main():
         action="store_true",
         help="Also log to console (stderr)"
     )
+
     parser.add_argument(
         "--trace-states",
         action="store_true",
@@ -69,7 +84,13 @@ def main():
     from .gui.app import run_app
 
     # Run the application
-    sys.exit(run_app(script_path=args.script, watch_variables=args.watch))
+    sys.exit(run_app(
+        script_path=args.script,
+        probes=args.probe,
+        watches=args.watch,
+        auto_run=args.auto_run,
+        auto_quit=args.auto_quit
+    ))
 
 
 if __name__ == "__main__":

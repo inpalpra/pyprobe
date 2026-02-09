@@ -32,11 +32,23 @@ def create_app() -> QApplication:
     return app
 
 
-def run_app(script_path: str = None, watch_variables: Optional[List[str]] = None) -> int:
+def run_app(
+    script_path: str = None,
+    probes: Optional[List[str]] = None,
+    watches: Optional[List[str]] = None,
+    auto_run: bool = False,
+    auto_quit: bool = False
+) -> int:
     """Run the PyProbe application."""
     app = create_app()
 
-    window = MainWindow(script_path=script_path, watch_variables=watch_variables)
+    window = MainWindow(
+        script_path=script_path,
+        probes=probes,
+        watches=watches,
+        auto_run=auto_run,
+        auto_quit=auto_quit
+    )
     window.show()
 
     return app.exec()

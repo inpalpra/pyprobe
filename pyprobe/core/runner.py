@@ -85,7 +85,7 @@ class ScriptRunner:
 
         # Start command listener thread (after tracer is ready)
         self._cmd_thread = threading.Thread(target=self._command_listener, daemon=True)
-        self._cmd_thread.start()
+        # self._cmd_thread.start()  -- MOVED DOWN to after handshake
 
         # Add initial watches before starting
         for var_name in self._initial_watches:
@@ -124,14 +124,24 @@ class ScriptRunner:
             # Start tracing (M1: use anchored tracer)
             self._tracer.start_anchored()
 
-            # Give GUI time to send initial probe commands
-            # (probes added before Run was clicked)
-            import time
-            deadline = time.time() + 0.1  # 100ms window
-            while time.time() < deadline:
+            # Start tracing (M1: use anchored tracer)
+            self._tracer.start_anchored()
+
+            # Wait for START command from GUI to ensure initial probes are registered
+            # This prevents race condition where script runs before probes are added
+            while True:
                 msg = self._ipc.receive_command(timeout=0.01)
                 if msg:
+                    if msg.msg_type == MessageType.CMD_START:
+                        break
                     self._handle_command(msg)
+                
+                # Check if parent process died
+                # (Optional safety check, but IPC channel usually handles EOF)
+
+            # Start command listener thread (NOW safe to start)
+            if not self._cmd_thread.is_alive():
+                self._cmd_thread.start()
 
             # Execute the script
             with open(self._script_path, 'r') as f:
@@ -289,7 +299,7 @@ class ScriptRunner:
             os._exit(0)
 
         # M1: Anchor-based handlers
-        elif msg.msg_type == MessageType.CMD_ADD_PROBE:
+        if msg.msg_type == MessageType.CMD_ADD_PROBE:
             anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
             throttle_ms = msg.payload.get('throttle_ms', 50.0)
             config = WatchConfig(

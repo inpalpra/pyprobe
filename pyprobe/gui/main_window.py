@@ -69,10 +69,21 @@ class MainWindow(QMainWindow):
     script_ended = pyqtSignal()
     exception_occurred = pyqtSignal(dict)
 
-    def __init__(self, script_path: Optional[str] = None, watch_variables: Optional[List[str]] = None):
+    def __init__(
+        self,
+        script_path: Optional[str] = None,
+        probes: Optional[List[str]] = None,
+        watches: Optional[List[str]] = None,
+        auto_run: bool = False,
+        auto_quit: bool = False
+    ):
         super().__init__()
 
         self._script_path: Optional[str] = script_path
+        self._cli_probes = probes or []
+        self._cli_watches = watches or []
+        self._auto_run = auto_run
+        self._auto_quit = auto_quit
         self._runner_process: Optional[mp.Process] = None
         self._ipc: Optional[IPCChannel] = None
         self._is_running = False  # Flag to track if script is running
@@ -132,6 +143,87 @@ class MainWindow(QMainWindow):
     def _probe_metadata(self) -> Dict[ProbeAnchor, dict]:
         """Delegate to ProbeController's probe_metadata."""
         return self._probe_controller.probe_metadata
+
+    def _process_cli_probes(self):
+        """Process CLI probe and watch arguments."""
+        if not self._script_path:
+            return
+
+        def parse_target(target_str: str) -> tuple[int, str, int]:
+            # Format: line:symbol[:instance]
+            parts = target_str.split(':')
+            if len(parts) >= 2:
+                try:
+                    line = int(parts[0])
+                    symbol = parts[1]
+                    instance = int(parts[2]) if len(parts) > 2 else 1
+                    return line, symbol, instance
+                except ValueError:
+                    pass
+            logger.warning(f"Invalid probe format: {target_str}. Expected line:symbol[:instance]")
+            return None
+
+        # Process graphical probes
+        for probe_str in self._cli_probes:
+            target = parse_target(probe_str)
+            if not target:
+                continue
+            
+            line, symbol, instance = target
+            logger.debug(f"Processing CLI probe: {symbol} at line {line}, instance {instance}")
+            
+            # Find variable instance
+            vars_on_line = self._code_viewer.ast_locator.get_all_variables_on_line(line)
+            matches = [v for v in vars_on_line if v.name == symbol]
+            matches.sort(key=lambda v: v.col_start)
+            
+            if 1 <= instance <= len(matches):
+                var_loc = matches[instance - 1]
+                # Create anchor
+                func_name = self._code_viewer.ast_locator.get_enclosing_function(line) or ""
+                anchor = ProbeAnchor(
+                    file=self._script_path,
+                    line=line,
+                    col=var_loc.col_start,
+                    symbol=symbol,
+                    func=func_name,
+                    is_assignment=var_loc.is_lhs
+                )
+                self._on_probe_requested(anchor)
+                logger.info(f"Added CLI probe for {symbol} at {line}:{var_loc.col_start}")
+            else:
+                logger.warning(f"Could not find instance {instance} of {symbol} on line {line}")
+
+        # Process watches
+        for watch_str in self._cli_watches:
+            target = parse_target(watch_str)
+            if not target:
+                continue
+            
+            line, symbol, instance = target
+            logger.debug(f"Processing CLI watch: {symbol} at line {line}, instance {instance}")
+            
+            # Find variable instance
+            vars_on_line = self._code_viewer.ast_locator.get_all_variables_on_line(line)
+            matches = [v for v in vars_on_line if v.name == symbol]
+            matches.sort(key=lambda v: v.col_start)
+            
+            if 1 <= instance <= len(matches):
+                var_loc = matches[instance - 1]
+                # Create anchor
+                func_name = self._code_viewer.ast_locator.get_enclosing_function(line) or ""
+                anchor = ProbeAnchor(
+                    file=self._script_path,
+                    line=line,
+                    col=var_loc.col_start,
+                    symbol=symbol,
+                    func=func_name,
+                    is_assignment=var_loc.is_lhs
+                )
+                self._on_watch_probe_requested(anchor)
+                logger.info(f"Added CLI watch for {symbol} at {line}:{var_loc.col_start}")
+            else:
+                logger.warning(f"Could not find instance {instance} of {symbol} on line {line}")
 
     def _setup_ui(self):
         """Create the UI layout."""
@@ -404,7 +496,7 @@ class MainWindow(QMainWindow):
 
     def _load_script(self, path: str):
         """Load a script file."""
-        self._script_path = path
+        self._script_path = os.path.abspath(path)
         self._status_bar.showMessage(f"Loaded: {path}")
         self._control_bar.set_script_loaded(True, path)
 
@@ -412,6 +504,13 @@ class MainWindow(QMainWindow):
         self._code_viewer.load_file(path)
         self._file_watcher.watch_file(path)
         self._last_source_content = self._code_viewer.toPlainText()
+
+        # Process CLI probes after loading
+        self._process_cli_probes()
+
+        # Auto-run if requested
+        if self._auto_run:
+            QTimer.singleShot(500, self._on_run_script)
 
     @pyqtSlot()
     def _on_action_clicked(self):
@@ -635,7 +734,14 @@ class MainWindow(QMainWindow):
             self._fps_timer.stop()
             self._script_runner.cleanup()
             self._control_bar.set_running(False)
+            self._control_bar.set_running(False)
             self._status_bar.showMessage("Ready")
+
+            # Auto-quit if requested
+            if self._auto_quit:
+                from PyQt6.QtWidgets import QApplication
+                logger.info("Auto-quit requested, closing application")
+                QTimer.singleShot(100, QApplication.quit)
 
     def _do_restart_loop(self):
         """Restart script for loop mode (called after delay)."""
