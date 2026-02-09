@@ -1,20 +1,19 @@
-"""
-Floating scalar watch window - displays all Alt+clicked scalars in one place.
+"""Scalar watch sidebar - displays all Alt+clicked scalars in one place.
 """
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, 
     QPushButton, QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from pyprobe.core.anchor import ProbeAnchor
 
 
-class ScalarWatchWindow(QWidget):
+class ScalarWatchSidebar(QWidget):
     """
-    Floating, always-on-top window for displaying scalars probed with Alt+click.
+    Sidebar widget for displaying scalars probed with Alt+click.
     
     Shows each scalar vertically stacked: label above value.
     """
@@ -23,11 +22,10 @@ class ScalarWatchWindow(QWidget):
     scalar_removed = pyqtSignal(object)  # ProbeAnchor
     
     def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
+        super().__init__(parent)
         
-        self.setWindowTitle("Scalar Watch")
-        self.setMinimumSize(200, 120)
-        self.resize(220, 200)
+        self.setMinimumWidth(180)
+        self.setMaximumWidth(280)
         
         # Track scalars: anchor -> (card_widget, value_widget)
         self._scalars: Dict[ProbeAnchor, tuple] = {}
@@ -38,8 +36,13 @@ class ScalarWatchWindow(QWidget):
     def _setup_ui(self):
         """Build the UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+        
+        # Header label
+        header = QLabel("Watch")
+        header.setObjectName("sidebarHeader")
+        layout.addWidget(header)
         
         # Scroll area for scalars
         scroll = QScrollArea()
@@ -55,14 +58,13 @@ class ScalarWatchWindow(QWidget):
         scroll.setWidget(self._content)
         layout.addWidget(scroll)
         
-        # Install event filter on viewport to allow dragging from inside scroll area
-        scroll.viewport().installEventFilter(self)
         self._scroll = scroll
         
         # Placeholder when empty
-        self._placeholder = QLabel("Alt+click scalars to watch")
+        self._placeholder = QLabel("Alt+click scalars\nto watch")
         self._placeholder.setObjectName("placeholder")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._placeholder.setWordWrap(True)
         self._content_layout.insertWidget(0, self._placeholder)
     
     def _apply_styles(self):
@@ -74,6 +76,15 @@ class ScalarWatchWindow(QWidget):
             }
             QScrollArea {
                 background-color: transparent;
+            }
+            QLabel#sidebarHeader {
+                color: #888888;
+                font-size: 12px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid #2a2a4a;
             }
             QLabel#placeholder {
                 color: #555555;
@@ -108,35 +119,6 @@ class ScalarWatchWindow(QWidget):
         """)
     
 
-    
-    def eventFilter(self, obj, event):
-        """Handle mouse events from scroll area viewport manually."""
-        if hasattr(self, '_scroll') and obj == self._scroll.viewport():
-            if event.type() == QEvent.Type.MouseButtonPress:
-                if event.button() == Qt.MouseButton.LeftButton:
-                    self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-                    # We don't accept/return True so scroll area still gets it (e.g. for focus)
-            elif event.type() == QEvent.Type.MouseMove:
-                if event.buttons() & Qt.MouseButton.LeftButton and hasattr(self, '_drag_offset'):
-                    self.move(event.globalPosition().toPoint() - self._drag_offset)
-                    # Don't consume so we don't block other behaviors?
-                    # But if we move, maybe we *shouldn't* scroll. 
-                    # If we return True, we block it.
-        return super().eventFilter(obj, event)
-
-    def mousePressEvent(self, event):
-        """Handle mouse press to start dragging."""
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_offset = event.pos()
-            event.accept()
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        """Handle mouse move to drag window."""
-        if event.buttons() & Qt.MouseButton.LeftButton and hasattr(self, '_drag_offset'):
-            self.move(self.mapToGlobal(event.pos()) - self._drag_offset)
-            event.accept()
-        super().mouseMoveEvent(event)
     
     def add_scalar(self, anchor: ProbeAnchor, color: QColor) -> None:
         """Add a scalar to the watch window."""
@@ -187,10 +169,6 @@ class ScalarWatchWindow(QWidget):
         
         # Track
         self._scalars[anchor] = (card, value_label)
-        
-        # Show window if hidden
-        if not self.isVisible():
-            self.show()
     
     def update_scalar(self, anchor: ProbeAnchor, value) -> None:
         """Update the displayed value for a scalar."""

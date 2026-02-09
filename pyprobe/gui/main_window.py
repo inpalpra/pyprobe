@@ -42,7 +42,7 @@ from .dock_bar import DockBar
 from .script_runner import ScriptRunner
 from .message_handler import MessageHandler
 from .probe_controller import ProbeController
-from .scalar_watch_window import ScalarWatchWindow
+from .scalar_watch_window import ScalarWatchSidebar
 
 
 class MainWindow(QMainWindow):
@@ -170,15 +170,19 @@ class MainWindow(QMainWindow):
         self._probe_container = ProbePanelContainer()
         splitter.addWidget(self._probe_container)
 
-        splitter.setSizes([400, 800])
+        # Scalar watch sidebar (right side, initially hidden)
+        self._scalar_watch_sidebar = ScalarWatchSidebar()
+        self._scalar_watch_sidebar.setVisible(False)
+        splitter.addWidget(self._scalar_watch_sidebar)
+        
+        # Store reference to splitter for resizing
+        self._main_splitter = splitter
+        splitter.setSizes([400, 800, 0])  # Sidebar starts collapsed
 
         # M2.5: Dock bar at bottom (hidden when empty)
         self._dock_bar = DockBar(self)
         self._dock_bar.setVisible(False)
         main_vlayout.addWidget(self._dock_bar)
-        
-        # Scalar watch window (floating, created lazily)
-        self._scalar_watch_window: Optional[ScalarWatchWindow] = None
 
         # === M1: File watcher and probe registry ===
         self._file_watcher = FileWatcher(self)
@@ -202,6 +206,9 @@ class MainWindow(QMainWindow):
         # self._control_bar.pause_clicked.connect(self._on_pause_script) # Removed
         self._control_bar.stop_clicked.connect(self._on_stop_script)
         self._control_bar.watch_clicked.connect(self._on_toggle_watch_window)
+
+        # Scalar watch sidebar
+        self._scalar_watch_sidebar.scalar_removed.connect(self._on_watch_scalar_removed)
 
         # === M1: Code viewer signals ===
         self._code_viewer.probe_requested.connect(self._on_probe_requested)
@@ -270,9 +277,9 @@ class MainWindow(QMainWindow):
                 shape=payload.get('shape'),
             )
         
-        # Route to scalar watch window if it exists and has this anchor
-        if self._scalar_watch_window and self._scalar_watch_window.has_scalar(anchor):
-            self._scalar_watch_window.update_scalar(anchor, payload['value'])
+        # Route to scalar watch sidebar if it has this anchor
+        if self._scalar_watch_sidebar.has_scalar(anchor):
+            self._scalar_watch_sidebar.update_scalar(anchor, payload['value'])
         
         # M2.5: Forward overlay data to target panels
         self._forward_overlay_data(anchor, payload)
@@ -290,9 +297,9 @@ class MainWindow(QMainWindow):
                     shape=probe_data.get('shape'),
                 )
             
-            # Route to scalar watch window if it exists and has this anchor
-            if self._scalar_watch_window and self._scalar_watch_window.has_scalar(anchor):
-                self._scalar_watch_window.update_scalar(anchor, probe_data['value'])
+            # Route to scalar watch sidebar if it has this anchor
+            if self._scalar_watch_sidebar.has_scalar(anchor):
+                self._scalar_watch_sidebar.update_scalar(anchor, probe_data['value'])
             
             # M2.5: Forward overlay data to target panels
             self._forward_overlay_data(anchor, probe_data)
@@ -397,17 +404,19 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_toggle_watch_window(self):
-        """Toggle the scalar watch window visibility."""
-        if self._scalar_watch_window is None:
-            # Create and show the watch window
-            self._scalar_watch_window = ScalarWatchWindow()
-            self._scalar_watch_window.scalar_removed.connect(self._on_watch_scalar_removed)
-            self._scalar_watch_window.show()
-        elif self._scalar_watch_window.isVisible():
-            self._scalar_watch_window.hide()
+        """Toggle the scalar watch sidebar visibility."""
+        if self._scalar_watch_sidebar.isVisible():
+            # Hide sidebar - collapse to 0 width
+            sizes = self._main_splitter.sizes()
+            self._saved_sidebar_width = sizes[2] if sizes[2] > 0 else 200
+            self._scalar_watch_sidebar.setVisible(False)
+            self._main_splitter.setSizes([sizes[0], sizes[1] + sizes[2], 0])
         else:
-            self._scalar_watch_window.show()
-            self._scalar_watch_window.raise_()  # Bring to front
+            # Show sidebar - restore width
+            self._scalar_watch_sidebar.setVisible(True)
+            sizes = self._main_splitter.sizes()
+            sidebar_width = getattr(self, '_saved_sidebar_width', 200)
+            self._main_splitter.setSizes([sizes[0], sizes[1] - sidebar_width, sidebar_width])
 
     # === M1: ANCHOR-BASED PROBE HANDLERS ===
 
@@ -425,16 +434,11 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(object)
     def _on_watch_probe_requested(self, anchor: ProbeAnchor):
-        """Handle Alt+click to add/remove scalar from watch window (toggle)."""
-        # Create watch window lazily
-        if self._scalar_watch_window is None:
-            self._scalar_watch_window = ScalarWatchWindow()
-            self._scalar_watch_window.scalar_removed.connect(self._on_watch_scalar_removed)
-        
+        """Handle Alt+click to add/remove scalar from watch sidebar (toggle)."""
         # Toggle behavior: if already watching, remove it
-        if self._scalar_watch_window.has_scalar(anchor):
-            self._scalar_watch_window.remove_scalar(anchor)
-            logger.debug(f"Removed {anchor.symbol} from scalar watch window (toggle)")
+        if self._scalar_watch_sidebar.has_scalar(anchor):
+            self._scalar_watch_sidebar.remove_scalar(anchor)
+            logger.debug(f"Removed {anchor.symbol} from scalar watch sidebar (toggle)")
             return
         
         # Get a color for the scalar (or assign one)
@@ -445,8 +449,12 @@ class MainWindow(QMainWindow):
             if color is None:
                 color = QColor('#00ffff')
         
-        # Add to watch window
-        self._scalar_watch_window.add_scalar(anchor, color)
+        # Add to watch sidebar
+        self._scalar_watch_sidebar.add_scalar(anchor, color)
+        
+        # Show sidebar if hidden
+        if not self._scalar_watch_sidebar.isVisible():
+            self._on_toggle_watch_window()
         
         # Highlight in code viewer
         self._code_viewer.set_probe_active(anchor, color)
@@ -457,11 +465,11 @@ class MainWindow(QMainWindow):
             msg = make_add_probe_cmd(anchor)
             ipc.send_command(msg)
         
-        logger.debug(f"Added {anchor.symbol} to scalar watch window")
+        logger.debug(f"Added {anchor.symbol} to scalar watch sidebar")
 
     @pyqtSlot(object)
     def _on_watch_scalar_removed(self, anchor: ProbeAnchor):
-        """Handle removal of scalar from watch window."""
+        """Handle removal of scalar from watch sidebar."""
         # Clear from code viewer highlight
         self._code_viewer.remove_probe(anchor)
         # Release from registry
@@ -473,7 +481,7 @@ class MainWindow(QMainWindow):
             msg = make_remove_probe_cmd(anchor)
             ipc.send_command(msg)
         
-        logger.debug(f"Removed {anchor.symbol} from scalar watch window")
+        logger.debug(f"Removed {anchor.symbol} from scalar watch sidebar")
 
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):
