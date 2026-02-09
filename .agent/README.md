@@ -81,209 +81,66 @@ Prints detailed `[TRACE]` output to stdout showing:
 ## LESSONS (STAR-AR FORMAT)
 > see `prompts/END.md` for format spec
 
-### L1 2026-02-06 anim-GC
-S: fade_out anim on probe removal
-T: animate UI cleanup
-A: created QPropertyAnimation w/o parent/ref
-R: anim GC'd, callback never fires
-A': parent anim to widget + store ref
-R': anim completes, cleanup runs
-Fix: `widget._fade_anim = anim; parent=widget`
-File: gui/animations.py
+### PROCESS LESSONS (debugging approach)
 
-### L9 2026-02-07 queue-feeder-race
-S: subprocess sends DATA_SCRIPT_END, then os._exit()
-T: signal script completion to GUI
-A: queue.put() + os._exit() immediately
-R: feeder thread killed mid-send, msg lost, GUI stuck at PAUSE
-A': sleep 100ms before os._exit() to let feeder complete
-R': msg reliably arrives at GUI
-Fix: `time.sleep(0.1)` before `os._exit(exit_code)`
-File: core/runner.py:344-347
-
-### L10 2026-02-07 debug-observe-first
+#### L10 2026-02-07 debug-observe-first
 S: GUI button stuck at PAUSE after script end
 T: fix button state bug
 A: hypothesized causes, made code changes, tested → repeated 4x
 R: wasted effort, wrong hypotheses, no progress
 A': add comprehensive state tracing FIRST, observe actual behavior
-R': trace reveals exact failure point (DATA_SCRIPT_END never received)
+R': trace reveals exact failure point
 Fix: created state_tracer.py with --trace-states flag
-File: pyprobe/state_tracer.py
 
-### L11 2026-02-07 gui-debug-pattern
+#### L11 2026-02-07 gui-debug-pattern
 S: intermittent GUI state bug
-T: debug state machine logic
 A: read code, guess root cause, patch speculatively
-R: multiple failed fixes, user frustration
+R: multiple failed fixes
 A': instrument (State, Action) → (NewState) at every transition
-R': trace log pinpoints exact broken transition
 Fix: trace every IPC msg, button click, state change; log to file
-File: state_tracer.py, main_window.py
 
-### L12 2026-02-07 ipc-debug-both-sides
+#### L12 2026-02-07 ipc-debug-both-sides
 S: msg sent but never received
-T: find where msg is lost
 A: added logging only on receiver (GUI) side
 R: couldn't see if msg was actually sent
 A': log on BOTH sender (subprocess) AND receiver (GUI)
-R': terminal shows "sent successfully" but trace shows not received → queue issue
 Fix: print to sys.__stderr__ in subprocess, trace in GUI
-File: runner.py, main_window.py
 
-### L13 2026-02-08 gui-debug-user-interaction
-S: debugging GUI app with trace logging added to code
-T: observe trace output to understand bug
+#### L13 2026-02-08 gui-debug-user-interaction
+S: debugging GUI app with trace logging added
 A: launched `python -m pyprobe ...` repeatedly, waited for cmd completion
-R: GUI never completes, no output until user clicks to trigger code path, wasted time
-A': ask user to launch GUI, interact (click probe target), then share terminal output
-R': debug output appears after user triggers code path, useful data obtained
-Fix: for PyProbe GUI debugging, always instruct user to: 1) launch, 2) click to trigger, 3) share output
-File: process
+R: GUI never completes, no output until user interaction
+A': ask user to: 1) launch, 2) interact, 3) share terminal output
 
-### L14 2026-02-09 drag-mime-missing-field
-S: overlaid symbol (received_symbols) not capturing correctly after drag-drop
-T: debug why overlay anchor not matching
-A: traced AnchorMatcher → saw is_assignment=False for LHS symbol
-R: RHS values captured instead of LHS, overlay showed wrong data
-A': trace full data flow: where anchor created → IPC serialization → deserialization
-R': found is_assignment lost in drag_helpers.encode_anchor_mime (field not included)
-Fix: add is_assignment to encode_anchor_mime, pass in code_viewer._start_drag, read in probe_panel.dropEvent
-File: gui/drag_helpers.py, gui/code_viewer.py, gui/probe_panel.py
+### DESIGN LESSONS (architecture/philosophy)
 
-### L15 2026-02-09 overlay-match-symbol-only
-S: LHS and RHS of same symbol (received_symbols) both forwarded same data
-T: distinguish LHS vs RHS for overlay data forwarding
-A: overlay match used `anchor.symbol in overlay_symbols`
-R: both LHS and RHS anchors matched, received same data value
-A': match by full anchor identity (symbol + line + is_assignment)
-R': LHS overlay gets post-assignment value, RHS overlay gets pre-assignment value
-Fix: compare all 3 fields in _forward_overlay_data, use unique overlay key with _lhs/_rhs suffix
-File: gui/main_window.py:830-885
-
-### L16 2026-02-09 stale-loop-value
-S: 2nd loop iteration captured stale value from previous iteration
-T: deferred capture should get current iteration's value
-A: flush check only verified `var_exists` in frame.f_locals
-R: on iter 2, old value exists → flushed immediately with stale data
-A': track object ID when deferring, only flush when ID changes
-R': flush correctly waits for new assignment, captures fresh value
-Fix: store old_id = id(value) in _pending_deferred tuple, compare in _flush_deferred
-File: core/tracer.py:391-420, 550-558
-
-### L17 2026-02-09 qscrollarea-layout
-S: LayoutManager._maximize() iterating panels to park
-T: hide all panels except maximized one
-A: used `container.layout()` for QScrollArea container
-R: layout() returns None for QScrollArea, no panels hidden
-A': QScrollArea stores content in widget(); use `container.widget().layout()`
-R': panels correctly found and parked
-Fix: check isinstance(container, QScrollArea), use widget().layout()
-File: gui/layout_manager.py:55-65
-
-### L18 2026-02-09 qgridlayout-itemat-gaps
-S: QGridLayout.count()=4 but itemAt(3) returns None
-T: iterate all panels in grid layout
-A: used `for i in range(layout.count()): layout.itemAt(i)`
-R: grid gaps → itemAt returns None for some indices, panels missed
-A': iterate container._panels dict directly, not layout
-R': all panels found regardless of grid cell arrangement
-Fix: replace layout.itemAt() loop with `for anchor, widget in container._panels.items()`
-File: gui/layout_manager.py:55-72
-
-
-### L2 2026-02-06 kwarg-order
-S: calling fade_out w/ callback
-T: trigger cleanup after anim
-A: `fade_out(panel, callback)` positional
-R: callback passed as duration_ms, TypeError
-A': check func sig, use kwarg `on_finished=`
-R': correct arg binding
-Fix: `fade_out(panel, on_finished=callback)`
-File: gui/main_window.py:385
-
-### L3 2026-02-06 filter-vs-degrade
+#### L3 2026-02-06 filter-vs-degrade
 S: non-data symbols (np, print) probed by user
-T: prevent meaningless probes
 A: block probing in `_get_anchor_at_position()` → return None
 R: also blocked func args like `x` in `foo(x)`, valid use case
 A': allow all probes, show "Nothing to show" placeholder
-R': graceful UX, no false negatives
-Fix: remove `is_probeable()` check; add placeholder in ScalarDisplay
-File: gui/code_viewer.py, plots/scalar_display.py
+Fix: graceful degradation > strict filtering
 
-### L4 2026-02-06 word-wrap-default
-S: highlight rects misplaced when window resized
-T: calculate variable rect from line/col position
-A: `col_start * char_width` assumed no wrap
-R: rects in wrong place when text wraps to next visual line
-A': check QPlainTextEdit defaults, disable wrap for code viewer
-R': rects stay aligned regardless of window size
-Fix: `self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)`
-File: gui/code_viewer.py:67
-
-### L5 2026-02-06 symptom-vs-root
-S: highlight rects misplaced when window resized
-T: fix positioning bug
-A: add `documentMargin()` to x-offset (symptom-based fix)
-R: fixed specific case, but root cause was wrap mode
-Fix: see L4 (root cause fix)
-File: gui/code_viewer.py
-
-### L6 2026-02-06 anchor-sync
-S: probing `x` and `wfm` on same line -> time async
-T: capture related vars at exact same time
+#### L6 2026-02-06 anchor-sync
+S: probing `x` and `wfm` on same line → time async
 A: each anchor checks throttle independently
 R: jitter, graphs drift out of phase
 A': shared throttle per (file, line) location
-R': all anchors on line capture atomic snapshot
 Fix: `_location_throttle` dict in tracer
-File: core/tracer.py
 
-### L7 2026-02-06 tracer-pre-exec
+#### L7 2026-02-06 tracer-pre-exec
 S: probing assignment `wfm = Waveform(...)`
-T: capture result of assignment
 A: capture on 'line' event
-R: trace event is PRE-exec, captured old value (frame N-1)
-A': defer capture to NEXT event in same scope (ignore 'call')
-R': captures post-exec value (frame N)
+R: trace event is PRE-exec, captured old value
+A': defer capture to NEXT event in same scope
 Fix: `is_assignment` flag + `_pending_deferred` buffer
-File: core/tracer.py
-R: still broken, wrong hypothesis
-A': verify assumptions (is word wrap on?) before fixing
-R': find actual root cause
-Fix: question defaults before adding offsets
-File: gui/code_viewer.py
 
-### L6 2026-02-06 venv-run
-S: running `python -m pyprobe` for verification
-T: test new ScalarHistoryChart feature
-A: ran `python -m pyprobe` without activating venv
-R: ModuleNotFoundError: No module named 'PyQt6'
-A': always activate proj venv before running
-R': all deps available
-Fix: `source .venv/bin/activate && python -m pyprobe ...`
-File: (all python cmds)
-
-### L7 2026-02-06 ipc-pickle-custom
-S: probing custom Waveform object (user-defined class)
-T: display waveform with proper time axis
-A: sent custom object through multiprocessing queue
-R: `PicklingError: Can't pickle <class '__main__.Waveform'>`
-A': serialize to dict before IPC, deserialize on GUI side
-R': waveform plots correctly with time axis
-Fix: `_serialize_value()` in tracer converts to `{'__waveform__': True, 'x': ..., 't': ...}`
-File: core/tracer.py, plots/waveform_plot.py, core/data_classifier.py
-
-### L8 2026-02-07 scalar-sort-order
+#### L8 2026-02-07 scalar-sort-order
 S: waveform collection scalars [t0, dt] need semantic order
-T: serialize waveform scalars for IPC
 A: sorted scalars by value `scalars.sort()`
-R: t0=10, dt=0.2 → sorted to [0.2, 10], broke time vector calc
+R: t0=10, dt=0.2 → sorted to [0.2, 10], broke time vector
 A': identify t0/dt by attr name patterns, never sort by value
-R': t0 preserved at idx 0, dt at idx 1, time vector correct
-Fix: `_classify_as_waveform()` detects t0/dt patterns → order [t0,dt]; removed `.sort()`
-File: core/data_classifier.py:115-145, core/tracer.py:267,287
+Fix: `_classify_as_waveform()` detects t0/dt patterns
 
 ## PATTERNS
 
