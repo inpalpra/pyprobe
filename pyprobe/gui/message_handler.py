@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 from ..ipc.messages import Message, MessageType
 from ..core.anchor import ProbeAnchor
+from ..core.capture_record import CaptureRecord
 
 
 class MessageHandler(QObject):
@@ -30,6 +31,8 @@ class MessageHandler(QObject):
     # Signals for thread-safe GUI updates
     probe_value = pyqtSignal(dict)  # Full payload with anchor, value, dtype
     probe_value_batch = pyqtSignal(list)  # List of probe payloads
+    probe_record = pyqtSignal(object)  # CaptureRecord
+    probe_record_batch = pyqtSignal(list)  # List[CaptureRecord]
     script_ended = pyqtSignal()
     exception_raised = pyqtSignal(dict)
     variable_data = pyqtSignal(dict)  # Legacy support
@@ -146,12 +149,18 @@ class MessageHandler(QObject):
         # Handle anchor-based probe data
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE:
             self._frame_count += 1
+            record = self._payload_to_record(msg.payload)
+            if record is not None:
+                self.probe_record.emit(record)
             self.probe_value.emit(msg.payload)
 
         # Handle batched probe data for atomic updates
         elif msg.msg_type == MessageType.DATA_PROBE_VALUE_BATCH:
             self._frame_count += 1
             probes = msg.payload.get('probes', [])
+            records = [r for r in (self._payload_to_record(p) for p in probes) if r is not None]
+            if records:
+                self.probe_record_batch.emit(records)
             self.probe_value_batch.emit(probes)
 
         elif msg.msg_type == MessageType.DATA_SCRIPT_END:
@@ -172,3 +181,20 @@ class MessageHandler(QObject):
 
         elif msg.msg_type == MessageType.DATA_STDERR:
             pass  # Could display in a console widget
+
+    def _payload_to_record(self, payload: dict) -> Optional[CaptureRecord]:
+        """Convert a probe payload dict into a CaptureRecord."""
+        try:
+            anchor = ProbeAnchor.from_dict(payload['anchor'])
+        except Exception:
+            return None
+
+        return CaptureRecord(
+            anchor=anchor,
+            value=payload.get('value'),
+            dtype=payload.get('dtype', 'unknown'),
+            shape=payload.get('shape'),
+            seq_num=payload.get('seq_num', -1),
+            timestamp=payload.get('timestamp', 0),
+            logical_order=payload.get('logical_order', 0),
+        )

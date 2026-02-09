@@ -5,7 +5,7 @@ with careful attention to minimizing overhead in tight loops.
 
 import sys
 import time
-from typing import Dict, Set, Optional, Any, Callable
+from typing import Dict, List, Set, Optional, Any, Callable, Tuple
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
@@ -17,7 +17,8 @@ from .data_classifier import (
 )
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
-from .deferred_capture import DeferredCaptureManager
+from .capture_manager import CaptureManager
+from .capture_record import CaptureRecord
 from pyprobe.logging import trace_print
 
 
@@ -64,7 +65,6 @@ class VariableTracer:
     Design decisions for minimizing overhead:
     1. Early exit in trace function for non-watched files/functions
     2. Anchor-based matching for O(1) lookup
-    3. Throttling checked BEFORE accessing frame.f_locals (expensive)
     """
 
     def __init__(
@@ -73,7 +73,9 @@ class VariableTracer:
         target_files: Optional[Set[str]] = None,
         target_functions: Optional[Set[str]] = None,
         anchor_data_callback: Optional[Callable[[ProbeAnchor, CapturedVariable], None]] = None,
-        anchor_batch_callback: Optional[Callable[[list], None]] = None
+        anchor_batch_callback: Optional[Callable[[list], None]] = None,
+        capture_record_callback: Optional[Callable[[CaptureRecord], None]] = None,
+        capture_record_batch_callback: Optional[Callable[[List[CaptureRecord]], None]] = None,
     ):
         """
         Args:
@@ -82,10 +84,14 @@ class VariableTracer:
             target_functions: Only trace these functions (None = all functions)
             anchor_data_callback: Called for anchor-based captures (anchor, captured_var)
             anchor_batch_callback: Called with list of (anchor, captured_var) tuples from same trace event
+            capture_record_callback: Called with CaptureRecord for capture pipeline tests
+            capture_record_batch_callback: Called with list of CaptureRecords from same trace event
         """
         self._data_callback = data_callback
         self._anchor_data_callback = anchor_data_callback
         self._anchor_batch_callback = anchor_batch_callback
+        self._capture_record_callback = capture_record_callback
+        self._capture_record_batch_callback = capture_record_batch_callback
         self._target_files = target_files
         self._target_functions = target_functions
         self._enabled = False
@@ -101,35 +107,13 @@ class VariableTracer:
         self._anchor_matcher = AnchorMatcher()
         self._anchor_watches: Dict[ProbeAnchor, WatchConfig] = {}
         
-        # Location-based throttle: all anchors at (file, line) share one throttle
-        # This ensures probes on same line always capture together
-        self._location_throttle: Dict[tuple, float] = {}  # (file, line) -> last_capture_time
-        self._location_throttle_ms = 50.0  # Default throttle for location-based captures
-        
-        # Deferred capture manager for assignment targets
-        self._deferred = DeferredCaptureManager()
+        # Capture manager for ordered captures
+        self._capture_manager = CaptureManager()
 
     def stop(self) -> None:
         """Disable tracing."""
         self._enabled = False
         sys.settrace(None)
-
-    def _value_changed(self, value: Any, config: WatchConfig) -> bool:
-        """Check if value changed significantly (for CHANGE_DETECT strategy)."""
-        try:
-            if isinstance(value, np.ndarray):
-                # For arrays, use hash of downsampled data
-                step = max(1, len(value.flat) // 100)
-                new_hash = hash(value.flat[::step].tobytes())
-            else:
-                new_hash = hash(value)
-
-            if new_hash == config.last_value_hash:
-                return False
-            config.last_value_hash = new_hash
-            return True
-        except (TypeError, ValueError):
-            return True  # If we can't hash, always capture
 
     def _serialize_value(self, value: Any) -> Any:
         """
@@ -220,9 +204,13 @@ class VariableTracer:
             return None
 
         # Always flush pending deferred captures (from previous line/event)
-        flushed = self._deferred.flush(frame, event, self._create_anchor_capture)
+        flushed = self._capture_manager.flush_deferred(
+            frame_id=id(frame),
+            event=event,
+            resolve_value=lambda anchor: self._resolve_anchor_value(frame, anchor),
+        )
         if flushed:
-            self._send_batch(flushed)
+            self._send_record_batch(flushed)
 
         # Only process 'line' events for new matching
         if event != 'line':
@@ -257,39 +245,18 @@ class VariableTracer:
             return self._trace_func
 
         # Capture for each matching anchor, batching all captures from this event
-        current_time = time.perf_counter()
-
-        # Location-based throttle: all anchors on this line share one throttle check
+        timestamp = time.perf_counter_ns()
         location_key = (filename, lineno)
-        last_capture = self._location_throttle.get(location_key, 0.0)
-        elapsed_ms = (current_time - last_capture) * 1000
-        is_throttled = elapsed_ms < self._location_throttle_ms
-
-        batch = []
+        batch: List[CaptureRecord] = []
         frame_id = id(frame)
 
-        for anchor in matching_anchors:
+        rhs_anchors = [a for a in matching_anchors if not getattr(a, 'is_assignment', False)]
+        lhs_anchors = [a for a in matching_anchors if getattr(a, 'is_assignment', False)]
+
+        logical_order = 0
+        for anchor in rhs_anchors:
             config = self._anchor_watches.get(anchor)
             if config is None or not config.enabled:
-                continue
-
-            # If this is an assignment target, defer capture to next line (post-execution)
-            # ALWAYS defer LHS captures even when throttled - we want the final value
-            is_assign = getattr(anchor, 'is_assignment', False)
-            if is_assign:
-                # Record the current object ID (or None if doesn't exist)
-                symbol = anchor.symbol
-                if symbol in frame.f_locals:
-                    old_id = id(frame.f_locals[symbol])
-                elif symbol in frame.f_globals:
-                    old_id = id(frame.f_globals[symbol])
-                else:
-                    old_id = None
-                self._deferred.defer(frame_id, anchor, lineno, old_id)
-                continue
-
-            # For immediate (RHS) captures, respect throttle
-            if is_throttled:
                 continue
 
             # Get the value (check locals first, then globals for module-level vars)
@@ -298,61 +265,94 @@ class VariableTracer:
             else:
                 value = frame.f_globals[anchor.symbol]
 
-            # For CHANGE_DETECT, still check if value changed
-            if config and config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
-                if not self._value_changed(value, config):
-                    continue
-
-            # Create capture with anchor context
-            captured = self._create_anchor_capture(anchor, value, current_time)
+            dtype, shape = classify_data(value)
+            serialized_value = self._serialize_value(value)
+            record = self._capture_manager.capture_immediate(
+                anchor=anchor,
+                value=serialized_value,
+                dtype=dtype,
+                shape=shape,
+                timestamp=timestamp,
+                logical_order=logical_order,
+            )
+            logical_order += 1
 
             # Debug trace for immediate captures
             if isinstance(value, np.ndarray) and np.iscomplexobj(value):
                 trace_print(f"IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
 
-            batch.append((anchor, captured))
-        
-        # Update location throttle time if we captured or deferred anything
-        if batch or self._deferred.has_pending(frame_id):
-            self._location_throttle[location_key] = current_time
+            batch.append(record)
+
+        for anchor in lhs_anchors:
+            config = self._anchor_watches.get(anchor)
+            if config is None or not config.enabled:
+                continue
+            self._capture_manager.defer_capture(
+                frame_id=frame_id,
+                anchor=anchor,
+                logical_order=logical_order,
+                timestamp=timestamp,
+            )
+            logical_order += 1
 
         # Send batch
         if batch:
-            self._send_batch(batch)
+            self._send_record_batch(batch)
 
         return self._trace_func
 
-    def _send_batch(self, batch: list) -> None:
-        """Send a batch of captures to the appropriate callback."""
+    def _send_record_batch(self, batch: List[CaptureRecord]) -> None:
+        """Send a batch of CaptureRecords to the appropriate callback."""
         try:
+            if self._capture_record_batch_callback is not None:
+                self._capture_record_batch_callback(batch)
+                return
+
+            if self._capture_record_callback is not None:
+                for record in batch:
+                    self._capture_record_callback(record)
+                return
+
+            converted = [(record.anchor, self._record_to_captured(record)) for record in batch]
             if self._anchor_batch_callback is not None:
-                self._anchor_batch_callback(batch)
+                self._anchor_batch_callback(converted)
             elif self._anchor_data_callback is not None:
-                for anchor, captured in batch:
+                for anchor, captured in converted:
                     self._anchor_data_callback(anchor, captured)
             else:
-                for anchor, captured in batch:
+                for _, captured in converted:
                     self._data_callback(captured)
         except Exception:
             pass  # Don't let callback errors break tracing
 
-    def _create_anchor_capture(
-        self, anchor: ProbeAnchor, value: Any, timestamp: float
-    ) -> CapturedVariable:
-        """Create CapturedVariable with anchor context."""
+    def _record_to_captured(self, record: CaptureRecord) -> CapturedVariable:
+        """Convert CaptureRecord to legacy CapturedVariable for existing callbacks."""
+        timestamp_sec = record.timestamp / 1_000_000_000
+        return CapturedVariable(
+            name=record.anchor.symbol,
+            value=record.value,
+            dtype=record.dtype,
+            shape=record.shape,
+            timestamp=timestamp_sec,
+            source_file=record.anchor.file,
+            line_number=record.anchor.line,
+            function_name=record.anchor.func,
+        )
+
+    def _resolve_anchor_value(
+        self, frame, anchor: ProbeAnchor
+    ) -> Tuple[Any, str, Optional[tuple]]:
+        """Resolve and serialize a value for a deferred capture."""
+        if anchor.symbol in frame.f_locals:
+            value = frame.f_locals[anchor.symbol]
+        elif anchor.symbol in frame.f_globals:
+            value = frame.f_globals[anchor.symbol]
+        else:
+            raise KeyError(anchor.symbol)
+
         dtype, shape = classify_data(value)
         serialized_value = self._serialize_value(value)
-
-        return CapturedVariable(
-            name=anchor.symbol,
-            value=serialized_value,
-            dtype=dtype,
-            shape=shape,
-            timestamp=timestamp,
-            source_file=anchor.file,
-            line_number=anchor.line,
-            function_name=anchor.func
-        )
+        return serialized_value, dtype, shape
 
     def start(self) -> None:
         """Start tracing with anchor-based matching."""

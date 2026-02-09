@@ -43,6 +43,7 @@ from .script_runner import ScriptRunner
 from .message_handler import MessageHandler
 from .probe_controller import ProbeController
 from .scalar_watch_window import ScalarWatchSidebar
+from .redraw_throttler import RedrawThrottler
 
 
 class MainWindow(QMainWindow):
@@ -101,6 +102,7 @@ class MainWindow(QMainWindow):
         # Initialize ScriptRunner and MessageHandler
         self._script_runner = ScriptRunner(self)
         self._message_handler = MessageHandler(self._script_runner, self._tracer, self)
+        self._redraw_throttler = RedrawThrottler()
         self._setup_script_runner()
         self._setup_message_handler()
         self._setup_fps_timer()
@@ -242,11 +244,54 @@ class MainWindow(QMainWindow):
 
     def _setup_message_handler(self):
         """Connect MessageHandler signals to slots."""
-        self._message_handler.probe_value.connect(self._on_probe_value)
-        self._message_handler.probe_value_batch.connect(self._on_probe_value_batch)
+        self._message_handler.probe_record.connect(self._on_probe_record)
+        self._message_handler.probe_record_batch.connect(self._on_probe_record_batch)
         self._message_handler.script_ended.connect(self._on_script_ended)
         self._message_handler.exception_raised.connect(self._on_exception)
         self._message_handler.variable_data.connect(self._on_variable_data)
+
+    @pyqtSlot(object)
+    def _on_probe_record(self, record):
+        """Handle single probe record from MessageHandler."""
+        self._handle_probe_records([record])
+
+    @pyqtSlot(list)
+    def _on_probe_record_batch(self, records: list):
+        """Handle batched probe records from MessageHandler."""
+        self._handle_probe_records(records)
+
+    def _handle_probe_records(self, records: list) -> None:
+        """Store records and schedule redraws from buffers."""
+        for record in records:
+            anchor = record.anchor
+            self._probe_registry.update_data_received(anchor)
+
+            if anchor in self._probe_metadata:
+                self._probe_metadata[anchor]['dtype'] = record.dtype
+
+            self._redraw_throttler.receive(record)
+
+            if self._scalar_watch_sidebar.has_scalar(anchor):
+                self._scalar_watch_sidebar.update_scalar(anchor, record.value)
+
+            self._forward_overlay_data(anchor, {
+                'value': record.value,
+                'dtype': record.dtype,
+                'shape': record.shape,
+            })
+
+        self._maybe_redraw()
+
+    def _maybe_redraw(self) -> None:
+        """Redraw dirty buffers at a throttled rate."""
+        if not self._redraw_throttler.should_redraw():
+            return
+
+        dirty = self._redraw_throttler.get_dirty_buffers()
+        for anchor, buffer in dirty.items():
+            if anchor in self._probe_panels:
+                for panel in self._probe_panels[anchor]:
+                    panel.update_from_buffer(buffer)
 
     def _setup_script_runner(self):
         """Configure the script runner with callbacks and connect signals."""

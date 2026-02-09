@@ -8,12 +8,14 @@ import os
 import io
 import threading
 import traceback
+import time
 from pathlib import Path
 from typing import List, Optional, Set
 import multiprocessing as mp
 
 from .tracer import VariableTracer, WatchConfig, ThrottleStrategy, CapturedVariable
 from .anchor import ProbeAnchor
+from .sequence import SequenceGenerator
 from ..ipc.channels import IPCChannel
 from ..ipc.messages import (
     Message, MessageType, make_variable_data_msg, make_exception_msg,
@@ -60,6 +62,9 @@ class ScriptRunner:
 
         # Command listener thread
         self._cmd_thread: Optional[threading.Thread] = None
+
+        # Sequence generator for probe captures
+        self._seq_gen = SequenceGenerator()
 
     def run(self) -> int:
         """
@@ -187,11 +192,17 @@ class ScriptRunner:
         # Check if paused
         self._pause_event.wait()
 
+        seq_num = self._seq_gen.next()
+        timestamp = time.perf_counter_ns()
+
         msg = make_probe_value_msg(
             anchor=anchor,
             value=captured.value,
             dtype=captured.dtype,
             shape=captured.shape,
+            seq_num=seq_num,
+            timestamp=timestamp,
+            logical_order=0,
         )
         self._ipc.send_data(msg)
 
@@ -206,9 +217,18 @@ class ScriptRunner:
         self._pause_event.wait()
 
         # Build list of probe data tuples
+        timestamp = time.perf_counter_ns()
         probes = []
-        for anchor, captured in batch:
-            probes.append((anchor, captured.value, captured.dtype, captured.shape))
+        for logical_order, (anchor, captured) in enumerate(batch):
+            probes.append((
+                anchor,
+                captured.value,
+                captured.dtype,
+                captured.shape,
+                self._seq_gen.next(),
+                timestamp,
+                logical_order,
+            ))
 
         msg = make_probe_value_batch_msg(probes)
         self._ipc.send_data(msg)

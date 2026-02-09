@@ -156,7 +156,6 @@ All captures from a single trace event are batched:
 | File | Changes |
 |------|---------|
 | `pyprobe/core/tracer.py` | Use CaptureManager, remove throttle logic |
-| `pyprobe/core/deferred_capture.py` | Integrate with CaptureManager or replace |
 | `pyprobe/ipc/channels.py` | Use OrderedCaptureQueue |
 | `pyprobe/gui/message_handler.py` | Route to ProbeDataBuffers |
 | `pyprobe/gui/probe_panel.py` | Render from ProbeDataBuffer |

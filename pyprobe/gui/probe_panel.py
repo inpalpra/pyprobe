@@ -21,6 +21,7 @@ from .animations import ProbeAnimations
 from .lens_dropdown import LensDropdown
 from .plot_toolbar import PlotToolbar, InteractionMode
 from .drag_helpers import has_anchor_mime, decode_anchor_mime
+from .probe_buffer import ProbeDataBuffer
 
 
 class ProbePanel(QFrame):
@@ -209,6 +210,19 @@ class ProbePanel(QFrame):
 
         if self._plot:
             self._plot.update_data(value, dtype, shape, source_info)
+
+    def update_from_buffer(self, buffer: ProbeDataBuffer) -> None:
+        """Update the plot using the full capture buffer."""
+        timestamps, values = buffer.get_plot_data()
+        if not values:
+            return
+
+        dtype = buffer.last_dtype or self._dtype
+        shape = buffer.last_shape
+
+        self.update_data(values[-1], dtype, shape)
+        if hasattr(self._plot, "update_history"):
+            self._plot.update_history(values)
 
     def _on_lens_changed(self, plugin_name: str):
         """Handle lens change - swap out the plot widget."""

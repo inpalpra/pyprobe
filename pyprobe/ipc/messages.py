@@ -134,6 +134,9 @@ def make_probe_value_msg(
     value: Any,
     dtype: str,
     shape: Optional[tuple] = None,
+    seq_num: Optional[int] = None,
+    timestamp: Optional[int] = None,
+    logical_order: int = 0,
 ) -> Message:
     """Create DATA_PROBE_VALUE message."""
     return Message(
@@ -143,12 +146,15 @@ def make_probe_value_msg(
             'value': value,
             'dtype': dtype,
             'shape': shape,
+            'seq_num': seq_num,
+            'timestamp': timestamp,
+            'logical_order': logical_order,
         }
     )
 
 
 def make_probe_value_batch_msg(
-    probes: list,  # List of (anchor, value, dtype, shape) tuples
+    probes: list,  # List of dicts or (anchor, value, dtype, shape, seq, timestamp, order)
 ) -> Message:
     """
     Create DATA_PROBE_VALUE_BATCH message.
@@ -157,12 +163,20 @@ def make_probe_value_batch_msg(
     ensuring atomic updates in the GUI.
     """
     items = []
-    for anchor, value, dtype, shape in probes:
+    for item in probes:
+        if isinstance(item, dict):
+            items.append(item)
+            continue
+
+        anchor, value, dtype, shape, seq_num, timestamp, logical_order = item
         items.append({
             'anchor': anchor.to_dict(),
             'value': value,
             'dtype': dtype,
             'shape': shape,
+            'seq_num': seq_num,
+            'timestamp': timestamp,
+            'logical_order': logical_order,
         })
     return Message(
         msg_type=MessageType.DATA_PROBE_VALUE_BATCH,

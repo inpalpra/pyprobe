@@ -10,7 +10,7 @@ The current capture mechanism has fundamental ordering and data loss issues that
 
 ### Files Involved
 - `pyprobe/core/tracer.py` - sys.settrace hook, captures variable values
-- `pyprobe/core/deferred_capture.py` - Handles LHS assignment captures
+- `pyprobe/core/deferred_capture.py` - Handles LHS assignment captures (removed; replaced by CaptureManager)
 - `pyprobe/core/anchor_matcher.py` - Matches probe locations to trace events
 - `pyprobe/ipc/channels.py` - IPC between subprocess (tracer) and GUI
 
@@ -35,7 +35,7 @@ The 50ms throttle was meant to prevent GUI flooding, but it blocks the capture i
 
 #### 2. Deferred Capture Uses Object ID Comparison
 ```python
-# deferred_capture.py
+# deferred_capture.py (removed)
 if current_id != old_id:
     ready_to_flush.append(anchor)
 ```
@@ -330,7 +330,7 @@ for i in range(1_000_000):
 ## Files to Modify
 
 1. **pyprobe/core/tracer.py** - Rewrite trace function with new capture logic
-2. **pyprobe/core/deferred_capture.py** - Replace with robust CaptureManager
+2. **pyprobe/core/deferred_capture.py** - Replaced by robust CaptureManager (removed)
 3. **pyprobe/ipc/messages.py** - Add sequence numbers to capture messages
 4. **pyprobe/gui/message_handler.py** - Buffer management, redraw throttling
 5. **pyprobe/gui/probe_panel.py** - Graph buffer storage and rendering

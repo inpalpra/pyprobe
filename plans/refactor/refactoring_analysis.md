@@ -98,12 +98,10 @@ Plus complex deferred capture logic (`_flush_deferred`, lines 360-466).
 
 | Component | Purpose |
 |-----------|---------|
-| `DeferredCaptureManager` | Encapsulate pending capture state and flush logic |
 | Deprecate `_trace_func` | Keep only anchor-based path, simplify dramatically |
 
 ### Benefits
 - **Reduced complexity**: One trace path instead of two
-- **Testable**: DeferredCaptureManager can be unit tested
 - **AI clarity**: Single code path to understand
 
 ---

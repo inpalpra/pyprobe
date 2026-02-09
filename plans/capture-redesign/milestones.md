@@ -36,6 +36,9 @@ This document outlines sequential milestones to implement the capture pipeline r
 - Changes to GUI
 - Actual capture logic changes
 
+**Note**:
+- Sequence/timestamp assignment will move into the capture layer (CaptureManager) in later milestones; any interim assignment outside the capture layer is temporary.
+
 ---
 
 ## Milestone 2: CaptureManager Core
@@ -78,7 +81,7 @@ This document outlines sequential milestones to implement the capture pipeline r
 
 **Key Files**:
 - Modify: `pyprobe/core/capture_manager.py`
-- Reference: `pyprobe/core/deferred_capture.py` (understand current approach)
+- Reference: legacy deferred capture (removed; see git history if needed)
 
 **Verification**:
 - Deferred captures get sequence numbers in correct order relative to immediate captures
@@ -88,7 +91,7 @@ This document outlines sequential milestones to implement the capture pipeline r
 
 **Does NOT include**:
 - Integration with tracer.py
-- Removal of old deferred_capture.py
+- Removal of old deferred_capture.py (done in Milestone 10)
 - GUI changes
 
 ---
@@ -106,7 +109,7 @@ This document outlines sequential milestones to implement the capture pipeline r
 
 **Key Files**:
 - Modify: `pyprobe/core/tracer.py`
-- Deprecate/Remove: `pyprobe/core/deferred_capture.py` (after migration)
+- Deprecate/Remove: `pyprobe/core/deferred_capture.py` (completed in Milestone 10)
 
 **Verification**:
 - Running test script produces CaptureRecords with correct seq_nums
@@ -254,13 +257,13 @@ This document outlines sequential milestones to implement the capture pipeline r
 **Goal**: Remove deprecated code, update documentation.
 
 **Scope**:
-- Remove old `deferred_capture.py` if fully replaced
+- Remove old `deferred_capture.py` (completed)
 - Remove deprecated throttling code
 - Update inline documentation
 - Update any user-facing documentation
 
 **Key Files**:
-- Delete: `pyprobe/core/deferred_capture.py` (if replaced)
+- Delete: `pyprobe/core/deferred_capture.py` (completed)
 - Modify: Various files for documentation updates
 
 **Verification**:
