@@ -14,7 +14,7 @@ from PyQt6.QtGui import QColor
 import multiprocessing as mp
 import os
 
-from pyprobe.logging import get_logger
+from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
 
 from .probe_panel import ProbePanelContainer, ProbePanel
@@ -403,9 +403,9 @@ class MainWindow(QMainWindow):
         self._runner_process.start()
 
         # M1: Send probe commands for any existing anchors
-        print(f"[TRACE] _on_run_script: Sending ADD_PROBE for {len(list(self._probe_registry.active_anchors))} anchors")
+        trace_print(f"_on_run_script: Sending ADD_PROBE for {len(list(self._probe_registry.active_anchors))} anchors")
         for anchor in self._probe_registry.active_anchors:
-            print(f"[TRACE] _on_run_script: ADD_PROBE {anchor.symbol} at line {anchor.line}")
+            trace_print(f"_on_run_script: ADD_PROBE {anchor.symbol} at line {anchor.line}")
             msg = make_add_probe_cmd(anchor)
             self._ipc.send_command(msg)
 

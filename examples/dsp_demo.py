@@ -15,7 +15,7 @@ import time
 
 # Simulation parameters
 NUM_SYMBOLS = 500
-NUM_FRAMES = 1
+NUM_FRAMES = 2
 
 # QAM-16 constellation points
 QAM16_CONSTELLATION = np.array([
@@ -86,7 +86,7 @@ def main():
         #       f"PAPR={20*np.log10(peak_to_avg):.1f} dB")
 
         # Simulate processing time
-        time.sleep(0.05)  # 50ms per frame = ~20 FPS
+        time.sleep(0.075)  # 75ms per frame = ~15 FPS
 
     print()
     print("Demo complete!")

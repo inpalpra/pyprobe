@@ -1,6 +1,7 @@
 """Efficient anchor matching for trace function."""
 from typing import Dict, List, Optional, Set, Tuple
 from pyprobe.core.anchor import ProbeAnchor
+from pyprobe.logging import trace_print
 
 class AnchorMatcher:
     """Index structure for O(1) anchor lookup in trace function.
@@ -39,14 +40,14 @@ class AnchorMatcher:
         candidates = self._by_location.get(key, [])
         # Debug: print candidates and their is_assignment status
         if candidates:
-            print(f"[TRACE] AnchorMatcher.match: line={line}, candidates={[(a.symbol, getattr(a, 'is_assignment', False)) for a in candidates]}")
+            trace_print(f"AnchorMatcher.match: line={line}, candidates={[(a.symbol, getattr(a, 'is_assignment', False)) for a in candidates]}")
         # Include if symbol is in locals OR if it's an assignment target (will be deferred)
         result = [
             a for a in candidates 
             if a.symbol in local_vars or getattr(a, 'is_assignment', False)
         ]
         if candidates:
-            print(f"[TRACE] AnchorMatcher.match: matched={[a.symbol for a in result]}")
+            trace_print(f"AnchorMatcher.match: matched={[a.symbol for a in result]}")
         return result
 
     def has_file(self, file: str) -> bool:

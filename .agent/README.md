@@ -51,6 +51,18 @@ python -m pyprobe --loglevel DEBUG examples/dsp_demo.py
 # logs → /tmp/pyprobe_debug.log
 ```
 
+### Capture Timing Trace
+For debugging probe capture timing (deferred captures, LHS/RHS, multi-line statements):
+```bash
+PYPROBE_TRACE=1 python -m pyprobe examples/dsp_demo.py
+```
+Prints detailed `[TRACE]` output to stdout showing:
+- `DEFER` - when deferred capture is registered
+- `_flush_deferred` - flush decisions, object ID tracking
+- `CAPTURE` - actual capture with array mean for complex data
+- `AnchorMatcher.match` - anchor matching with is_assignment status
+- `ASTLocator` - LHS detection for line 72 variables (hardcoded for dsp_demo debugging)
+
 ## LESSONS (STAR-AR FORMAT)
 > see `prompts/END.md` for format spec
 
@@ -113,6 +125,36 @@ A': ask user to launch GUI, interact (click probe target), then share terminal o
 R': debug output appears after user triggers code path, useful data obtained
 Fix: for PyProbe GUI debugging, always instruct user to: 1) launch, 2) click to trigger, 3) share output
 File: process
+
+### L14 2026-02-09 drag-mime-missing-field
+S: overlaid symbol (received_symbols) not capturing correctly after drag-drop
+T: debug why overlay anchor not matching
+A: traced AnchorMatcher → saw is_assignment=False for LHS symbol
+R: RHS values captured instead of LHS, overlay showed wrong data
+A': trace full data flow: where anchor created → IPC serialization → deserialization
+R': found is_assignment lost in drag_helpers.encode_anchor_mime (field not included)
+Fix: add is_assignment to encode_anchor_mime, pass in code_viewer._start_drag, read in probe_panel.dropEvent
+File: gui/drag_helpers.py, gui/code_viewer.py, gui/probe_panel.py
+
+### L15 2026-02-09 overlay-match-symbol-only
+S: LHS and RHS of same symbol (received_symbols) both forwarded same data
+T: distinguish LHS vs RHS for overlay data forwarding
+A: overlay match used `anchor.symbol in overlay_symbols`
+R: both LHS and RHS anchors matched, received same data value
+A': match by full anchor identity (symbol + line + is_assignment)
+R': LHS overlay gets post-assignment value, RHS overlay gets pre-assignment value
+Fix: compare all 3 fields in _forward_overlay_data, use unique overlay key with _lhs/_rhs suffix
+File: gui/main_window.py:830-885
+
+### L16 2026-02-09 stale-loop-value
+S: 2nd loop iteration captured stale value from previous iteration
+T: deferred capture should get current iteration's value
+A: flush check only verified `var_exists` in frame.f_locals
+R: on iter 2, old value exists → flushed immediately with stale data
+A': track object ID when deferring, only flush when ID changes
+R': flush correctly waits for new assignment, captures fresh value
+Fix: store old_id = id(value) in _pending_deferred tuple, compare in _flush_deferred
+File: core/tracer.py:391-420, 550-558
 
 
 ### L2 2026-02-06 kwarg-order
@@ -266,6 +308,9 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - QPlainTextEdit defaults to word wrap ON, breaks `col * char_width` math
 - custom objects can't pickle across IPC, serialize in tracer._serialize_value()
 - mp.Queue.put() uses feeder thread; os._exit() kills it mid-send → sleep before exit
+- drag-drop MIME: ALL anchor fields must be encoded/decoded (is_assignment was missing)
+- overlay matching: must compare full anchor identity (symbol+line+is_assignment), not just symbol name
+- deferred capture in loops: must track object ID, var_exists alone triggers on stale value from prev iteration
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?

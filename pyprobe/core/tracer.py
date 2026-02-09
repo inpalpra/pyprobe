@@ -17,6 +17,7 @@ from .data_classifier import (
 )
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
+from pyprobe.logging import trace_print
 
 
 class ThrottleStrategy(Enum):
@@ -391,10 +392,10 @@ class VariableTracer:
         for anchor, original_line, old_id in pending:
             # CRITICAL: Only flush if we're on a DIFFERENT line than where registered
             # This ensures we capture right after the assignment, not later
-            print(f"[TRACE] _flush_deferred: anchor={anchor.symbol}, original_line={original_line}, current_line={current_line}")
+            trace_print(f"_flush_deferred: anchor={anchor.symbol}, original_line={original_line}, current_line={current_line}")
             if current_line == original_line:
                 # Still on the same line - keep pending
-                print(f"[TRACE] _flush_deferred: Same line, keeping pending")
+                trace_print(f"_flush_deferred: Same line, keeping pending")
                 still_pending.append((anchor, original_line, old_id))
                 continue
             
@@ -414,7 +415,7 @@ class VariableTracer:
                 ready_to_flush.append(anchor)
             else:
                 # Same object as before - assignment hasn't happened yet, keep pending
-                print(f"[TRACE] _flush_deferred: Same object ID, keeping pending")
+                trace_print(f"_flush_deferred: Same object ID, keeping pending")
                 still_pending.append((anchor, original_line, old_id))
         
         # Update pending list
@@ -441,7 +442,7 @@ class VariableTracer:
                 # Debug: print value info for complex arrays
                 import numpy as np
                 if isinstance(value, np.ndarray) and np.iscomplexobj(value):
-                    print(f"[TRACE] _flush_deferred CAPTURE: {anchor.symbol} at line {anchor.line}, current_line={current_line}, mean={value.mean():.4f}")
+                    trace_print(f"_flush_deferred CAPTURE: {anchor.symbol} at line {anchor.line}, current_line={current_line}, mean={value.mean():.4f}")
                 
                 captured = self._create_anchor_capture(anchor, value, current_time)
                 batch.append((anchor, captured))
@@ -553,7 +554,7 @@ class VariableTracer:
                     old_id = id(frame.f_globals[symbol])
                 else:
                     old_id = None
-                print(f"[TRACE] DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}, old_id={old_id}")
+                trace_print(f"DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}, old_id={old_id}")
                 self._pending_deferred[frame_id].append((anchor, lineno, old_id))
                 continue
 
@@ -574,7 +575,7 @@ class VariableTracer:
             # Debug trace for immediate captures
             import numpy as np
             if isinstance(value, np.ndarray) and np.iscomplexobj(value):
-                print(f"[TRACE] IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
+                trace_print(f"IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
             
             batch.append((anchor, captured))
         

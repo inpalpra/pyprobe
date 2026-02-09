@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, List, Tuple, Set
 from dataclasses import dataclass, field
 
-from pyprobe.logging import get_logger
+from pyprobe.logging import get_logger, trace_print
 
 logger = get_logger(__name__)
 
@@ -100,7 +100,7 @@ class ASTLocator:
                 self._variables.append(var_loc)
                 # Debug trace for line 72 variables
                 if node.lineno == 72 and node.id in ('received_symbols', 'signal_i', 'signal_q'):
-                    print(f"[TRACE] ASTLocator: {node.id} at L{node.lineno}:C{node.col_offset} pos={pos}, is_lhs={is_lhs}, lhs_positions contains? {pos in lhs_positions}")
+                    trace_print(f"ASTLocator: {node.id} at L{node.lineno}:C{node.col_offset} pos={pos}, is_lhs={is_lhs}, lhs_positions contains? {pos in lhs_positions}")
                 logger.debug(f"Classified {node.id} at L{node.lineno}:C{node.col_offset} as {symbol_type}")
 
     def _collect_special_positions(

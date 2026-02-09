@@ -14,6 +14,7 @@ Usage:
 
 import logging
 import sys
+import os
 from typing import Optional
 
 # Default log file path
@@ -21,6 +22,16 @@ DEFAULT_LOG_FILE = '/tmp/pyprobe_debug.log'
 
 # Global flag to track if logging has been configured
 _logging_configured = False
+
+# TRACE mode: enabled via PYPROBE_TRACE=1 environment variable
+# Prints detailed tracing info for debugging probe capture timing
+TRACE_ENABLED = os.environ.get('PYPROBE_TRACE', '').lower() in ('1', 'true', 'yes')
+
+
+def trace_print(msg: str) -> None:
+    """Print trace message if PYPROBE_TRACE is enabled."""
+    if TRACE_ENABLED:
+        print(f"[TRACE] {msg}")
 
 
 def setup_logging(
