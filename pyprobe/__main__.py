@@ -42,6 +42,12 @@ def main():
         help="Add scalar watch. Format: line:symbol:instance (e.g., 4:x:1)"
     )
     parser.add_argument(
+        "--overlay",
+        action="append",
+        help="Overlay a signal on an existing probe. Format: target_symbol:line:symbol:instance "
+             "(e.g., signal_i:75:received_symbols:1 overlays received_symbols onto signal_i)"
+    )
+    parser.add_argument(
         "-l", "--loglevel",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="WARNING",
@@ -88,6 +94,7 @@ def main():
         script_path=args.script,
         probes=args.probe,
         watches=args.watch,
+        overlays=args.overlay,
         auto_run=args.auto_run,
         auto_quit=args.auto_quit
     ))

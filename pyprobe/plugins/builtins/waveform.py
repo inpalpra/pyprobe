@@ -559,8 +559,8 @@ class WaveformWidget(QWidget):
         """
         Return the data currently plotted on the graph.
         
-        Returns a list of dicts, one per curve:
-        [{'x': [...], 'y': [...]}, ...]
+        Returns a list of dicts, one per curve (including overlays):
+        [{'name': 'signal_i', 'x': [...], 'y': [...], 'is_overlay': False}, ...]
         
         This allows tests to verify what is actually rendered.
         """
@@ -569,11 +569,26 @@ class WaveformWidget(QWidget):
             x_data, y_data = curve.getData()
             if x_data is not None and y_data is not None:
                 result.append({
+                    'name': self._var_name,
                     'x': list(x_data),
-                    'y': list(y_data)
+                    'y': list(y_data),
+                    'is_overlay': False
                 })
             else:
-                result.append({'x': [], 'y': []})
+                result.append({'name': self._var_name, 'x': [], 'y': [], 'is_overlay': False})
+        
+        # Include overlay curves if present
+        if hasattr(self, '_overlay_curves'):
+            for key, curve in self._overlay_curves.items():
+                x_data, y_data = curve.getData()
+                if x_data is not None and y_data is not None:
+                    result.append({
+                        'name': key,
+                        'x': list(x_data),
+                        'y': list(y_data),
+                        'is_overlay': True
+                    })
+        
         return result
 
 

@@ -36,6 +36,7 @@ def run_app(
     script_path: str = None,
     probes: Optional[List[str]] = None,
     watches: Optional[List[str]] = None,
+    overlays: Optional[List[str]] = None,
     auto_run: bool = False,
     auto_quit: bool = False
 ) -> int:
@@ -46,6 +47,7 @@ def run_app(
         script_path=script_path,
         probes=probes,
         watches=watches,
+        overlays=overlays,
         auto_run=auto_run,
         auto_quit=auto_quit
     )

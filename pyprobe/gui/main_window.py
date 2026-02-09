@@ -75,6 +75,7 @@ class MainWindow(QMainWindow):
         script_path: Optional[str] = None,
         probes: Optional[List[str]] = None,
         watches: Optional[List[str]] = None,
+        overlays: Optional[List[str]] = None,
         auto_run: bool = False,
         auto_quit: bool = False
     ):
@@ -83,6 +84,7 @@ class MainWindow(QMainWindow):
         self._script_path: Optional[str] = script_path
         self._cli_probes = probes or []
         self._cli_watches = watches or []
+        self._cli_overlays = overlays or []
         self._auto_run = auto_run
         self._auto_quit = auto_quit
         self._runner_process: Optional[mp.Process] = None
@@ -223,6 +225,64 @@ class MainWindow(QMainWindow):
                 )
                 self._on_watch_probe_requested(anchor)
                 logger.info(f"Added CLI watch for {symbol} at {line}:{var_loc.col_start}")
+            else:
+                logger.warning(f"Could not find instance {instance} of {symbol} on line {line}")
+
+    def _process_cli_overlays(self):
+        """Process CLI overlay arguments.
+        
+        Format: target_symbol:line:symbol:instance
+        E.g., signal_i:75:received_symbols:1
+        """
+        if not self._script_path:
+            return
+
+        for overlay_str in self._cli_overlays:
+            parts = overlay_str.split(':')
+            if len(parts) < 4:
+                logger.warning(f"Invalid overlay format: {overlay_str}. Expected target_symbol:line:symbol:instance")
+                continue
+
+            target_symbol = parts[0]
+            try:
+                line = int(parts[1])
+                symbol = parts[2]
+                instance = int(parts[3]) if len(parts) > 3 else 1
+            except ValueError:
+                logger.warning(f"Invalid overlay format: {overlay_str}")
+                continue
+
+            logger.debug(f"Processing CLI overlay: {symbol}@{line} -> {target_symbol}")
+
+            # Find the target probe panel
+            target_panel = None
+            for anchor, panel_list in self._probe_panels.items():
+                if anchor.symbol == target_symbol and panel_list:
+                    target_panel = panel_list[0]
+                    break
+
+            if target_panel is None:
+                logger.warning(f"Could not find target probe panel for {target_symbol}")
+                continue
+
+            # Find the overlay variable
+            vars_on_line = self._code_viewer.ast_locator.get_all_variables_on_line(line)
+            matches = [v for v in vars_on_line if v.name == symbol]
+            matches.sort(key=lambda v: v.col_start)
+
+            if 1 <= instance <= len(matches):
+                var_loc = matches[instance - 1]
+                func_name = self._code_viewer.ast_locator.get_enclosing_function(line) or ""
+                overlay_anchor = ProbeAnchor(
+                    file=self._script_path,
+                    line=line,
+                    col=var_loc.col_start,
+                    symbol=symbol,
+                    func=func_name,
+                    is_assignment=var_loc.is_lhs
+                )
+                self._on_overlay_requested(target_panel, overlay_anchor)
+                logger.info(f"Added CLI overlay: {symbol}@{line} -> {target_symbol}")
             else:
                 logger.warning(f"Could not find instance {instance} of {symbol} on line {line}")
 
@@ -510,8 +570,9 @@ class MainWindow(QMainWindow):
         self._file_watcher.watch_file(path)
         self._last_source_content = self._code_viewer.toPlainText()
 
-        # Process CLI probes after loading
+        # Process CLI probes and overlays after loading
         self._process_cli_probes()
+        self._process_cli_overlays()
 
         # Auto-run if requested
         if self._auto_run:
@@ -808,6 +869,9 @@ class MainWindow(QMainWindow):
         
         For constellation data (complex arrays):
         PLOT_DATA:{"symbol": "x", "real": [...], "imag": [...], "mean_real": 0.1, "mean_imag": -0.2}
+        
+        For waveform with overlays (list of curve dicts):
+        PLOT_DATA:{"symbol": "x", "curves": [{"name": "x", "y": [...], "is_overlay": false}, ...]}
         """
         import json
         for anchor, panel_list in self._probe_panels.items():
@@ -817,16 +881,29 @@ class MainWindow(QMainWindow):
                     'symbol': anchor.symbol,
                     'line': anchor.line,
                 }
-                # Include standard y values if present
-                if 'y' in plot_data:
-                    export_record['y'] = plot_data.get('y', [])
-                # Include constellation data if present (real/imag pairs)
-                if 'real' in plot_data and 'imag' in plot_data:
-                    export_record['real'] = plot_data['real']
-                    export_record['imag'] = plot_data['imag']
-                    export_record['mean_real'] = plot_data.get('mean_real', 0.0)
-                    export_record['mean_imag'] = plot_data.get('mean_imag', 0.0)
-                    export_record['history_count'] = plot_data.get('history_count', 0)
+                # Handle list-of-dicts format (waveform with potential overlays)
+                if isinstance(plot_data, list) and plot_data:
+                    # Check if any curve has overlay data
+                    has_overlays = any(d.get('is_overlay', False) for d in plot_data if isinstance(d, dict))
+                    if has_overlays:
+                        # Export full curve list including overlays
+                        export_record['curves'] = plot_data
+                    else:
+                        # Legacy: export first curve y values
+                        first = plot_data[0] if plot_data else {}
+                        if 'y' in first:
+                            export_record['y'] = first['y']
+                elif isinstance(plot_data, dict):
+                    # Include standard y values if present
+                    if 'y' in plot_data:
+                        export_record['y'] = plot_data.get('y', [])
+                    # Include constellation data if present (real/imag pairs)
+                    if 'real' in plot_data and 'imag' in plot_data:
+                        export_record['real'] = plot_data['real']
+                        export_record['imag'] = plot_data['imag']
+                        export_record['mean_real'] = plot_data.get('mean_real', 0.0)
+                        export_record['mean_imag'] = plot_data.get('mean_imag', 0.0)
+                        export_record['history_count'] = plot_data.get('history_count', 0)
                 print(f"PLOT_DATA:{json.dumps(export_record)}", file=sys.stderr)
 
     # === M2.5: Park / Restore / Overlay ===

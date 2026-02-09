@@ -1,13 +1,10 @@
 """
-Example DSP script demonstrating PyProbe capabilities.
+Regression test script for drag-drop overlay verification.
 
-Run with: python -m pyprobe examples/dsp_demo.py
+This is a copy of examples/dsp_demo.py with NUM_FRAMES=1 for
+single-iteration testing of the overlay functionality.
 
-Then add these variables to the watch list:
-  - received_symbols (constellation diagram)
-  - signal_i (waveform)
-  - signal_q (waveform)
-  - snr_db (scalar)
+Run with: python -m pyprobe regression/dsp_demo_single_frame.py --auto-run --auto-quit
 """
 
 import numpy as np
@@ -15,7 +12,7 @@ import time
 
 # Simulation parameters
 NUM_SYMBOLS = 500
-NUM_FRAMES = 1
+NUM_FRAMES = 1  # Single frame for test
 
 # QAM-16 constellation points
 QAM16_CONSTELLATION = np.array([
@@ -24,6 +21,9 @@ QAM16_CONSTELLATION = np.array([
     +1-3j, +1-1j, +1+1j, +1+3j,
     +3-3j, +3-1j, +3+1j, +3+3j
 ]) / np.sqrt(10)  # Normalize power
+
+# Use fixed seed for reproducibility in tests
+np.random.seed(42)
 
 
 def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
@@ -43,8 +43,8 @@ def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
     received_symbols = symbols + noise
 
     # Extract I and Q components
-    signal_i = 0.5*received_symbols.real # temporary to make it visible
-    signal_q = 0.5*received_symbols.imag # temporary to make it visible
+    signal_i = 0.5*received_symbols.real  # Scale for visibility
+    signal_q = 0.5*received_symbols.imag  # Scale for visibility
 
     return received_symbols, signal_i, signal_q
 
@@ -52,41 +52,36 @@ def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
 def main():
     """Main processing loop."""
     print("=" * 50)
-    print("PyProbe DSP Demo")
+    print("PyProbe DSP Demo (Single Frame)")
     print("=" * 50)
     print()
-    print("Add these variables to the watch list:")
-    print("  - received_symbols (constellation diagram)")
-    print("  - signal_i (waveform)")
-    print("  - signal_q (waveform)")
-    print("  - snr_db (scalar)")
+    print("Variables for overlay test:")
+    print("  - signal_i (primary waveform)")
+    print("  - received_symbols (to overlay - will split to real/imag)")
     print()
     print("Starting signal generation...")
     print()
 
     for frame in range(NUM_FRAMES):
-        # Vary SNR over time (15-25 dB)
-        snr_db = 20 + 5 * np.sin(2 * np.pi * frame / 50)
+        # Fixed SNR for reproducibility
+        snr_db = 20.0
 
         # Generate QAM signal with noise
         received_symbols, signal_i, signal_q = generate_qam_signal(
             NUM_SYMBOLS, snr_db
         )
 
+        # Offset to make overlay distinguishable
         received_symbols = received_symbols + np.complex128(-1-1j)
 
         # Compute some statistics (these can also be probed)
         power_db = 10 * np.log10(np.mean(np.abs(received_symbols) ** 2))
         peak_to_avg = np.max(np.abs(received_symbols)) / np.mean(np.abs(received_symbols))
 
-        # Print progress
-        # print(f"Frame {frame + 1:3d}/{NUM_FRAMES}: "
-        #       f"SNR={snr_db:.1f} dB, "
-        #       f"Power={power_db:.2f} dB, "
-        #       f"PAPR={20*np.log10(peak_to_avg):.1f} dB")
+        print(f"Frame {frame + 1}/{NUM_FRAMES}: SNR={snr_db:.1f} dB")
 
-        # Simulate processing time
-        time.sleep(0.075)  # 75ms per frame = ~15 FPS
+        # Short delay
+        time.sleep(0.1)
 
     print()
     print("Demo complete!")
