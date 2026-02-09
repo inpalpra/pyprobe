@@ -38,7 +38,6 @@ class LayoutManager(QObject):
         If another panel is maximized, restore that one and maximize this.
         If none maximized, maximize this panel.
         """
-        print(f"[TRACE] LayoutManager.toggle_maximize called for panel={panel}")
         if self._maximized_panel is panel:
             self.restore()
         elif self._maximized_panel is not None:
@@ -58,13 +57,9 @@ class LayoutManager(QObject):
             logger.warning("Container has no _panels dict, falling back to layout iteration")
             return
         
-        print(f"[TRACE] _maximize: iterating {len(panels_dict)} panels from _panels dict")
-        
         for anchor, widget in panels_dict.items():
-            print(f"[TRACE] _maximize: panel={anchor.symbol}, is_target={widget is panel}, visible={widget.isVisible()}")
             if widget is not panel and widget.isVisible():
                 self._hidden_panels.append((widget, anchor))
-                print(f"[TRACE] _maximize: parking {anchor.symbol}")
                 self.panel_park_requested.emit(anchor)
         
         logger.debug(f"Maximized panel, parked {len(self._hidden_panels)} others")

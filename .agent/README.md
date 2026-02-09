@@ -15,27 +15,42 @@
 ## DIR STRUCT
 ```
 pyprobe/
-├── __main__.py      # CLI entry. --loglevel DEBUG for tracing
-├── logging.py       # centralized logging. use get_logger(__name__)
+├── __main__.py          # CLI entry. --loglevel DEBUG for tracing
+├── logging.py           # centralized logging. use get_logger(__name__)
+├── state_tracer.py      # --trace-states for GUI state debugging
 ├── core/
-│   ├── anchor.py    # ProbeAnchor: frozen dataclass, hashable, dict key OK
-│   ├── runner.py    # subprocess runs target script w/ tracer
-│   └── tracer.py    # sys.settrace hook
+│   ├── anchor.py        # ProbeAnchor: frozen dataclass, hashable
+│   ├── runner.py        # subprocess runs target script w/ tracer
+│   ├── tracer.py        # sys.settrace hook
+│   └── data_classifier.py # classify captured values for plot routing
 ├── gui/
-│   ├── main_window.py   # MainWindow: probe lifecycle, IPC polling
-│   ├── code_viewer.py   # CodeViewer: click detection, probe_requested/probe_removed signals
-│   ├── animations.py    # ProbeAnimations: fade_in/fade_out
-│   ├── probe_registry.py # ProbeRegistry: central probe state mgmt
-│   ├── probe_panel.py   # ProbePanel + ProbePanelContainer
+│   ├── main_window.py   # MainWindow: top-level UI, signal routing
+│   ├── probe_controller.py # probe lifecycle, overlays, lens prefs
+│   ├── message_handler.py  # IPC message processing
+│   ├── script_runner.py    # script execution control
+│   ├── code_viewer.py      # CodeViewer: probe click detection
+│   ├── probe_panel.py      # ProbePanel: per-variable display
+│   ├── panel_container.py  # grid layout for panels
+│   ├── layout_manager.py   # maximize/restore, dock bar integration
+│   ├── focus_manager.py    # panel focus tracking
+│   ├── dock_bar.py         # parked panel tabs
+│   ├── probe_registry.py   # central probe state mgmt
+│   ├── drag_helpers.py     # MIME encode/decode for overlay drops
+│   └── ...
+├── plugins/
+│   ├── base.py          # PlotPlugin ABC
+│   ├── registry.py      # plugin discovery/registration
+│   └── builtins/        # waveform.py, constellation.py, scalar.py
+├── plots/
+│   ├── plot_factory.py  # routes dtype→plugin
+│   ├── axis_controller.py # axis pinning/editing
 │   └── ...
 ├── analysis/
-│   ├── ast_locator.py   # ASTLocator: cursor→var mapping
+│   ├── ast_locator.py   # cursor→var mapping
 │   └── anchor_mapper.py # maps anchors across file edits
-├── ipc/
-│   ├── channels.py      # IPCChannel: queue-based comm
-│   └── messages.py      # Message types
-└── prompts/             # AI prompt templates
-    └── END.md  # STAR-AR lesson format
+└── ipc/
+    ├── channels.py      # IPCChannel: queue-based comm
+    └── messages.py      # Message types
 ```
 
 ## KEY DOCS
@@ -155,6 +170,26 @@ A': track object ID when deferring, only flush when ID changes
 R': flush correctly waits for new assignment, captures fresh value
 Fix: store old_id = id(value) in _pending_deferred tuple, compare in _flush_deferred
 File: core/tracer.py:391-420, 550-558
+
+### L17 2026-02-09 qscrollarea-layout
+S: LayoutManager._maximize() iterating panels to park
+T: hide all panels except maximized one
+A: used `container.layout()` for QScrollArea container
+R: layout() returns None for QScrollArea, no panels hidden
+A': QScrollArea stores content in widget(); use `container.widget().layout()`
+R': panels correctly found and parked
+Fix: check isinstance(container, QScrollArea), use widget().layout()
+File: gui/layout_manager.py:55-65
+
+### L18 2026-02-09 qgridlayout-itemat-gaps
+S: QGridLayout.count()=4 but itemAt(3) returns None
+T: iterate all panels in grid layout
+A: used `for i in range(layout.count()): layout.itemAt(i)`
+R: grid gaps → itemAt returns None for some indices, panels missed
+A': iterate container._panels dict directly, not layout
+R': all panels found regardless of grid cell arrangement
+Fix: replace layout.itemAt() loop with `for anchor, widget in container._panels.items()`
+File: gui/layout_manager.py:55-72
 
 
 ### L2 2026-02-06 kwarg-order
@@ -311,6 +346,8 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - drag-drop MIME: ALL anchor fields must be encoded/decoded (is_assignment was missing)
 - overlay matching: must compare full anchor identity (symbol+line+is_assignment), not just symbol name
 - deferred capture in loops: must track object ID, var_exists alone triggers on stale value from prev iteration
+- QScrollArea.layout() returns None; panels are in widget().layout()
+- QGridLayout.itemAt() has gaps; iterate _panels dict not layout for reliable widget access
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?
