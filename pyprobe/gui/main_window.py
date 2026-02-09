@@ -42,6 +42,7 @@ from .dock_bar import DockBar
 from .script_runner import ScriptRunner
 from .message_handler import MessageHandler
 from .probe_controller import ProbeController
+from .scalar_watch_window import ScalarWatchWindow
 
 
 class MainWindow(QMainWindow):
@@ -175,6 +176,9 @@ class MainWindow(QMainWindow):
         self._dock_bar = DockBar(self)
         self._dock_bar.setVisible(False)
         main_vlayout.addWidget(self._dock_bar)
+        
+        # Scalar watch window (floating, created lazily)
+        self._scalar_watch_window: Optional[ScalarWatchWindow] = None
 
         # === M1: File watcher and probe registry ===
         self._file_watcher = FileWatcher(self)
@@ -197,10 +201,12 @@ class MainWindow(QMainWindow):
         self._control_bar.action_clicked.connect(self._on_action_clicked)
         # self._control_bar.pause_clicked.connect(self._on_pause_script) # Removed
         self._control_bar.stop_clicked.connect(self._on_stop_script)
+        self._control_bar.watch_clicked.connect(self._on_toggle_watch_window)
 
         # === M1: Code viewer signals ===
         self._code_viewer.probe_requested.connect(self._on_probe_requested)
         self._code_viewer.probe_removed.connect(self._on_probe_remove_requested)
+        self._code_viewer.watch_probe_requested.connect(self._on_watch_probe_requested)
 
         # === M1: File watcher signals ===
         self._file_watcher.file_changed.connect(self._on_file_changed)
@@ -264,6 +270,10 @@ class MainWindow(QMainWindow):
                 shape=payload.get('shape'),
             )
         
+        # Route to scalar watch window if it exists and has this anchor
+        if self._scalar_watch_window and self._scalar_watch_window.has_scalar(anchor):
+            self._scalar_watch_window.update_scalar(anchor, payload['value'])
+        
         # M2.5: Forward overlay data to target panels
         self._forward_overlay_data(anchor, payload)
 
@@ -279,6 +289,10 @@ class MainWindow(QMainWindow):
                     dtype=probe_data['dtype'],
                     shape=probe_data.get('shape'),
                 )
+            
+            # Route to scalar watch window if it exists and has this anchor
+            if self._scalar_watch_window and self._scalar_watch_window.has_scalar(anchor):
+                self._scalar_watch_window.update_scalar(anchor, probe_data['value'])
             
             # M2.5: Forward overlay data to target panels
             self._forward_overlay_data(anchor, probe_data)
@@ -381,6 +395,20 @@ class MainWindow(QMainWindow):
         self._script_runner.stop()
         # UI updates handled in _on_runner_ended signal handler
 
+    @pyqtSlot()
+    def _on_toggle_watch_window(self):
+        """Toggle the scalar watch window visibility."""
+        if self._scalar_watch_window is None:
+            # Create and show the watch window
+            self._scalar_watch_window = ScalarWatchWindow()
+            self._scalar_watch_window.scalar_removed.connect(self._on_watch_scalar_removed)
+            self._scalar_watch_window.show()
+        elif self._scalar_watch_window.isVisible():
+            self._scalar_watch_window.hide()
+        else:
+            self._scalar_watch_window.show()
+            self._scalar_watch_window.raise_()  # Bring to front
+
     # === M1: ANCHOR-BASED PROBE HANDLERS ===
 
     @pyqtSlot(object)
@@ -392,6 +420,58 @@ class MainWindow(QMainWindow):
             panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
             panel.overlay_requested.connect(self._on_overlay_requested)
             panel.overlay_remove_requested.connect(self._on_overlay_remove_requested)
+
+    @pyqtSlot(object)
+    def _on_watch_probe_requested(self, anchor: ProbeAnchor):
+        """Handle Alt+click to add/remove scalar from watch window (toggle)."""
+        # Create watch window lazily
+        if self._scalar_watch_window is None:
+            self._scalar_watch_window = ScalarWatchWindow()
+            self._scalar_watch_window.scalar_removed.connect(self._on_watch_scalar_removed)
+        
+        # Toggle behavior: if already watching, remove it
+        if self._scalar_watch_window.has_scalar(anchor):
+            self._scalar_watch_window.remove_scalar(anchor)
+            logger.debug(f"Removed {anchor.symbol} from scalar watch window (toggle)")
+            return
+        
+        # Get a color for the scalar (or assign one)
+        color = self._probe_registry.get_color(anchor)
+        if color is None:
+            # Register the probe to get a color
+            color = self._probe_registry.add_probe(anchor)
+            if color is None:
+                color = QColor('#00ffff')
+        
+        # Add to watch window
+        self._scalar_watch_window.add_scalar(anchor, color)
+        
+        # Highlight in code viewer
+        self._code_viewer.set_probe_active(anchor, color)
+        
+        # Send probe command to subprocess if running
+        ipc = self._script_runner.ipc
+        if ipc and self._script_runner.is_running:
+            msg = make_add_probe_cmd(anchor)
+            ipc.send_command(msg)
+        
+        logger.debug(f"Added {anchor.symbol} to scalar watch window")
+
+    @pyqtSlot(object)
+    def _on_watch_scalar_removed(self, anchor: ProbeAnchor):
+        """Handle removal of scalar from watch window."""
+        # Clear from code viewer highlight
+        self._code_viewer.remove_probe(anchor)
+        # Release from registry
+        self._probe_registry.remove_probe(anchor)
+        
+        # Send remove probe command to subprocess if running
+        ipc = self._script_runner.ipc
+        if ipc and self._script_runner.is_running:
+            msg = make_remove_probe_cmd(anchor)
+            ipc.send_command(msg)
+        
+        logger.debug(f"Removed {anchor.symbol} from scalar watch window")
 
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):

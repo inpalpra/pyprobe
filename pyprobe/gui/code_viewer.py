@@ -36,6 +36,7 @@ class CodeViewer(QPlainTextEdit):
     # Signals
     probe_requested = pyqtSignal(object)  # ProbeAnchor
     probe_removed = pyqtSignal(object)    # ProbeAnchor
+    watch_probe_requested = pyqtSignal(object)  # ProbeAnchor (Alt+click for scalar watch)
     hover_changed = pyqtSignal(object)    # ProbeAnchor or None
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -291,9 +292,19 @@ class CodeViewer(QPlainTextEdit):
                     logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, is_active={is_active}")
                     
                     if is_active:
-                        self.probe_removed.emit(anchor)
+                        # Check if Alt is pressed - if so, it's a watch toggle
+                        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
+                            # Alt+click on active probe -> toggle watch off
+                            self.watch_probe_requested.emit(anchor)
+                        else:
+                            # Regular click on active probe -> remove graph probe
+                            self.probe_removed.emit(anchor)
                     else:
-                        self.probe_requested.emit(anchor)
+                        # Check for Alt modifier -> watch window
+                        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
+                            self.watch_probe_requested.emit(anchor)
+                        else:
+                            self.probe_requested.emit(anchor)
                 # else: distance > 10, was a drag, don't toggle
             # else: no drag_start state
         

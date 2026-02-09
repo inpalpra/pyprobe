@@ -444,13 +444,6 @@ class ProbePanel(QFrame):
             if ac:
                 ac.reset()
 
-    # === M2.5: Double-click maximize ===
-
-    def mouseDoubleClickEvent(self, event) -> None:
-        """Toggle maximize on double-click of plot background."""
-        self.maximize_requested.emit()
-        event.accept()
-
     # === M2.5: Drag-and-drop overlay ===
 
     def dragEnterEvent(self, event) -> None:

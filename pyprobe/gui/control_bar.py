@@ -18,6 +18,7 @@ class ControlBar(QToolBar):
     open_clicked = pyqtSignal()
     action_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
+    watch_clicked = pyqtSignal()  # Toggle scalar watch window
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -77,6 +78,16 @@ class ControlBar(QToolBar):
         self._loop_btn.setEnabled(False)
         self._loop_btn.toggled.connect(self._on_loop_toggled)
         self.addWidget(self._loop_btn)
+
+        self.addSeparator()
+        
+        # Watch button (toggle scalar watch window)
+        self._watch_btn = QToolButton()
+        self._watch_btn.setText("Watch")
+        self._watch_btn.setObjectName("watchButton")
+        self._watch_btn.setToolTip("Toggle Scalar Watch window (Alt+click vars to add)")
+        self._watch_btn.clicked.connect(self.watch_clicked.emit)
+        self.addWidget(self._watch_btn)
 
         self.addSeparator()
 
