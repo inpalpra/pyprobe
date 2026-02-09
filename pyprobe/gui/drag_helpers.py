@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 MIME_TYPE = 'application/x-pyprobe-anchor'
 
 
-def encode_anchor_mime(file: str, line: int, col: int, symbol: str, func: str = "") -> QMimeData:
+def encode_anchor_mime(file: str, line: int, col: int, symbol: str, func: str = "", is_assignment: bool = False) -> QMimeData:
     """Encode probe anchor data into QMimeData for drag-and-drop.
     
     Args:
@@ -22,6 +22,7 @@ def encode_anchor_mime(file: str, line: int, col: int, symbol: str, func: str = 
         col: Column number
         symbol: Variable name
         func: Enclosing function name
+        is_assignment: True if this is an assignment target (LHS)
     
     Returns:
         QMimeData with encoded anchor
@@ -32,6 +33,7 @@ def encode_anchor_mime(file: str, line: int, col: int, symbol: str, func: str = 
         'col': col,
         'symbol': symbol,
         'func': func,
+        'is_assignment': is_assignment,
     }
     mime_data = QMimeData()
     mime_data.setData(MIME_TYPE, json.dumps(data).encode('utf-8'))

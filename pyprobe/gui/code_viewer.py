@@ -320,6 +320,7 @@ class CodeViewer(QPlainTextEdit):
             col=anchor.col,
             symbol=anchor.symbol,
             func=anchor.func or "",
+            is_assignment=anchor.is_assignment,
         )
         drag = QDrag(self)
         drag.setMimeData(mime_data)

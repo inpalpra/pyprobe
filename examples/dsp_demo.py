@@ -15,7 +15,7 @@ import time
 
 # Simulation parameters
 NUM_SYMBOLS = 500
-NUM_FRAMES = 50
+NUM_FRAMES = 2
 
 # QAM-16 constellation points
 QAM16_CONSTELLATION = np.array([
@@ -43,8 +43,8 @@ def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
     received_symbols = symbols + noise
 
     # Extract I and Q components
-    signal_i = received_symbols.real
-    signal_q = received_symbols.imag
+    signal_i = 0.5*received_symbols.real # temporary to make it visible
+    signal_q = 0.5*received_symbols.imag # temporary to make it visible
 
     return received_symbols, signal_i, signal_q
 

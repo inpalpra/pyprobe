@@ -37,11 +37,17 @@ class AnchorMatcher:
         """Find all matching anchors for a (file, line) with given local variables."""
         key = (file, line)
         candidates = self._by_location.get(key, [])
+        # Debug: print candidates and their is_assignment status
+        if candidates:
+            print(f"[TRACE] AnchorMatcher.match: line={line}, candidates={[(a.symbol, getattr(a, 'is_assignment', False)) for a in candidates]}")
         # Include if symbol is in locals OR if it's an assignment target (will be deferred)
-        return [
+        result = [
             a for a in candidates 
             if a.symbol in local_vars or getattr(a, 'is_assignment', False)
         ]
+        if candidates:
+            print(f"[TRACE] AnchorMatcher.match: matched={[a.symbol for a in result]}")
+        return result
 
     def has_file(self, file: str) -> bool:
         """Check if any anchors exist for this file."""

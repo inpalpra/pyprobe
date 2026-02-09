@@ -388,25 +388,34 @@ class VariableTracer:
         ready_to_flush = []
         still_pending = []
         
-        for anchor, original_line in pending:
+        for anchor, original_line, old_id in pending:
             # CRITICAL: Only flush if we're on a DIFFERENT line than where registered
             # This ensures we capture right after the assignment, not later
             print(f"[TRACE] _flush_deferred: anchor={anchor.symbol}, original_line={original_line}, current_line={current_line}")
             if current_line == original_line:
                 # Still on the same line - keep pending
                 print(f"[TRACE] _flush_deferred: Same line, keeping pending")
-                still_pending.append((anchor, original_line))
+                still_pending.append((anchor, original_line, old_id))
                 continue
             
-            # We're on a different line - check if variable now exists
+            # We're on a different line - check if variable now exists AND has a new ID
             symbol = anchor.symbol
-            var_exists = symbol in frame.f_locals or symbol in frame.f_globals
+            if symbol in frame.f_locals:
+                current_id = id(frame.f_locals[symbol])
+            elif symbol in frame.f_globals:
+                current_id = id(frame.f_globals[symbol])
+            else:
+                # Variable doesn't exist yet
+                still_pending.append((anchor, original_line, old_id))
+                continue
             
-            if var_exists:
+            # Only flush if the object ID has changed (meaning a new assignment happened)
+            if current_id != old_id:
                 ready_to_flush.append(anchor)
             else:
-                # Variable doesn't exist yet (shouldn't happen normally)
-                still_pending.append((anchor, original_line))
+                # Same object as before - assignment hasn't happened yet, keep pending
+                print(f"[TRACE] _flush_deferred: Same object ID, keeping pending")
+                still_pending.append((anchor, original_line, old_id))
         
         # Update pending list
         if still_pending:
@@ -535,9 +544,17 @@ class VariableTracer:
                 frame_id = id(frame)
                 if frame_id not in self._pending_deferred:
                     self._pending_deferred[frame_id] = []
-                # Store (anchor, original_line) so we only flush when on a different line
-                print(f"[TRACE] DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}")
-                self._pending_deferred[frame_id].append((anchor, lineno))
+                # Record the current object ID (or None if doesn't exist)
+                # This lets us detect when a NEW assignment has happened
+                symbol = anchor.symbol
+                if symbol in frame.f_locals:
+                    old_id = id(frame.f_locals[symbol])
+                elif symbol in frame.f_globals:
+                    old_id = id(frame.f_globals[symbol])
+                else:
+                    old_id = None
+                print(f"[TRACE] DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}, old_id={old_id}")
+                self._pending_deferred[frame_id].append((anchor, lineno, old_id))
                 continue
 
             # Get the value (check locals first, then globals for module-level vars)

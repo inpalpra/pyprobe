@@ -98,6 +98,9 @@ class ASTLocator:
                     symbol_type=symbol_type,
                 )
                 self._variables.append(var_loc)
+                # Debug trace for line 72 variables
+                if node.lineno == 72 and node.id in ('received_symbols', 'signal_i', 'signal_q'):
+                    print(f"[TRACE] ASTLocator: {node.id} at L{node.lineno}:C{node.col_offset} pos={pos}, is_lhs={is_lhs}, lhs_positions contains? {pos in lhs_positions}")
                 logger.debug(f"Classified {node.id} at L{node.lineno}:C{node.col_offset} as {symbol_type}")
 
     def _collect_special_positions(

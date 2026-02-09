@@ -467,6 +467,7 @@ class ProbePanel(QFrame):
                     col=data['col'],
                     symbol=data['symbol'],
                     func=data.get('func', ''),
+                    is_assignment=data.get('is_assignment', False),
                 )
                 self.overlay_requested.emit(self, anchor)
                 event.acceptProposedAction()
