@@ -23,7 +23,8 @@ Goal: Reduce complexity in core files to improve AI agent comprehension, maintai
 
 | Task | Date | Details |
 |------|------|---------|
-| ScriptRunner extraction | 2026-02-09 | Moved 6 methods from `main_window.py` → `script_runner.py` (270 lines) |
+| ScriptRunner extraction | 2026-02-09 | Moved 6 methods from `main_window.py` → `script_runner.py` (296 lines) |
+| MessageHandler extraction | 2026-02-09 | Moved `_poll_ipc`, `_handle_message` → `message_handler.py` (174 lines) |
 
 ### 🔄 In Progress
 
@@ -33,11 +34,10 @@ Goal: Reduce complexity in core files to improve AI agent comprehension, maintai
 
 | Priority | Task | Effort | Impact | Dependencies |
 |----------|------|--------|--------|--------------|
-| 1 | Extract MessageHandler from MainWindow | 4h | High | ScriptRunner ✅ |
-| 2 | Extract ProbeController from MainWindow | 6h | High | MessageHandler |
-| 3 | Split `probe_panel.py` | 2h | Medium | None |
-| 4 | Consolidate waveform duplication | 4h | Medium | None |
-| 5 | Simplify `tracer.py` | 1 day | Medium | None |
+| 1 | Extract ProbeController from MainWindow | 6h | High | MessageHandler ✅ |
+| 2 | Split `probe_panel.py` | 2h | Medium | None |
+| 3 | Consolidate waveform duplication | 4h | Medium | None |
+| 4 | Simplify `tracer.py` | 1 day | Medium | None |
 
 ---
 
@@ -148,8 +148,9 @@ class ProbeController(QObject):
 ## References
 
 ### Key Files
-- [main_window.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/main_window.py) (~990 lines after ScriptRunner)
-- [script_runner.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/script_runner.py) (270 lines) ✅
+- [main_window.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/main_window.py) (~900 lines after MessageHandler)
+- [script_runner.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/script_runner.py) (296 lines) ✅
+- [message_handler.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/message_handler.py) (174 lines) ✅
 - [probe_panel.py](file:///Users/ppal/repos/pyprobe/pyprobe/gui/probe_panel.py) (811 lines)
 - [tracer.py](file:///Users/ppal/repos/pyprobe/pyprobe/core/tracer.py) (630 lines)
 - [waveform_plot.py](file:///Users/ppal/repos/pyprobe/pyprobe/plots/waveform_plot.py) (640 lines)
@@ -171,4 +172,9 @@ See [BACKLOG.md](file:///Users/ppal/repos/pyprobe/.agent/BACKLOG.md) P1.5 sectio
 ### 2026-02-09 (Agent Session 1)
 - Completed ScriptRunner extraction
 - MainWindow reduced from 1062 → ~990 lines
+- All 76 tests passing
+
+### 2026-02-09 (Agent Session 2)
+- Completed MessageHandler extraction
+- MainWindow reduced from ~970 → 900 lines
 - All 76 tests passing

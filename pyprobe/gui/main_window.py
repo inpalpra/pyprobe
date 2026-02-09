@@ -39,6 +39,7 @@ from ..state_tracer import get_tracer
 # === M2.5 IMPORTS ===
 from .dock_bar import DockBar
 from .script_runner import ScriptRunner
+from .message_handler import MessageHandler
 
 
 class MainWindow(QMainWindow):
@@ -88,7 +89,6 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_signals()
-        self._setup_polling_timer()
 
         # Apply cyberpunk theme
         apply_cyberpunk_theme(self)
@@ -98,9 +98,12 @@ class MainWindow(QMainWindow):
         self._tracer.set_main_window(self)
         self._loop_count = 0  # Track loop iterations for tracing
 
-        # Initialize ScriptRunner
+        # Initialize ScriptRunner and MessageHandler
         self._script_runner = ScriptRunner(self)
+        self._message_handler = MessageHandler(self._script_runner, self._tracer, self)
         self._setup_script_runner()
+        self._setup_message_handler()
+        self._setup_fps_timer()
 
         # Load script if provided
         if script_path:
@@ -192,16 +195,19 @@ class MainWindow(QMainWindow):
         # M2.5: Dock bar restore
         self._dock_bar.panel_restore_requested.connect(self._on_dock_bar_restore)
 
-    def _setup_polling_timer(self):
-        """Set up timer to poll IPC queue."""
-        self._poll_timer = QTimer()
-        self._poll_timer.timeout.connect(self._poll_ipc)
-        self._poll_timer.setInterval(16)  # ~60 FPS
-
-        # FPS counter timer
+    def _setup_fps_timer(self):
+        """Set up timer for FPS counter."""
         self._fps_timer = QTimer()
         self._fps_timer.timeout.connect(self._update_fps)
         self._fps_timer.setInterval(1000)  # Every second
+
+    def _setup_message_handler(self):
+        """Connect MessageHandler signals to slots."""
+        self._message_handler.probe_value.connect(self._on_probe_value)
+        self._message_handler.probe_value_batch.connect(self._on_probe_value_batch)
+        self._message_handler.script_ended.connect(self._on_script_ended)
+        self._message_handler.exception_raised.connect(self._on_exception)
+        self._message_handler.variable_data.connect(self._on_variable_data)
 
     def _setup_script_runner(self):
         """Configure the script runner with callbacks and connect signals."""
@@ -210,124 +216,48 @@ class MainWindow(QMainWindow):
         self._script_runner.ended.connect(self._on_runner_ended)
         self._script_runner.loop_restarted.connect(self._on_loop_restarted)
 
-    def _poll_ipc(self):
-        """Poll the IPC queue for incoming data."""
-        # Fast exit if not running
-        if not self._script_runner.is_running:
-            return
-
-        ipc = self._script_runner.ipc
-        if ipc is None:
-            return
-
-        # Check subprocess status - critical for debugging
-        proc = self._script_runner._runner_process
-        subprocess_alive = proc is not None and proc.is_alive() if proc else False
+    @pyqtSlot(dict)
+    def _on_probe_value(self, payload: dict):
+        """Handle single probe value from MessageHandler."""
+        anchor = ProbeAnchor.from_dict(payload['anchor'])
+        self._probe_registry.update_data_received(anchor)
         
-        # Process available messages without blocking (timeout=0 is non-blocking)
-        # Limit to 50 messages per frame to keep GUI responsive
-        messages_this_poll = 0
-        for _ in range(50):
-            if not self._script_runner.is_running:
-                break
-
-            try:
-                msg = ipc.receive_data(timeout=0)
-            except (AttributeError, OSError, EOFError, BrokenPipeError) as e:
-                # IPC was cleaned up or queue closed
-                self._tracer.trace_error(f"IPC receive error: {type(e).__name__}: {e}")
-                break
-
-            if msg is None:
-                break
-
-            messages_this_poll += 1
-            # Log EVERY message type received
-            self._tracer.trace_ipc_received(
-                msg.msg_type.name, 
-                {"subprocess_alive": subprocess_alive, "msg_num": messages_this_poll}
-            )
-            self._handle_message(msg)
-        
-        # If subprocess died but we didn't get DATA_SCRIPT_END, that's a bug!
-        # But only fire this once by checking is_running
-        if not subprocess_alive and proc is not None and self._script_runner.is_running:
-            exit_code = proc.exitcode
-            if exit_code is not None:
-                self._tracer.trace_error(f"Subprocess exited (code={exit_code}) but no DATA_SCRIPT_END received!")
-                # Prevent repeated firing - use cleanup which sets is_running to False
-                self._script_runner.soft_cleanup_for_loop()
-                # Force script_ended if subprocess died
-                self.script_ended.emit()
-
-    def _handle_message(self, msg: Message):
-        """Handle an incoming message from the runner."""
-        if msg.msg_type == MessageType.DATA_VARIABLE:
-            self._frame_count += 1
-            # Emit signal for thread-safe GUI update
-            self.variable_received.emit(msg.payload)
-
-        # === M1: Handle anchor-based probe data ===
-        elif msg.msg_type == MessageType.DATA_PROBE_VALUE:
-            self._frame_count += 1
-            anchor = ProbeAnchor.from_dict(msg.payload['anchor'])
-            self._probe_registry.update_data_received(anchor)
+        # Update the anchor's own panel if it exists
+        if anchor in self._probe_panels:
+            # Update metadata dtype
+            if anchor in self._probe_metadata:
+                self._probe_metadata[anchor]['dtype'] = payload['dtype']
             
-            # Update the anchor's own panel if it exists
+            self._probe_panels[anchor].update_data(
+                value=payload['value'],
+                dtype=payload['dtype'],
+                shape=payload.get('shape'),
+            )
+        
+        # M2.5: Forward overlay data to target panels
+        self._forward_overlay_data(anchor, payload)
+
+    @pyqtSlot(list)
+    def _on_probe_value_batch(self, probes: list):
+        """Handle batched probe values from MessageHandler."""
+        for probe_data in probes:
+            anchor = ProbeAnchor.from_dict(probe_data['anchor'])
+            self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_panels:
-                # Update metadata dtype
-                if anchor in self._probe_metadata:
-                    self._probe_metadata[anchor]['dtype'] = msg.payload['dtype']
-                
                 self._probe_panels[anchor].update_data(
-                    value=msg.payload['value'],
-                    dtype=msg.payload['dtype'],
-                    shape=msg.payload.get('shape'),
+                    value=probe_data['value'],
+                    dtype=probe_data['dtype'],
+                    shape=probe_data.get('shape'),
                 )
             
             # M2.5: Forward overlay data to target panels
-            self._forward_overlay_data(anchor, msg.payload)
-
-        # === M1: Handle batched probe data for atomic updates ===
-        elif msg.msg_type == MessageType.DATA_PROBE_VALUE_BATCH:
-            self._frame_count += 1
-            probes = msg.payload.get('probes', [])
-            # Process all probes from this batch atomically
-            for probe_data in probes:
-                anchor = ProbeAnchor.from_dict(probe_data['anchor'])
-                self._probe_registry.update_data_received(anchor)
-                if anchor in self._probe_panels:
-                    self._probe_panels[anchor].update_data(
-                        value=probe_data['value'],
-                        dtype=probe_data['dtype'],
-                        shape=probe_data.get('shape'),
-                    )
-                
-                # M2.5: Forward overlay data to target panels (was missing!)
-                self._forward_overlay_data(anchor, probe_data)
-
-        elif msg.msg_type == MessageType.DATA_SCRIPT_END:
-            # NOTE: Don't reset state here! Let _on_script_ended() handle it
-            # so loop logic can properly manage restarts
-            logger.debug("DATA_SCRIPT_END received, emitting script_ended signal")
-            self._tracer.trace_ipc_received("DATA_SCRIPT_END", {"subprocess_alive": self._runner_process.is_alive() if self._runner_process else False})
-            self.script_ended.emit()
-
-        elif msg.msg_type == MessageType.DATA_EXCEPTION:
-            self.exception_occurred.emit(msg.payload)
-
-        elif msg.msg_type == MessageType.DATA_STDOUT:
-            pass  # Could display in a console widget
-
-        elif msg.msg_type == MessageType.DATA_STDERR:
-            pass  # Could display in a console widget
+            self._forward_overlay_data(anchor, probe_data)
 
     def _update_fps(self):
         """Update FPS display."""
-        self._fps = self._frame_count
-        self._frame_count = 0
+        self._fps = self._message_handler.reset_frame_count()
 
-        if self._ipc:
+        if self._script_runner.is_running:
             self._status_bar.showMessage(
                 f"Running: {os.path.basename(self._script_path or '')} | "
                 f"{self._fps} updates/sec"
@@ -400,7 +330,7 @@ class MainWindow(QMainWindow):
         
         if self._script_runner.start():
             # Start polling timers
-            self._poll_timer.start()
+            self._message_handler.start_polling()
             self._fps_timer.start()
             self._status_bar.showMessage(f"Running: {self._script_path}")
             self._control_bar.set_running(True)
@@ -595,7 +525,7 @@ class MainWindow(QMainWindow):
             # Soft cleanup: terminate process but don't close IPC or reset UI
             logger.debug("  -> taking loop path")
             self._tracer.trace_reaction_state_changed(f"script ended, looping")
-            self._poll_timer.stop()
+            self._message_handler.stop_polling()
             self._fps_timer.stop()
             self._script_runner.soft_cleanup_for_loop()
             # Restart with small delay for process cleanup
@@ -604,7 +534,7 @@ class MainWindow(QMainWindow):
             # Full cleanup when not looping
             logger.debug("  -> taking cleanup path")
             self._tracer.trace_reaction_state_changed(f"script ended, stopping")
-            self._poll_timer.stop()
+            self._message_handler.stop_polling()
             self._fps_timer.stop()
             self._script_runner.cleanup()
             self._control_bar.set_running(False)
@@ -613,7 +543,7 @@ class MainWindow(QMainWindow):
     def _do_restart_loop(self):
         """Restart script for loop mode (called after delay)."""
         if self._script_runner.restart_loop():
-            self._poll_timer.start()
+            self._message_handler.start_polling()
             self._fps_timer.start()
             self._status_bar.showMessage(f"Looping: {self._script_path}")
         else:
@@ -641,7 +571,7 @@ class MainWindow(QMainWindow):
     def _on_runner_ended(self):
         """Handle ScriptRunner ended signal."""
         logger.debug("ScriptRunner ended signal received")
-        self._poll_timer.stop()
+        self._message_handler.stop_polling()
         self._fps_timer.stop()
         self._control_bar.set_running(False)
         self._status_bar.showMessage("Ready")
