@@ -8,12 +8,12 @@
 
 Goal: Reduce complexity in core files to improve AI agent comprehension, maintainability, and bug fix velocity.
 
-| Metric | Before | Target |
-|--------|--------|--------|
-| `main_window.py` | 1062 lines | ~400 lines |
-| `probe_panel.py` | 811 lines | ~400 lines (split) |
-| `tracer.py` | 630 lines | ~400 lines |
-| Duplicate code | `waveform_plot.py` + `waveform.py` | Delete duplicate |
+| Metric | Before | Target | Current |
+|--------|--------|--------|----------|
+| `main_window.py` | 1062 lines | ~400 lines | 568 lines |
+| `probe_panel.py` | 811 lines | ~400 lines (split) | 811 lines |
+| `tracer.py` | 630 lines | ~400 lines | 630 lines |
+| Duplicate code | `waveform_plot.py` + `waveform.py` | Delete duplicate | Pending |
 
 ---
 
@@ -25,6 +25,7 @@ Goal: Reduce complexity in core files to improve AI agent comprehension, maintai
 |------|------|---------|
 | ScriptRunner extraction | 2026-02-09 | Moved 6 methods from `main_window.py` → `script_runner.py` (296 lines) |
 | MessageHandler extraction | 2026-02-09 | Moved `_poll_ipc`, `_handle_message` → `message_handler.py` (174 lines) |
+| ProbeController extraction | 2026-02-09 | Moved probe lifecycle, lens, and overlay logic → `probe_controller.py` (464 lines). Reduced `main_window.py` from 901 to 568 lines. |
 
 ### 🔄 In Progress
 
@@ -34,10 +35,9 @@ Goal: Reduce complexity in core files to improve AI agent comprehension, maintai
 
 | Priority | Task | Effort | Impact | Dependencies |
 |----------|------|--------|--------|--------------|
-| 1 | Extract ProbeController from MainWindow | 6h | High | MessageHandler ✅ |
-| 2 | Split `probe_panel.py` | 2h | Medium | None |
-| 3 | Consolidate waveform duplication | 4h | Medium | None |
-| 4 | Simplify `tracer.py` | 1 day | Medium | None |
+| 1 | Split `probe_panel.py` | 2h | Medium | None |
+| 2 | Consolidate waveform duplication | 4h | Medium | None |
+| 3 | Simplify `tracer.py` | 1 day | Medium | None |
 
 ---
 

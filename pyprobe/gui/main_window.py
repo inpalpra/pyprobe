@@ -40,6 +40,7 @@ from ..state_tracer import get_tracer
 from .dock_bar import DockBar
 from .script_runner import ScriptRunner
 from .message_handler import MessageHandler
+from .probe_controller import ProbeController
 
 
 class MainWindow(QMainWindow):
@@ -74,8 +75,8 @@ class MainWindow(QMainWindow):
         self._is_running = False  # Flag to track if script is running
         self._user_stopped = False # Flag to track if user manually stopped (prevents loop)
 
-        # M1: Probe panels by anchor (not by variable name)
-        self._probe_panels: Dict[ProbeAnchor, ProbePanel] = {}
+        # M1: Probe panels by anchor - managed by ProbeController
+        # Direct references to _probe_panels delegate to controller
 
         # FPS tracking
         self._frame_count = 0
@@ -83,9 +84,6 @@ class MainWindow(QMainWindow):
 
         # M1: Source file content cache for anchor mapping
         self._last_source_content: Optional[str] = None
-        
-        # M2: Probe metadata tracking (including lens choice)
-        self._probe_metadata: Dict[ProbeAnchor, dict] = {}
 
         self._setup_ui()
         self._setup_signals()
@@ -104,10 +102,32 @@ class MainWindow(QMainWindow):
         self._setup_script_runner()
         self._setup_message_handler()
         self._setup_fps_timer()
+        
+        # Initialize ProbeController (after UI setup)
+        self._probe_controller = ProbeController(
+            registry=self._probe_registry,
+            container=self._probe_container,
+            code_viewer=self._code_viewer,
+            gutter=self._code_gutter,
+            get_ipc=lambda: self._script_runner.ipc,
+            get_is_running=lambda: self._script_runner.is_running,
+            parent=self
+        )
+        self._setup_probe_controller()
 
         # Load script if provided
         if script_path:
             self._load_script(script_path)
+    
+    @property
+    def _probe_panels(self) -> Dict[ProbeAnchor, ProbePanel]:
+        """Delegate to ProbeController's probe_panels."""
+        return self._probe_controller.probe_panels
+    
+    @property
+    def _probe_metadata(self) -> Dict[ProbeAnchor, dict]:
+        """Delegate to ProbeController's probe_metadata."""
+        return self._probe_controller.probe_metadata
 
     def _setup_ui(self):
         """Create the UI layout."""
@@ -215,6 +235,10 @@ class MainWindow(QMainWindow):
         self._script_runner.started.connect(self._on_runner_started)
         self._script_runner.ended.connect(self._on_runner_ended)
         self._script_runner.loop_restarted.connect(self._on_loop_restarted)
+
+    def _setup_probe_controller(self):
+        """Connect ProbeController signals to slots."""
+        self._probe_controller.status_message.connect(self._status_bar.showMessage)
 
     @pyqtSlot(dict)
     def _on_probe_value(self, payload: dict):
@@ -356,110 +380,24 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_probe_requested(self, anchor: ProbeAnchor):
         """Handle click-to-probe request from code viewer."""
-        logger.debug(f"_on_probe_requested called with anchor: {anchor}")
-        logger.debug(f"Current _probe_panels keys: {list(self._probe_panels.keys())}")
-        
-        if self._probe_registry.is_full():
-            logger.debug("Registry is full, returning")
-            self._status_bar.showMessage("Maximum probes reached (5)")
-            return
-
-        # Add to registry and get assigned color
-        color = self._probe_registry.add_probe(anchor)
-        logger.debug(f"Probe added, assigned color: {color.name() if color else 'None'}")
-        logger.debug(f"After add, _probe_panels keys: {list(self._probe_panels.keys())}")
-        
-        # Initialize metadata
-        if anchor not in self._probe_metadata:
-            self._probe_metadata[anchor] = {
-                'lens': None,
-                'dtype': None
-            }
-
-        # Update code viewer
-        self._code_viewer.set_probe_active(anchor, color)
-
-        # Update gutter
-        self._code_gutter.set_probed_line(anchor.line, color)
-
-        # Create probe panel
-        panel = self._probe_container.create_probe_panel(anchor, color)
-        self._probe_panels[anchor] = panel
-        
-        # M2: Connect lens changed signal tracking
-        if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
-            from functools import partial
-            panel._lens_dropdown.lens_changed.connect(
-                partial(self._on_lens_changed, anchor)
-            )
-            
-            # If we have a stored lens preference, apply it
-            stored_lens = self._probe_metadata[anchor].get('lens')
-            if stored_lens:
-                panel._lens_dropdown.set_lens(stored_lens)
-
-        # M2.5: Connect park and overlay signals
-        panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
-        panel.overlay_requested.connect(self._on_overlay_requested)
-
-        # Send to runner if running
-        if self._ipc and self._is_running:
-            msg = make_add_probe_cmd(anchor)
-            self._ipc.send_command(msg)
-
-        self._status_bar.showMessage(f"Probe added: {anchor.identity_label()}")
+        panel = self._probe_controller.add_probe(anchor)
+        if panel:
+            # M2.5: Connect park and overlay signals
+            panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
+            panel.overlay_requested.connect(self._on_overlay_requested)
 
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):
         """Handle probe removal request."""
-        logger.debug(f"_on_probe_remove_requested called with anchor: {anchor}")
-        logger.debug(f"Current _probe_panels keys: {list(self._probe_panels.keys())}")
-        logger.debug(f"anchor in _probe_panels: {anchor in self._probe_panels}")
-        logger.debug(f"Active probes in code_viewer: {list(self._code_viewer._active_probes.keys())}")
-        
-        if anchor not in self._probe_panels:
-            logger.debug("Anchor not in _probe_panels, returning early")
-            return
-
-        panel = self._probe_panels[anchor]
-
-        # Animate removal
-        ProbeAnimations.fade_out(panel, on_finished=lambda: self._complete_probe_removal(anchor))
+        self._probe_controller.remove_probe(anchor)
 
     def _complete_probe_removal(self, anchor: ProbeAnchor):
         """Complete probe removal after animation."""
-        logger.debug(f"_complete_probe_removal called with anchor: {anchor}")
-        
-        # Remove from registry
-        self._probe_registry.remove_probe(anchor)
-        logger.debug(f"Removed from registry")
+        self._probe_controller.complete_probe_removal(anchor)
 
-        # Update code viewer
-        self._code_viewer.remove_probe(anchor)
-
-        # Update gutter
-        self._code_gutter.clear_probed_line(anchor.line)
-
-        # Remove panel
-        if anchor in self._probe_panels:
-            panel = self._probe_panels.pop(anchor)
-            self._probe_container.remove_probe_panel(anchor)
-
-        # Send to runner if running
-        if self._ipc and self._is_running:
-            msg = make_remove_probe_cmd(anchor)
-            self._ipc.send_command(msg)
-
-        self._status_bar.showMessage(f"Probe removed: {anchor.identity_label()}")
-
-        self._status_bar.showMessage(f"Probe removed: {anchor.identity_label()}")
-
-    @pyqtSlot(object, str)
     def _on_lens_changed(self, anchor: ProbeAnchor, lens_name: str):
         """Handle lens change from probe panel."""
-        if anchor in self._probe_metadata:
-            self._probe_metadata[anchor]['lens'] = lens_name
-            logger.debug(f"Lens preference saved for {anchor.identity_label()}: {lens_name}")
+        self._probe_controller.handle_lens_changed(anchor, lens_name)
 
     @pyqtSlot(str)
     def _on_file_changed(self, filepath: str):
@@ -621,280 +559,10 @@ class MainWindow(QMainWindow):
                 break
 
     def _on_overlay_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
-        """Handle overlay drop request - add overlay signal to the target panel.
-        
-        This adds the overlay symbol as a probe (if not already) and forwards its
-        data updates to the target panel's plot widget for overlaid visualization.
-        """
-        logger.debug(f"Overlay requested: {overlay_anchor.symbol} -> {target_panel._anchor.symbol}")
-        
-        # Check if target panel's plot supports overlays (waveform plots do)
-        # NOTE: We still allow overlay registration even if plot isn't a WaveformWidget yet,
-        # because the plot type may change once data arrives. The actual compatibility
-        # check happens at data forwarding time in _forward_overlay_data.
-        plot = target_panel._plot
-        
-        # Just log the type, but don't block registration
-        from pyprobe.plugins.builtins.waveform import WaveformWidget
-        is_waveform = isinstance(plot, WaveformWidget) if plot else False
-        
-        # If overlay anchor is not already probed, we need to probe it
-        if overlay_anchor not in self._probe_registry.active_anchors:
-            # Add to registry without creating a separate panel
-            color = self._probe_registry.add_probe(overlay_anchor)
-            if color is None:
-                self._status_bar.showMessage(f"Maximum probes reached")
-                return
-            
-            # Update code viewer to show it's probed
-            self._code_viewer.set_probe_active(overlay_anchor, color)
-            self._code_gutter.set_probed_line(overlay_anchor.line, color)
-            
-            # Initialize metadata
-            self._probe_metadata[overlay_anchor] = {
-                'lens': None,
-                'dtype': None,
-                'overlay_target': target_panel._anchor  # Track that this is an overlay
-            }
-            
-            # Send probe command to runner
-            if self._ipc and self._is_running:
-                msg = make_add_probe_cmd(overlay_anchor)
-                self._ipc.send_command(msg)
-        # Register this overlay relationship for data forwarding
-        if not hasattr(target_panel, '_overlay_anchors'):
-            target_panel._overlay_anchors = []
-        
-        if overlay_anchor not in target_panel._overlay_anchors:
-            target_panel._overlay_anchors.append(overlay_anchor)
-            logger.debug(f"Added overlay anchor: {overlay_anchor.symbol} to panel {target_panel._anchor.symbol}")
-        
-        self._status_bar.showMessage(f"Overlaid: {overlay_anchor.symbol} on {target_panel._anchor.symbol}")
+        """Handle overlay drop request - delegate to ProbeController."""
+        self._probe_controller.handle_overlay_requested(target_panel, overlay_anchor)
 
     def _forward_overlay_data(self, anchor: ProbeAnchor, payload: dict) -> None:
-        """Forward overlay probe data to target panels that have this anchor as overlay.
-        
-        When an overlay anchor's data arrives, we need to update the target panel's
-        plot to show this data as an additional trace.
-        """
-        # Find all panels that have this anchor as an overlay
-        found_any = False
-        for panel in self._probe_panels.values():
-            if not hasattr(panel, '_overlay_anchors'):
-                continue
-            
-            # Match by full anchor identity: symbol + line + is_assignment
-            # This distinguishes between LHS and RHS of same symbol on same line
-            matching_overlay = None
-            for overlay_anchor in panel._overlay_anchors:
-                if (overlay_anchor.symbol == anchor.symbol and 
-                    overlay_anchor.line == anchor.line and
-                    overlay_anchor.is_assignment == anchor.is_assignment):
-                    matching_overlay = overlay_anchor
-                    break
-            
-            if matching_overlay is None:
-                continue
-                
-            found_any = True
-            # Forward data to this panel's plot as overlay
-            plot = panel._plot
-            if plot is None:
-                continue
-            
-            # Use unique key that includes is_assignment to distinguish LHS/RHS
-            overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
-            
-            # Add overlay data to the waveform or constellation plot
-            from pyprobe.plugins.builtins.waveform import WaveformWidget
-            from pyprobe.plugins.builtins.constellation import ConstellationWidget
-            if isinstance(plot, WaveformWidget):
-                self._add_overlay_to_waveform(
-                    plot, 
-                    overlay_key,  # Use unique key instead of just symbol
-                    payload['value'],
-                    payload['dtype'],
-                    payload.get('shape')
-                )
-            elif isinstance(plot, ConstellationWidget):
-                self._add_overlay_to_constellation(
-                    plot, 
-                    overlay_key,  # Use unique key instead of just symbol
-                    payload['value'],
-                    payload['dtype'],
-                    payload.get('shape')
-                )
-            # else: unsupported plot type, skip silently
-        
-        if not found_any:
-            pass  # No panels have this anchor as overlay
+        """Forward overlay probe data - delegate to ProbeController."""
+        self._probe_controller.forward_overlay_data(anchor, payload)
 
-    def _add_overlay_to_waveform(
-        self, 
-        plot: 'WaveformWidget', 
-        symbol: str,
-        value, 
-        dtype: str, 
-        shape
-    ) -> None:
-        """Add an overlay trace to a waveform plot.
-        
-        This adds a new curve to the plot for the overlay signal.
-        For complex data, creates two curves (real and imag parts).
-        """
-        import numpy as np
-        import pyqtgraph as pg
-        
-        
-        # Support real and complex 1D arrays
-        if dtype not in ('real_1d', 'complex_1d', 'array_collection', 'array_1d', 'array_complex'):
-            return
-        
-        try:
-            data = np.asarray(value)
-            if data.ndim != 1:
-                return  # Only 1D arrays supported for overlay
-        except (ValueError, TypeError) as e:
-            return
-        
-        # Get or create overlay curves dict on the plot
-        if not hasattr(plot, '_overlay_curves'):
-            plot._overlay_curves = {}
-        
-        from pyprobe.plugins.builtins.waveform import ROW_COLORS
-        
-        # Check if complex data - create 2 curves (real and imag)
-        is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
-        
-        if is_complex:
-            # Create real and imag curve keys
-            real_key = f"{symbol}_real"
-            imag_key = f"{symbol}_imag"
-            
-            # Create real curve if needed
-            if real_key not in plot._overlay_curves:
-                color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                curve = plot._plot_widget.plot(
-                    pen=pg.mkPen(color=color, width=1.5),
-                    antialias=False,
-                    name=f"{symbol} (real)"
-                )
-                plot._overlay_curves[real_key] = curve
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, f"{symbol} (real)")
-            
-            # Create imag curve if needed
-            if imag_key not in plot._overlay_curves:
-                color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                curve = plot._plot_widget.plot(
-                    pen=pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine),
-                    antialias=False,
-                    name=f"{symbol} (imag)"
-                )
-                plot._overlay_curves[imag_key] = curve
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, f"{symbol} (imag)")
-            
-            # Update real curve data
-            real_data = data.real.copy()
-            imag_data = data.imag.copy()
-            x = np.arange(len(data))
-            
-            # Downsample if needed
-            if len(data) > plot.MAX_DISPLAY_POINTS:
-                real_data = plot.downsample(real_data)
-                imag_data = plot.downsample(imag_data)
-                x = np.arange(len(real_data))
-            
-            plot._overlay_curves[real_key].setData(x, real_data)
-            plot._overlay_curves[imag_key].setData(x, imag_data)
-        else:
-            # Single real curve
-            if symbol not in plot._overlay_curves:
-                color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-                
-                curve = plot._plot_widget.plot(
-                    pen=pg.mkPen(color=color, width=1.5),
-                    antialias=False,
-                    name=symbol
-                )
-                plot._overlay_curves[symbol] = curve
-                
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, symbol)
-                logger.debug(f"Created overlay curve for {symbol}")
-            # else: curve already exists, just update data
-            
-            # Update the curve data
-            curve = plot._overlay_curves[symbol]
-            x = np.arange(len(data))
-            
-            # Downsample if needed
-            if len(data) > plot.MAX_DISPLAY_POINTS:
-                data = plot.downsample(data)
-                x = np.arange(len(data))
-            
-            curve.setData(x, data)
-
-    def _add_overlay_to_constellation(
-        self, 
-        plot: 'ConstellationWidget', 
-        symbol: str,
-        value, 
-        dtype: str, 
-        shape
-    ) -> None:
-        """Add an overlay scatter to a constellation plot.
-        
-        This adds new scatter plot items to the constellation for the overlay signal.
-        """
-        import numpy as np
-        import pyqtgraph as pg
-        
-        
-        # Skip if not complex data
-        if dtype not in ('complex_1d', 'array_complex', 'array_1d'):
-            return
-        
-        try:
-            data = np.asarray(value).flatten()
-            
-            # Convert to complex if not already
-            if not np.issubdtype(data.dtype, np.complexfloating):
-                return
-        except (ValueError, TypeError) as e:
-            return
-        
-        # Get or create overlay scatters dict on the plot
-        if not hasattr(plot, '_overlay_scatters'):
-            plot._overlay_scatters = {}
-        
-        # Create or update the scatter for this symbol
-        if symbol not in plot._overlay_scatters:
-            # Pick a distinct color from the palette
-            from pyprobe.plugins.builtins.waveform import ROW_COLORS
-            color_idx = len(plot._overlay_scatters) + 1  # +1 to skip main signal color
-            color = ROW_COLORS[color_idx % len(ROW_COLORS)]
-            
-            scatter = pg.ScatterPlotItem(
-                pen=None,
-                brush=pg.mkBrush(color),
-                size=6,
-                name=symbol
-            )
-            plot._plot_widget.addItem(scatter)
-            plot._overlay_scatters[symbol] = scatter
-            logger.debug(f"Created overlay scatter for {symbol}")
-        # else: scatter already exists, just update data
-        
-        # Update the scatter data
-        scatter = plot._overlay_scatters[symbol]
-        
-        # Downsample if needed
-        if len(data) > plot.MAX_DISPLAY_POINTS:
-            data = plot.downsample(data)
-        
-        scatter.setData(x=data.real, y=data.imag)
