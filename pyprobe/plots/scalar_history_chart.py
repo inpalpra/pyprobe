@@ -225,6 +225,19 @@ class ScalarHistoryChart(BasePlot):
         """Access the axis controller for external use."""
         return self._axis_controller
 
+    def get_plot_data(self) -> dict:
+        """
+        Return the data currently plotted on the graph.
+        
+        Returns the internal history buffer for test verification.
+        
+        Returns:
+            dict with 'x' and 'y' keys containing lists of values
+        """
+        y_data = list(self._history)
+        x_data = list(range(len(y_data)))
+        return {'x': x_data, 'y': y_data}
+
     def showEvent(self, event) -> None:
         """Trigger layout update when widget is shown."""
         super().showEvent(event)

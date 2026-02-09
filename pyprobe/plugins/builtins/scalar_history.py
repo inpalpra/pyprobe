@@ -199,6 +199,20 @@ class ScalarHistoryWidget(QWidget):
             self._pin_indicator.update_layout(view_rect)
             self._pin_indicator.raise_()
 
+    def get_plot_data(self) -> dict:
+        """
+        Return the data currently plotted on the graph.
+        
+        Returns the internal history buffer directly (more reliable
+        than curve.getData() which may have timing issues).
+        
+        Returns:
+            dict with 'x' and 'y' keys containing lists of values
+        """
+        y_data = list(self._history)
+        x_data = list(range(len(y_data)))
+        return {'x': x_data, 'y': y_data}
+
 
 class ScalarHistoryPlugin(ProbePlugin):
     """Plugin for visualizing scalar values as a time-series chart."""

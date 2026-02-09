@@ -79,5 +79,31 @@ class TestCLIAutomation(unittest.TestCase):
         # 3. Verify GUI received data (End-to-End verification)
         self.assertIn("DEBUG: MainWindow received data for x", output, "GUI did not receive probe data for x")
 
+        # 4. Verify actual plotted data values using pyqtgraph export
+        import json
+        import re
+        
+        # Find PLOT_DATA lines in output
+        plot_data_matches = re.findall(r'PLOT_DATA:(\{.*?\})', output)
+        self.assertTrue(len(plot_data_matches) > 0, "No PLOT_DATA export found in output")
+        
+        # Parse and verify the data for symbol 'x'
+        found_x_data = False
+        for match in plot_data_matches:
+            data = json.loads(match)
+            if data.get('symbol') == 'x':
+                found_x_data = True
+                # loop.py: x = 10, then x = x - 1 three times
+                # Expected captured values: [9, 8, 7]
+                expected_y = [9.0, 8.0, 7.0]
+                actual_y = data.get('y', [])
+                self.assertEqual(
+                    actual_y, expected_y,
+                    f"Plotted data mismatch. Expected {expected_y}, got {actual_y}"
+                )
+                break
+        
+        self.assertTrue(found_x_data, "No PLOT_DATA found for symbol 'x'")
+
 if __name__ == "__main__":
     unittest.main()

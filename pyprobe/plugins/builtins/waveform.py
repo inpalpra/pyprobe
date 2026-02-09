@@ -555,6 +555,27 @@ class WaveformWidget(QWidget):
             f"{prefix_str}Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
         )
 
+    def get_plot_data(self) -> list:
+        """
+        Return the data currently plotted on the graph.
+        
+        Returns a list of dicts, one per curve:
+        [{'x': [...], 'y': [...]}, ...]
+        
+        This allows tests to verify what is actually rendered.
+        """
+        result = []
+        for curve in self._curves:
+            x_data, y_data = curve.getData()
+            if x_data is not None and y_data is not None:
+                result.append({
+                    'x': list(x_data),
+                    'y': list(y_data)
+                })
+            else:
+                result.append({'x': [], 'y': []})
+        return result
+
 
 class WaveformPlugin(ProbePlugin):
     """Plugin for visualizing 1D arrays as waveforms."""

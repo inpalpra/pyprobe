@@ -573,3 +573,18 @@ class ProbePanel(QFrame):
         """Return variable name (for backwards compatibility)."""
         return self._anchor.symbol
 
+    def get_plot_data(self) -> dict:
+        """
+        Return the data currently plotted on the graph.
+        
+        Delegates to the underlying plot widget's get_plot_data() method
+        which uses pyqtgraph's curve.getData() API.
+        
+        Returns:
+            dict with 'x' and 'y' keys containing lists of values,
+            or empty dict if no data available.
+        """
+        if self._plot and hasattr(self._plot, 'get_plot_data'):
+            return self._plot.get_plot_data()
+        return {'x': [], 'y': []}
+

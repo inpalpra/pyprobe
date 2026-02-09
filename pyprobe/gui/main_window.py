@@ -744,9 +744,15 @@ class MainWindow(QMainWindow):
             # Auto-quit if requested
             if self._auto_quit:
                 from PyQt6.QtWidgets import QApplication
+                import json
+                
                 logger.info("Auto-quit requested, closing application")
-                # Increased delay to ensure logs are flushed for automated tests
-                QTimer.singleShot(1000, QApplication.quit)
+                # Delay to allow GUI updates to complete, then export and quit
+                def export_and_quit():
+                    self._export_plot_data()
+                    QTimer.singleShot(500, QApplication.quit)
+                
+                QTimer.singleShot(500, export_and_quit)
 
     def _do_restart_loop(self):
         """Restart script for loop mode (called after delay)."""
@@ -792,6 +798,24 @@ class MainWindow(QMainWindow):
         """Handle window close."""
         self._on_stop_script()
         super().closeEvent(event)
+
+    def _export_plot_data(self) -> None:
+        """
+        Export plot data from all probe panels for test verification.
+        
+        Outputs JSON lines to stderr in format:
+        PLOT_DATA:{"symbol": "x", "y": [9, 8, 7]}
+        """
+        import json
+        for anchor, panel_list in self._probe_panels.items():
+            for panel in panel_list:
+                plot_data = panel.get_plot_data()
+                export_record = {
+                    'symbol': anchor.symbol,
+                    'line': anchor.line,
+                    'y': plot_data.get('y', [])
+                }
+                print(f"PLOT_DATA:{json.dumps(export_record)}", file=sys.stderr)
 
     # === M2.5: Park / Restore / Overlay ===
 
