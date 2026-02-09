@@ -570,7 +570,12 @@ class VariableTracer:
 
             # Create capture with anchor context
             captured = self._create_anchor_capture(anchor, value, current_time)
-
+            
+            # Debug trace for immediate captures
+            import numpy as np
+            if isinstance(value, np.ndarray) and np.iscomplexobj(value):
+                print(f"[TRACE] IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
+            
             batch.append((anchor, captured))
         
         # Update location throttle time if we captured anything (or deferred anything)

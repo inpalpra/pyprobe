@@ -839,37 +839,48 @@ class MainWindow(QMainWindow):
             if not hasattr(panel, '_overlay_anchors'):
                 continue
             
-            # Get overlay symbols for comparison (match by symbol name, not full anchor equality)
-            overlay_symbols = [a.symbol for a in panel._overlay_anchors]
+            # Match by full anchor identity: symbol + line + is_assignment
+            # This distinguishes between LHS and RHS of same symbol on same line
+            matching_overlay = None
+            for overlay_anchor in panel._overlay_anchors:
+                if (overlay_anchor.symbol == anchor.symbol and 
+                    overlay_anchor.line == anchor.line and
+                    overlay_anchor.is_assignment == anchor.is_assignment):
+                    matching_overlay = overlay_anchor
+                    break
             
-            # Match by symbol name since anchors may have different metadata
-            if anchor.symbol in overlay_symbols:
-                found_any = True
-                # Forward data to this panel's plot as overlay
-                plot = panel._plot
-                if plot is None:
-                    continue
+            if matching_overlay is None:
+                continue
                 
-                # Add overlay data to the waveform or constellation plot
-                from pyprobe.plugins.builtins.waveform import WaveformWidget
-                from pyprobe.plugins.builtins.constellation import ConstellationWidget
-                if isinstance(plot, WaveformWidget):
-                    self._add_overlay_to_waveform(
-                        plot, 
-                        anchor.symbol,
-                        payload['value'],
-                        payload['dtype'],
-                        payload.get('shape')
-                    )
-                elif isinstance(plot, ConstellationWidget):
-                    self._add_overlay_to_constellation(
-                        plot, 
-                        anchor.symbol,
-                        payload['value'],
-                        payload['dtype'],
-                        payload.get('shape')
-                    )
-                # else: unsupported plot type, skip silently
+            found_any = True
+            # Forward data to this panel's plot as overlay
+            plot = panel._plot
+            if plot is None:
+                continue
+            
+            # Use unique key that includes is_assignment to distinguish LHS/RHS
+            overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
+            
+            # Add overlay data to the waveform or constellation plot
+            from pyprobe.plugins.builtins.waveform import WaveformWidget
+            from pyprobe.plugins.builtins.constellation import ConstellationWidget
+            if isinstance(plot, WaveformWidget):
+                self._add_overlay_to_waveform(
+                    plot, 
+                    overlay_key,  # Use unique key instead of just symbol
+                    payload['value'],
+                    payload['dtype'],
+                    payload.get('shape')
+                )
+            elif isinstance(plot, ConstellationWidget):
+                self._add_overlay_to_constellation(
+                    plot, 
+                    overlay_key,  # Use unique key instead of just symbol
+                    payload['value'],
+                    payload['dtype'],
+                    payload.get('shape')
+                )
+            # else: unsupported plot type, skip silently
         
         if not found_any:
             pass  # No panels have this anchor as overlay

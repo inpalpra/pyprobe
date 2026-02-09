@@ -15,7 +15,7 @@ import time
 
 # Simulation parameters
 NUM_SYMBOLS = 500
-NUM_FRAMES = 2
+NUM_FRAMES = 1
 
 # QAM-16 constellation points
 QAM16_CONSTELLATION = np.array([
