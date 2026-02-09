@@ -251,6 +251,93 @@ class ProbeController(QObject):
         
         self.status_message.emit(f"Overlaid: {overlay_anchor.symbol} on {target_panel._anchor.symbol}")
     
+    def remove_overlay(self, target_panel, overlay_anchor: ProbeAnchor):
+        """
+        Remove an overlay signal from a target panel.
+        
+        Args:
+            target_panel: The panel to remove the overlay from
+            overlay_anchor: The anchor to remove
+        """
+        logger.debug(f"Removing overlay: {overlay_anchor.symbol} from {target_panel._anchor.symbol}")
+        
+        # Remove from overlay anchors list
+        if hasattr(target_panel, '_overlay_anchors'):
+            if overlay_anchor in target_panel._overlay_anchors:
+                target_panel._overlay_anchors.remove(overlay_anchor)
+                logger.debug(f"Removed overlay anchor from list")
+        
+        # Remove curves from plot
+        plot = target_panel._plot
+        if plot is not None:
+            # Build the overlay key used when adding curves
+            overlay_key = f"{overlay_anchor.symbol}_{'lhs' if overlay_anchor.is_assignment else 'rhs'}"
+            
+            from pyprobe.plugins.builtins.waveform import WaveformWidget
+            from pyprobe.plugins.builtins.constellation import ConstellationWidget
+            
+            if isinstance(plot, WaveformWidget):
+                self._remove_overlay_from_waveform(plot, overlay_key)
+            elif isinstance(plot, ConstellationWidget):
+                self._remove_overlay_from_constellation(plot, overlay_key)
+        
+        # Check if this overlay anchor is used by any other panels
+        anchor_still_used = False
+        for panel in self._probe_panels.values():
+            if hasattr(panel, '_overlay_anchors') and overlay_anchor in panel._overlay_anchors:
+                anchor_still_used = True
+                break
+        
+        # If not used anywhere else and not a standalone probe, remove from registry
+        if not anchor_still_used and overlay_anchor not in self._probe_panels:
+            meta = self._probe_metadata.get(overlay_anchor)
+            if meta and meta.get('overlay_target'):
+                # This was an overlay-only anchor, clean up
+                self._registry.remove_probe(overlay_anchor)
+                self._code_viewer.remove_probe(overlay_anchor)
+                self._gutter.clear_probed_line(overlay_anchor.line)
+                if overlay_anchor in self._probe_metadata:
+                    del self._probe_metadata[overlay_anchor]
+                
+                # Tell runner to stop tracking this probe
+                ipc = self._get_ipc()
+                if ipc and self._get_is_running():
+                    msg = make_remove_probe_cmd(overlay_anchor)
+                    ipc.send_command(msg)
+        
+        self.status_message.emit(f"Overlay removed: {overlay_anchor.symbol}")
+    
+    def _remove_overlay_from_waveform(self, plot, symbol_key: str):
+        """Remove overlay curves from a waveform plot."""
+        if not hasattr(plot, '_overlay_curves'):
+            return
+        
+        # Find all curve keys that start with this symbol key
+        keys_to_remove = [k for k in plot._overlay_curves.keys() 
+                         if k == symbol_key or k.startswith(f"{symbol_key}_")]
+        
+        for key in keys_to_remove:
+            curve = plot._overlay_curves.pop(key)
+            # Remove from plot widget
+            plot._plot_widget.removeItem(curve)
+            # Remove from legend if present
+            if hasattr(plot, '_legend') and plot._legend is not None:
+                try:
+                    plot._legend.removeItem(curve)
+                except Exception:
+                    pass  # Legend item may not exist
+            logger.debug(f"Removed overlay curve: {key}")
+    
+    def _remove_overlay_from_constellation(self, plot, symbol_key: str):
+        """Remove overlay scatter from a constellation plot."""
+        if not hasattr(plot, '_overlay_scatters'):
+            return
+        
+        if symbol_key in plot._overlay_scatters:
+            scatter = plot._overlay_scatters.pop(symbol_key)
+            plot._plot_widget.removeItem(scatter)
+            logger.debug(f"Removed overlay scatter: {symbol_key}")
+    
     def forward_overlay_data(self, anchor: ProbeAnchor, payload: dict):
         """
         Forward overlay probe data to target panels that have this anchor as overlay.

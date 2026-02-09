@@ -386,6 +386,7 @@ class MainWindow(QMainWindow):
             # M2.5: Connect park and overlay signals
             panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
             panel.overlay_requested.connect(self._on_overlay_requested)
+            panel.overlay_remove_requested.connect(self._on_overlay_remove_requested)
 
     @pyqtSlot(object)
     def _on_probe_remove_requested(self, anchor: ProbeAnchor):
@@ -567,3 +568,6 @@ class MainWindow(QMainWindow):
         """Forward overlay probe data - delegate to ProbeController."""
         self._probe_controller.forward_overlay_data(anchor, payload)
 
+    def _on_overlay_remove_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
+        """Handle overlay removal request - delegate to ProbeController."""
+        self._probe_controller.remove_overlay(target_panel, overlay_anchor)

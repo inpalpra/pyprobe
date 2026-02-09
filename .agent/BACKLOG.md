@@ -4,11 +4,6 @@
 
 ## P1 - High Priority
 
-### BUG: No way to remove a variable from an overlaid graph
-- Once a variable is dragged and dropped into an existing graph, there is no way to remove it from that graph.
-- Clicking the overlaid variable does not remove it.
-- Clicking it also does not create a new dedicated graph window for it.
-
 ### BUG: Cannot overlay onto graph if both variables already have dedicated graphs
 - If two signals (e.g., `signal_i` and `signal_q`) are probed in separate graphs, dragging `signal_i` from code area to `signal_q`'s graph does not overlay them.
 - However, if `signal_i` is probed first, then `signal_q` is drag-dropped onto `signal_i`'s graph (without creating a dedicated graph for `signal_q` first), overlay works correctly.

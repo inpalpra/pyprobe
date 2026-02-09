@@ -35,6 +35,7 @@ class ProbePanel(QFrame):
     maximize_requested = pyqtSignal()
     park_requested = pyqtSignal()
     overlay_requested = pyqtSignal(object, object)  # (self/panel, ProbeAnchor)
+    overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
 
     def __init__(
         self,
@@ -285,6 +286,17 @@ class ProbePanel(QFrame):
         menu.addSeparator()
         park_action = menu.addAction("Park to Bar")
         park_action.triggered.connect(lambda: self.park_requested.emit())
+        
+        # M2.5: Remove Overlays submenu (if any overlays exist)
+        if hasattr(self, '_overlay_anchors') and self._overlay_anchors:
+            menu.addSeparator()
+            overlay_menu = menu.addMenu("Remove Overlays")
+            for overlay in self._overlay_anchors:
+                action = overlay_menu.addAction(overlay.symbol)
+                # Capture anchor in closure using default argument
+                action.triggered.connect(
+                    lambda checked, oa=overlay: self.overlay_remove_requested.emit(self, oa)
+                )
         
         menu.exec(event.globalPos())
 
