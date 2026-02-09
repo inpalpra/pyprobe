@@ -12,19 +12,25 @@ class ColorManager:
 
     Uses OrderedDict for LRU tracking - most recently accessed probes
     get full emphasis, older ones get de-emphasized.
-
-    Limited palette enforces brutal teardown - when colors run out,
-    user must remove old probes to add new ones.
     """
 
-    # Limited palette (brutal teardown requirement)
-    PALETTE = [
-        QColor('#00ffff'),  # cyan (primary)
-        QColor('#ff00ff'),  # magenta
-        QColor('#00ff00'),  # green
-        QColor('#ffff00'),  # yellow
-        QColor('#ff8800'),  # orange
-    ]
+    # Generate 100 colors from HSL color wheel (high saturation, varied hue)
+    MAX_PROBES = 100
+    
+    @staticmethod
+    def _generate_palette(count: int) -> list[QColor]:
+        """Generate a palette of distinct colors using HSL."""
+        colors = []
+        for i in range(count):
+            # Spread hues evenly, use golden ratio for better distribution
+            hue = (i * 137.508) % 360  # Golden angle in degrees
+            saturation = 0.85  # High saturation for visibility
+            lightness = 0.55   # Medium lightness for dark backgrounds
+            color = QColor.fromHslF(hue / 360.0, saturation, lightness)
+            colors.append(color)
+        return colors
+    
+    PALETTE = _generate_palette.__func__(MAX_PROBES)
 
     def __init__(self):
         # OrderedDict for LRU tracking: anchor -> color index

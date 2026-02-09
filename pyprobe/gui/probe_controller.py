@@ -97,7 +97,7 @@ class ProbeController(QObject):
         
         if self._registry.is_full():
             logger.debug("Registry is full, returning")
-            self.status_message.emit("Maximum probes reached (5)")
+            self.status_message.emit("Maximum probes reached (100)")
             return None
         
         # Add to registry and get assigned color

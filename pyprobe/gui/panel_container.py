@@ -208,12 +208,23 @@ class ProbePanelContainer(QScrollArea):
             return
 
         # Otherwise grid layout
-        for panel in panels:
-            self._layout.addWidget(panel, self._next_row, self._next_col)
-            self._next_col += 1
-            if self._next_col >= self._cols:
-                self._next_col = 0
+        # If odd number of panels, last one gets full width
+        last_idx = len(panels) - 1
+        for i, panel in enumerate(panels):
+            is_last = (i == last_idx)
+            is_odd_count = (len(panels) % 2 == 1)
+            
+            if is_last and is_odd_count:
+                # Last panel with odd count: span full width
+                self._layout.addWidget(panel, self._next_row, 0, 1, self._cols)
                 self._next_row += 1
+                self._next_col = 0
+            else:
+                self._layout.addWidget(panel, self._next_row, self._next_col)
+                self._next_col += 1
+                if self._next_col >= self._cols:
+                    self._next_col = 0
+                    self._next_row += 1
 
     def get_panel(self, var_name: str = None, anchor: ProbeAnchor = None) -> Optional[ProbePanel]:
         """Get a panel by variable name or anchor."""
