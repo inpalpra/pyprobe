@@ -178,6 +178,7 @@ class MessageHandler(QObject):
             self._end_received = True
 
         elif msg.msg_type == MessageType.DATA_EXCEPTION:
+            logger.error(f"Received exception from runner: {msg.payload}")
             self.exception_raised.emit(msg.payload)
 
         elif msg.msg_type == MessageType.DATA_STDOUT:

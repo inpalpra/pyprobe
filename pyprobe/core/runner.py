@@ -123,9 +123,8 @@ class ScriptRunner:
 
             # Start tracing (M1: use anchored tracer)
             self._tracer.start_anchored()
-
-            # Start tracing (M1: use anchored tracer)
-            self._tracer.start_anchored()
+            
+            print(f"[RUNNER] Compiling script path: {self._script_path}", file=sys.__stderr__)
 
             # Wait for START command from GUI to ensure initial probes are registered
             # This prevents race condition where script runs before probes are added
@@ -180,6 +179,9 @@ class ScriptRunner:
                     time.sleep(0.1)
             else:
                 print("[RUNNER] ERROR: Failed to send DATA_SCRIPT_END after 10 attempts!", file=sys.__stderr__)
+            
+            # Wait a bit to ensure IPC buffer flushes before process exit
+            time.sleep(0.5)
 
     def _on_variable_captured(self, captured: CapturedVariable) -> None:
         """Callback when tracer captures a variable."""

@@ -219,6 +219,9 @@ class VariableTracer:
         # Fast file filter
         code = frame.f_code
         filename = code.co_filename
+        
+        # Aggressive debug for automated test
+        trace_print(f"TRACE_FUNC: {filename}:{frame.f_lineno} event={event}")
 
         # Skip frozen/internal modules
         if filename.startswith(self._skip_prefixes):
@@ -243,6 +246,8 @@ class VariableTracer:
 
         if not matching_anchors:
             return self._trace_func
+        
+        trace_print(f"Matched {len(matching_anchors)} anchors at {filename}:{lineno}")
 
         # Capture for each matching anchor, batching all captures from this event
         timestamp = time.perf_counter_ns()
@@ -299,6 +304,7 @@ class VariableTracer:
 
     def _send_record_batch(self, batch: List[CaptureRecord]) -> None:
         """Send a batch of CaptureRecords to the appropriate callback."""
+        trace_print(f"Sending batch of {len(batch)} records")
         try:
             if self._capture_record_batch_callback is not None:
                 self._capture_record_batch_callback(batch)

@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QColor
 import multiprocessing as mp
 import os
+import sys
 
 from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
@@ -355,6 +356,7 @@ class MainWindow(QMainWindow):
     def _handle_probe_records(self, records: list) -> None:
         """Store records and schedule redraws from buffers."""
         for record in records:
+            print(f"DEBUG: MainWindow received data for {record.anchor.symbol}", file=sys.stderr)
             anchor = record.anchor
             self._probe_registry.update_data_received(anchor)
 
@@ -408,6 +410,8 @@ class MainWindow(QMainWindow):
     def _on_probe_value(self, payload: dict):
         """Handle single probe value from MessageHandler."""
         anchor = ProbeAnchor.from_dict(payload['anchor'])
+        logger.debug(f"Received data for {anchor.symbol}")
+        print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
         self._probe_registry.update_data_received(anchor)
 
         # Update all panels for this anchor
@@ -435,6 +439,7 @@ class MainWindow(QMainWindow):
         """Handle batched probe values from MessageHandler."""
         for probe_data in probes:
             anchor = ProbeAnchor.from_dict(probe_data['anchor'])
+            print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
             self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
@@ -734,14 +739,14 @@ class MainWindow(QMainWindow):
             self._fps_timer.stop()
             self._script_runner.cleanup()
             self._control_bar.set_running(False)
-            self._control_bar.set_running(False)
             self._status_bar.showMessage("Ready")
 
             # Auto-quit if requested
             if self._auto_quit:
                 from PyQt6.QtWidgets import QApplication
                 logger.info("Auto-quit requested, closing application")
-                QTimer.singleShot(100, QApplication.quit)
+                # Increased delay to ensure logs are flushed for automated tests
+                QTimer.singleShot(1000, QApplication.quit)
 
     def _do_restart_loop(self):
         """Restart script for loop mode (called after delay)."""
