@@ -71,7 +71,7 @@ class ScalarWatchSidebar(QWidget):
         """Apply dark theme styling."""
         self.setStyleSheet("""
             QWidget {
-                background-color: #16162a;
+                background-color: #000000;
                 color: #e0e0e0;
             }
             QScrollArea {
@@ -141,9 +141,17 @@ class ScalarWatchSidebar(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(0)
         
-        # Label (small, muted)
+        # Label with highlight background (like code viewer probes)
+        # Use semi-transparent fill with solid border
         name_label = QLabel(anchor.symbol)
         name_label.setObjectName("scalarLabel")
+        name_label.setStyleSheet(f"""
+            color: #ffffff;
+            background-color: rgba({color.red()}, {color.green()}, {color.blue()}, 60);
+            border: 1px solid {color.name()};
+            border-radius: 2px;
+            padding: 1px 4px;
+        """)
         card_layout.addWidget(name_label)
         
         # Value (large, bright)
