@@ -216,8 +216,19 @@ class ProbeController(QObject):
         """
         logger.debug(f"Overlay requested: {overlay_anchor.symbol} -> {target_panel._anchor.symbol}")
         
-        # If overlay anchor is not already probed, we need to probe it
-        if overlay_anchor not in self._registry.active_anchors:
+        # Check if this symbol is already probed (possibly with different anchor identity)
+        # If so, use the existing anchor to ensure data forwarding matches correctly
+        existing_anchor = None
+        for anchor in self._registry.active_anchors:
+            if anchor.symbol == overlay_anchor.symbol and anchor.line == overlay_anchor.line:
+                existing_anchor = anchor
+                break
+        
+        if existing_anchor is not None:
+            # Use the existing anchor identity for overlay registration
+            logger.debug(f"Using existing anchor for {overlay_anchor.symbol}")
+            overlay_anchor = existing_anchor
+        else:
             # Add to registry without creating a separate panel
             color = self._registry.add_probe(overlay_anchor)
             if color is None:

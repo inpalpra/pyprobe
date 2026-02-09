@@ -4,10 +4,6 @@
 
 ## P1 - High Priority
 
-### BUG: Cannot overlay onto graph if both variables already have dedicated graphs
-- If two signals (e.g., `signal_i` and `signal_q`) are probed in separate graphs, dragging `signal_i` from code area to `signal_q`'s graph does not overlay them.
-- However, if `signal_i` is probed first, then `signal_q` is drag-dropped onto `signal_i`'s graph (without creating a dedicated graph for `signal_q` first), overlay works correctly.
-
 ### BUG: Missing plot legends after drag-drop overlay
 - After drag-dropping a variable onto an existing graph, no plot legend is created for the newly added traces.
 - Example: dragging `received_symbols` to `signal_i`'s graph shows real/imag parts plotted, but without corresponding legend entries.
