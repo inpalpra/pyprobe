@@ -17,9 +17,9 @@ class ProbeAnchor:
     is_assignment: bool = False  # True if this location is an assignment target (LHS)
 
     def identity_label(self) -> str:
-        """Return human-readable identity: 'symbol @ file:line'"""
+        """Return human-readable identity: 'symbol @ file:line:col'"""
         filename = self.file.split('/')[-1]  # Just filename, not full path
-        return f"{self.symbol} @ {filename}:{self.line}"
+        return f"{self.symbol} @ {filename}:{self.line}:{self.col}"
 
     def short_label(self) -> str:
         """Return short label: 'symbol:line'"""
