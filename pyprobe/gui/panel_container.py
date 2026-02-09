@@ -2,7 +2,7 @@
 Container widget for probe panels with grid layout.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from PyQt6.QtWidgets import (
     QWidget, QScrollArea, QGridLayout, QLabel
 )
@@ -26,7 +26,8 @@ class ProbePanelContainer(QScrollArea):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        self._panels: Dict[ProbeAnchor, ProbePanel] = {}
+        # Supports multiple panels per anchor via Ctrl+click
+        self._panels: Dict[ProbeAnchor, List[ProbePanel]] = {}
         self._panels_by_name: Dict[str, ProbePanel] = {}  # For legacy access
         self._parked_panels: set = set()  # Track parked panel anchors
 
@@ -87,7 +88,7 @@ class ProbePanelContainer(QScrollArea):
         logger.debug(f"create_panel called: var_name={var_name}, anchor={anchor}")
         logger.debug(f"  _panels keys: {list(self._panels.keys())}")
         logger.debug(f"  _panels_by_name keys: {list(self._panels_by_name.keys())}")
-        
+
         # Create anchor if not provided (backwards compatibility)
         if anchor is None:
             anchor = ProbeAnchor(
@@ -101,13 +102,9 @@ class ProbePanelContainer(QScrollArea):
         if color is None:
             color = QColor('#00ffff')
 
-        if anchor in self._panels:
-            logger.debug(f"  Returning existing panel from _panels for anchor")
-            return self._panels[anchor]
-
         # Only check by var_name for legacy code (when no real anchor provided)
-        # When a real anchor IS provided, we already checked _panels above and it wasn't found,
-        # so we need to create a new panel (even if same var_name exists on different line)
+        # When a real anchor IS provided, we always create a new panel
+        # (Ctrl+click can create multiple panels for same anchor)
         if anchor.file == "<unknown>" and var_name in self._panels_by_name:
             logger.debug(f"  Returning existing panel from _panels_by_name for var_name={var_name}")
             return self._panels_by_name[var_name]
@@ -117,11 +114,13 @@ class ProbePanelContainer(QScrollArea):
 
         # Create panel
         panel = ProbePanel(anchor, color, dtype, self._content)
-        self._panels[anchor] = panel
+        if anchor not in self._panels:
+            self._panels[anchor] = []
+        self._panels[anchor].append(panel)
         # Only add to _panels_by_name for legacy (anchor-less) panels
         if anchor.file == "<unknown>":
             self._panels_by_name[var_name] = panel
-        logger.debug(f"  Created new panel, added to both dicts")
+        logger.debug(f"  Created new panel, added to _panels list (now {len(self._panels[anchor])} panels for this anchor)")
 
         # M2.5: Connect maximize/park signals and register with focus manager
         panel.maximize_requested.connect(lambda p=panel: self._layout_manager.toggle_maximize(p))
@@ -132,49 +131,80 @@ class ProbePanelContainer(QScrollArea):
 
         return panel
 
-    def remove_panel(self, var_name: str = None, anchor: ProbeAnchor = None):
-        """Remove a probe panel by var_name or anchor."""
-        logger.debug(f"remove_panel called: var_name={var_name}, anchor={anchor}")
+    def remove_panel(self, var_name: str = None, anchor: ProbeAnchor = None, panel: ProbePanel = None):
+        """Remove a probe panel by var_name, anchor, or panel reference.
+
+        If panel is provided, removes that specific panel.
+        If anchor is provided, removes the last panel for that anchor.
+        If var_name is provided, removes the panel by name (legacy).
+        """
+        logger.debug(f"remove_panel called: var_name={var_name}, anchor={anchor}, panel={panel}")
         logger.debug(f"  Before: _panels keys: {list(self._panels.keys())}")
         logger.debug(f"  Before: _panels_by_name keys: {list(self._panels_by_name.keys())}")
-        
-        panel = None
 
-        if anchor is not None and anchor in self._panels:
-            panel = self._panels.pop(anchor)
-            logger.debug(f"  Popped panel from _panels for anchor")
+        target_panel = None
+
+        # Option 1: Panel reference provided directly
+        if panel is not None:
+            target_panel = panel
+            # Find and remove from _panels
+            for a, panel_list in list(self._panels.items()):
+                if panel in panel_list:
+                    panel_list.remove(panel)
+                    logger.debug(f"  Removed panel from _panels[{a.symbol}] (now {len(panel_list)} remaining)")
+                    if not panel_list:
+                        del self._panels[a]
+                        logger.debug(f"  Deleted empty list for anchor {a.symbol}")
+                    break
             # Remove from name index too
-            found_name = None
             for name, p in list(self._panels_by_name.items()):
                 if p is panel:
-                    found_name = name
                     del self._panels_by_name[name]
                     logger.debug(f"  Also removed from _panels_by_name: {name}")
                     break
-            if found_name is None:
-                logger.debug(f"  WARNING: Panel not found in _panels_by_name!")
+
+        # Option 2: Anchor provided - remove last panel from list
+        elif anchor is not None and anchor in self._panels:
+            panel_list = self._panels[anchor]
+            if panel_list:
+                target_panel = panel_list.pop()
+                logger.debug(f"  Popped last panel from _panels for anchor (now {len(panel_list)} remaining)")
+                if not panel_list:
+                    del self._panels[anchor]
+                    logger.debug(f"  Deleted empty list for anchor")
+            # Remove from name index too
+            if target_panel is not None:
+                for name, p in list(self._panels_by_name.items()):
+                    if p is target_panel:
+                        del self._panels_by_name[name]
+                        logger.debug(f"  Also removed from _panels_by_name: {name}")
+                        break
+
+        # Option 3: var_name provided (legacy)
         elif var_name is not None and var_name in self._panels_by_name:
-            panel = self._panels_by_name.pop(var_name)
+            target_panel = self._panels_by_name.pop(var_name)
             logger.debug(f"  Popped panel from _panels_by_name for var_name")
             # Remove from anchor index too
-            for a, p in list(self._panels.items()):
-                if p is panel:
-                    del self._panels[a]
-                    logger.debug(f"  Also removed from _panels: {a}")
+            for a, panel_list in list(self._panels.items()):
+                if target_panel in panel_list:
+                    panel_list.remove(target_panel)
+                    if not panel_list:
+                        del self._panels[a]
+                    logger.debug(f"  Also removed from _panels")
                     break
 
-        if panel is None:
+        if target_panel is None:
             logger.debug(f"  No panel found to remove")
             return
 
         logger.debug(f"  After: _panels keys: {list(self._panels.keys())}")
         logger.debug(f"  After: _panels_by_name keys: {list(self._panels_by_name.keys())}")
-        
-        # M2.5: Unregister from focus manager
-        self._focus_manager.unregister_panel(panel)
 
-        self._layout.removeWidget(panel)
-        panel.deleteLater()
+        # M2.5: Unregister from focus manager
+        self._focus_manager.unregister_panel(target_panel)
+
+        self._layout.removeWidget(target_panel)
+        target_panel.deleteLater()
 
         # Re-layout remaining panels
         self._relayout_panels()
@@ -192,8 +222,11 @@ class ProbePanelContainer(QScrollArea):
             if item.widget() and item.widget() != self._placeholder:
                 self._layout.removeWidget(item.widget())
 
-        # Only layout non-parked panels
-        panels = [p for a, p in self._panels.items() if a not in self._parked_panels]
+        # Only layout non-parked panels (flatten the list of lists)
+        panels = []
+        for anchor, panel_list in self._panels.items():
+            if anchor not in self._parked_panels:
+                panels.extend(panel_list)
         if not panels:
             return
 
@@ -227,12 +260,23 @@ class ProbePanelContainer(QScrollArea):
                     self._next_row += 1
 
     def get_panel(self, var_name: str = None, anchor: ProbeAnchor = None) -> Optional[ProbePanel]:
-        """Get a panel by variable name or anchor."""
+        """Get the first panel by variable name or anchor (for backwards compatibility)."""
         if anchor is not None:
-            return self._panels.get(anchor)
+            panel_list = self._panels.get(anchor)
+            return panel_list[0] if panel_list else None
         if var_name is not None:
             return self._panels_by_name.get(var_name)
         return None
+
+    def get_all_panels(self, anchor: ProbeAnchor = None) -> List[ProbePanel]:
+        """Get all panels for an anchor, or all panels if anchor is None."""
+        if anchor is not None:
+            return list(self._panels.get(anchor, []))
+        # Return all panels flattened
+        all_panels = []
+        for panel_list in self._panels.values():
+            all_panels.extend(panel_list)
+        return all_panels
 
     def relayout(self) -> None:
         """Trigger a relayout of visible panels (public API for park/restore)."""
@@ -259,9 +303,9 @@ class ProbePanelContainer(QScrollArea):
             color=color
         )
 
-    def remove_probe_panel(self, anchor: ProbeAnchor):
-        """Remove a probe panel by anchor (M1 API)."""
-        self.remove_panel(anchor=anchor)
+    def remove_probe_panel(self, anchor: ProbeAnchor = None, panel: ProbePanel = None):
+        """Remove a probe panel by anchor or panel reference (M1 API)."""
+        self.remove_panel(anchor=anchor, panel=panel)
 
     # === M2.5: Tab navigation ===
 

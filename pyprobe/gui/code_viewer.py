@@ -50,7 +50,8 @@ class CodeViewer(QPlainTextEdit):
         # anchor -> (color, ref_count) for visual highlights with reference counting
         # Ref count tracks how many probes (graphical + watch) are watching this symbol
         self._active_probes: Dict[ProbeAnchor, tuple] = {}  # tuple[QColor, int]
-        self._graphical_probes: Set[ProbeAnchor] = set()  # probes with actual panels
+        # anchor -> count of graphical panels (supports multiple panels per anchor via Ctrl+click)
+        self._graphical_probes: Dict[ProbeAnchor, int] = {}
         self._invalid_probes: Set[ProbeAnchor] = set()
 
         # Hover state
@@ -187,7 +188,7 @@ class CodeViewer(QPlainTextEdit):
             else:
                 # Last reference, remove highlight entirely
                 self._active_probes.pop(anchor, None)
-                self._graphical_probes.discard(anchor)
+                self._graphical_probes.pop(anchor, None)
                 self._invalid_probes.discard(anchor)
                 logger.debug(f"Removed last reference for {anchor.symbol}")
         else:
@@ -199,22 +200,45 @@ class CodeViewer(QPlainTextEdit):
     def set_probe_graphical(self, anchor: ProbeAnchor) -> None:
         """Mark a probe as having a graphical panel.
 
+        Increments the graphical panel count for this anchor.
+
         Args:
             anchor: The probe anchor with a panel
         """
-        self._graphical_probes.add(anchor)
+        self._graphical_probes[anchor] = self._graphical_probes.get(anchor, 0) + 1
+        logger.debug(f"set_probe_graphical: {anchor.symbol} now has {self._graphical_probes[anchor]} panel(s)")
 
     def unset_probe_graphical(self, anchor: ProbeAnchor) -> None:
-        """Mark a probe as no longer having a graphical panel.
+        """Mark a probe as having one fewer graphical panel.
+
+        Decrements the graphical panel count for this anchor.
+        Removes the anchor from tracking when count reaches 0.
 
         Args:
-            anchor: The probe anchor without a panel
+            anchor: The probe anchor to decrement
         """
-        self._graphical_probes.discard(anchor)
+        if anchor in self._graphical_probes:
+            self._graphical_probes[anchor] -= 1
+            logger.debug(f"unset_probe_graphical: {anchor.symbol} now has {self._graphical_probes[anchor]} panel(s)")
+            if self._graphical_probes[anchor] <= 0:
+                del self._graphical_probes[anchor]
+                logger.debug(f"unset_probe_graphical: {anchor.symbol} removed from graphical probes")
+
+    def has_graphical_probe(self, anchor: ProbeAnchor) -> bool:
+        """Check if an anchor has at least one graphical panel.
+
+        Args:
+            anchor: The probe anchor to check
+
+        Returns:
+            True if anchor has at least one graphical panel
+        """
+        return self._graphical_probes.get(anchor, 0) > 0
 
     def clear_all_probes(self) -> None:
         """Remove all active probes."""
         self._active_probes.clear()
+        self._graphical_probes.clear()
         self._invalid_probes.clear()
         self.viewport().update()
 
@@ -334,13 +358,19 @@ class CodeViewer(QPlainTextEdit):
                 # Check if we stayed in roughly the same position (not a drag)
                 if distance <= 10:
                     anchor = self._drag_start_anchor
-                    has_graphical_panel = anchor in self._graphical_probes
+                    has_graphical_panel = self.has_graphical_probe(anchor)
                     is_highlighted = anchor in self._active_probes
-                    logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, has_panel={has_graphical_panel}, is_highlighted={is_highlighted}")
-                    
+                    # Use Shift for duplicate probe - works cross-platform without conflicts
+                    is_shift_held = event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                    logger.debug(f"mouseReleaseEvent: Click completed on {anchor.symbol}, has_panel={has_graphical_panel}, is_highlighted={is_highlighted}, shift={is_shift_held}")
+
                     # Check for Alt modifier -> watch window toggle
                     if event.modifiers() & Qt.KeyboardModifier.AltModifier:
                         self.watch_probe_requested.emit(anchor)
+                    elif is_shift_held and has_graphical_panel:
+                        # Shift+click on graphical probe -> create another panel (duplicate)
+                        logger.debug(f"Shift+click: creating duplicate probe for {anchor.symbol}")
+                        self.probe_requested.emit(anchor)
                     elif has_graphical_panel:
                         # Regular click on graphical probe -> remove it
                         self.probe_removed.emit(anchor)

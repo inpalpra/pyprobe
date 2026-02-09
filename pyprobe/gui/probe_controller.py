@@ -67,14 +67,14 @@ class ProbeController(QObject):
         self._get_ipc = get_ipc
         self._get_is_running = get_is_running
         
-        # Probe panels by anchor
-        self._probe_panels: Dict[ProbeAnchor, QWidget] = {}
+        # Probe panels by anchor - supports multiple panels per anchor via Ctrl+click
+        self._probe_panels: Dict[ProbeAnchor, List[QWidget]] = {}
         
         # Probe metadata (lens preferences, dtype, overlay target)
         self._probe_metadata: Dict[ProbeAnchor, dict] = {}
     
     @property
-    def probe_panels(self) -> Dict[ProbeAnchor, QWidget]:
+    def probe_panels(self) -> Dict[ProbeAnchor, List[QWidget]]:
         """Access to probe panels dict."""
         return self._probe_panels
     
@@ -110,16 +110,21 @@ class ProbeController(QObject):
                 'lens': None,
                 'dtype': None
             }
-        
-        # Update code viewer
-        self._code_viewer.set_probe_active(anchor, color)
-        
-        # Update gutter
-        self._gutter.set_probed_line(anchor.line, color)
-        
+
+        # Check if this is the first panel for this anchor
+        is_first_panel = anchor not in self._probe_panels or not self._probe_panels[anchor]
+
+        # Only update code viewer highlight for FIRST panel (not duplicates)
+        # This ensures ref_count matches: 1 for graphical probes, incremented separately for watch
+        if is_first_panel:
+            self._code_viewer.set_probe_active(anchor, color)
+            self._gutter.set_probed_line(anchor.line, color)
+
         # Create probe panel
         panel = self._container.create_probe_panel(anchor, color)
-        self._probe_panels[anchor] = panel
+        if anchor not in self._probe_panels:
+            self._probe_panels[anchor] = []
+        self._probe_panels[anchor].append(panel)
         
         # Connect lens changed signal
         if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
@@ -147,56 +152,77 @@ class ProbeController(QObject):
     def remove_probe(self, anchor: ProbeAnchor, on_animation_done: Callable = None):
         """
         Start probe removal (with animation).
-        
+
+        Removes the most recently created panel for this anchor.
+
         Args:
             anchor: Anchor to remove
             on_animation_done: Callback after animation completes
         """
         logger.debug(f"remove_probe called with anchor: {anchor}")
-        
-        if anchor not in self._probe_panels:
-            logger.debug("Anchor not in _probe_panels, returning early")
+
+        if anchor not in self._probe_panels or not self._probe_panels[anchor]:
+            logger.debug("Anchor not in _probe_panels or no panels, returning early")
             return
-        
-        panel = self._probe_panels[anchor]
-        
+
+        # Get the last panel (most recently created)
+        panel = self._probe_panels[anchor][-1]
+
         # Import here to avoid circular import
         from .animations import ProbeAnimations
-        
+
         # Animate removal, then complete
         if on_animation_done:
             ProbeAnimations.fade_out(panel, on_finished=on_animation_done)
         else:
             ProbeAnimations.fade_out(
-                panel, 
-                on_finished=lambda: self.complete_probe_removal(anchor)
+                panel,
+                on_finished=lambda p=panel: self.complete_probe_removal(anchor, p)
             )
     
-    def complete_probe_removal(self, anchor: ProbeAnchor):
-        """Complete probe removal after animation."""
-        logger.debug(f"complete_probe_removal called with anchor: {anchor}")
-        
-        # Remove from registry
-        self._registry.remove_probe(anchor)
-        logger.debug("Removed from registry")
-        
-        # Update code viewer
-        self._code_viewer.remove_probe(anchor)
-        
-        # Update gutter
-        self._gutter.clear_probed_line(anchor.line)
-        
-        # Remove panel
+    def complete_probe_removal(self, anchor: ProbeAnchor, panel=None):
+        """Complete probe removal after animation.
+
+        Args:
+            anchor: The probe anchor
+            panel: The specific panel to remove (if None, removes last panel)
+        """
+        logger.debug(f"complete_probe_removal called with anchor: {anchor}, panel: {panel}")
+
+        # Remove specific panel from our list
         if anchor in self._probe_panels:
-            panel = self._probe_panels.pop(anchor)
-            self._container.remove_probe_panel(anchor)
-        
-        # Send to runner if running
-        ipc = self._get_ipc()
-        if ipc and self._get_is_running():
-            msg = make_remove_probe_cmd(anchor)
-            ipc.send_command(msg)
-        
+            panel_list = self._probe_panels[anchor]
+            if panel is not None and panel in panel_list:
+                panel_list.remove(panel)
+                logger.debug(f"Removed specific panel, {len(panel_list)} remaining")
+            elif panel_list:
+                panel = panel_list.pop()
+                logger.debug(f"Removed last panel, {len(panel_list)} remaining")
+
+            # Clean up container
+            self._container.remove_probe_panel(panel=panel)
+
+            # Check if this was the last panel for this anchor
+            if not panel_list:
+                del self._probe_panels[anchor]
+                logger.debug("No more panels for this anchor, cleaning up")
+
+                # Remove from registry
+                self._registry.remove_probe(anchor)
+                logger.debug("Removed from registry")
+
+                # Update code viewer
+                self._code_viewer.remove_probe(anchor)
+
+                # Update gutter
+                self._gutter.clear_probed_line(anchor.line)
+
+                # Send to runner if running
+                ipc = self._get_ipc()
+                if ipc and self._get_is_running():
+                    msg = make_remove_probe_cmd(anchor)
+                    ipc.send_command(msg)
+
         self.status_message.emit(f"Probe removed: {anchor.identity_label()}")
         self.probe_removed.emit(anchor)
     
@@ -294,11 +320,14 @@ class ProbeController(QObject):
         
         # Check if this overlay anchor is used by any other panels
         anchor_still_used = False
-        for panel in self._probe_panels.values():
-            if hasattr(panel, '_overlay_anchors') and overlay_anchor in panel._overlay_anchors:
-                anchor_still_used = True
+        for panel_list in self._probe_panels.values():
+            for panel in panel_list:
+                if hasattr(panel, '_overlay_anchors') and overlay_anchor in panel._overlay_anchors:
+                    anchor_still_used = True
+                    break
+            if anchor_still_used:
                 break
-        
+
         # If not used anywhere else and not a standalone probe, remove from registry
         if not anchor_still_used and overlay_anchor not in self._probe_panels:
             meta = self._probe_metadata.get(overlay_anchor)
@@ -352,54 +381,55 @@ class ProbeController(QObject):
     def forward_overlay_data(self, anchor: ProbeAnchor, payload: dict):
         """
         Forward overlay probe data to target panels that have this anchor as overlay.
-        
+
         When an overlay anchor's data arrives, we need to update the target panel's
         plot to show this data as an additional trace.
         """
         # Find all panels that have this anchor as an overlay
-        for panel in self._probe_panels.values():
-            if not hasattr(panel, '_overlay_anchors'):
-                continue
-            
-            # Match by full anchor identity: symbol + line + is_assignment
-            matching_overlay = None
-            for overlay_anchor in panel._overlay_anchors:
-                if (overlay_anchor.symbol == anchor.symbol and 
-                    overlay_anchor.line == anchor.line and
-                    overlay_anchor.is_assignment == anchor.is_assignment):
-                    matching_overlay = overlay_anchor
-                    break
-            
-            if matching_overlay is None:
-                continue
-            
-            # Forward data to this panel's plot as overlay
-            plot = panel._plot
-            if plot is None:
-                continue
-            
-            # Use unique key that includes is_assignment to distinguish LHS/RHS
-            overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
-            
-            # Add overlay data to the waveform or constellation plot
-            from pyprobe.plugins.builtins.waveform import WaveformWidget
-            from pyprobe.plugins.builtins.constellation import ConstellationWidget
-            
-            if isinstance(plot, WaveformWidget):
-                self._add_overlay_to_waveform(
-                    plot, 
-                    overlay_key,
-                    payload['value'],
-                    payload['dtype'],
-                    payload.get('shape')
-                )
-            elif isinstance(plot, ConstellationWidget):
-                self._add_overlay_to_constellation(
-                    plot, 
-                    overlay_key,
-                    payload['value'],
-                    payload['dtype'],
-                    payload.get('shape')
+        for panel_list in self._probe_panels.values():
+            for panel in panel_list:
+                if not hasattr(panel, '_overlay_anchors'):
+                    continue
+
+                # Match by full anchor identity: symbol + line + is_assignment
+                matching_overlay = None
+                for overlay_anchor in panel._overlay_anchors:
+                    if (overlay_anchor.symbol == anchor.symbol and
+                        overlay_anchor.line == anchor.line and
+                        overlay_anchor.is_assignment == anchor.is_assignment):
+                        matching_overlay = overlay_anchor
+                        break
+
+                if matching_overlay is None:
+                    continue
+
+                # Forward data to this panel's plot as overlay
+                plot = panel._plot
+                if plot is None:
+                    continue
+
+                # Use unique key that includes is_assignment to distinguish LHS/RHS
+                overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
+
+                # Add overlay data to the waveform or constellation plot
+                from pyprobe.plugins.builtins.waveform import WaveformWidget
+                from pyprobe.plugins.builtins.constellation import ConstellationWidget
+
+                if isinstance(plot, WaveformWidget):
+                    self._add_overlay_to_waveform(
+                        plot,
+                        overlay_key,
+                        payload['value'],
+                        payload['dtype'],
+                        payload.get('shape')
+                    )
+                elif isinstance(plot, ConstellationWidget):
+                    self._add_overlay_to_constellation(
+                        plot,
+                        overlay_key,
+                        payload['value'],
+                        payload['dtype'],
+                        payload.get('shape')
                 )
     
     def _add_overlay_to_waveform(

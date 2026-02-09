@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
             self._load_script(script_path)
     
     @property
-    def _probe_panels(self) -> Dict[ProbeAnchor, ProbePanel]:
+    def _probe_panels(self) -> Dict[ProbeAnchor, List[ProbePanel]]:
         """Delegate to ProbeController's probe_panels."""
         return self._probe_controller.probe_panels
     
@@ -264,23 +264,24 @@ class MainWindow(QMainWindow):
         """Handle single probe value from MessageHandler."""
         anchor = ProbeAnchor.from_dict(payload['anchor'])
         self._probe_registry.update_data_received(anchor)
-        
-        # Update the anchor's own panel if it exists
+
+        # Update all panels for this anchor
         if anchor in self._probe_panels:
             # Update metadata dtype
             if anchor in self._probe_metadata:
                 self._probe_metadata[anchor]['dtype'] = payload['dtype']
-            
-            self._probe_panels[anchor].update_data(
-                value=payload['value'],
-                dtype=payload['dtype'],
-                shape=payload.get('shape'),
-            )
-        
+
+            for panel in self._probe_panels[anchor]:
+                panel.update_data(
+                    value=payload['value'],
+                    dtype=payload['dtype'],
+                    shape=payload.get('shape'),
+                )
+
         # Route to scalar watch sidebar if it has this anchor
         if self._scalar_watch_sidebar.has_scalar(anchor):
             self._scalar_watch_sidebar.update_scalar(anchor, payload['value'])
-        
+
         # M2.5: Forward overlay data to target panels
         self._forward_overlay_data(anchor, payload)
 
@@ -291,11 +292,12 @@ class MainWindow(QMainWindow):
             anchor = ProbeAnchor.from_dict(probe_data['anchor'])
             self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_panels:
-                self._probe_panels[anchor].update_data(
-                    value=probe_data['value'],
-                    dtype=probe_data['dtype'],
-                    shape=probe_data.get('shape'),
-                )
+                for panel in self._probe_panels[anchor]:
+                    panel.update_data(
+                        value=probe_data['value'],
+                        dtype=probe_data['dtype'],
+                        shape=probe_data.get('shape'),
+                    )
             
             # Route to scalar watch sidebar if it has this anchor
             if self._scalar_watch_sidebar.has_scalar(anchor):
@@ -523,7 +525,8 @@ class MainWindow(QMainWindow):
         for anchor in invalid:
             self._code_viewer.set_probe_invalid(anchor)
             if anchor in self._probe_panels:
-                self._probe_panels[anchor].set_state(ProbeState.INVALID)
+                for panel in self._probe_panels[anchor]:
+                    panel.set_state(ProbeState.INVALID)
 
         self._probe_registry.invalidate_anchors(invalid)
 
@@ -545,7 +548,8 @@ class MainWindow(QMainWindow):
     def _on_probe_state_changed(self, anchor: ProbeAnchor, state: ProbeState):
         """Handle probe state change from registry."""
         if anchor in self._probe_panels:
-            self._probe_panels[anchor].set_state(state)
+            for panel in self._probe_panels[anchor]:
+                panel.set_state(state)
 
     @pyqtSlot()
     def _on_script_ended(self):
@@ -625,14 +629,15 @@ class MainWindow(QMainWindow):
     # === M2.5: Park / Restore / Overlay ===
 
     def _on_panel_park_requested(self, anchor: ProbeAnchor) -> None:
-        """Park a panel to the dock bar."""
+        """Park all panels for an anchor to the dock bar."""
         if anchor not in self._probe_panels:
             return
 
-        panel = self._probe_panels[anchor]
-        panel.hide()
+        # Hide all panels for this anchor
+        for panel in self._probe_panels[anchor]:
+            panel.hide()
 
-        # Mark panel as parked and relayout remaining panels
+        # Mark panels as parked and relayout remaining panels
         self._probe_container.park_panel(anchor)
 
         # Add to dock bar
@@ -645,13 +650,14 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(f"Parked: {anchor.symbol}")
 
     def _on_dock_bar_restore(self, anchor_key: str) -> None:
-        """Restore a panel from the dock bar."""
-        # Find the panel matching this anchor_key
-        for anchor, panel in self._probe_panels.items():
+        """Restore panels from the dock bar."""
+        # Find panels matching this anchor_key
+        for anchor, panel_list in self._probe_panels.items():
             if anchor.identity_label() == anchor_key:
-                panel.show()
+                for panel in panel_list:
+                    panel.show()
                 self._dock_bar.remove_panel(anchor_key)
-                # Unpark and relayout all panels including restored one
+                # Unpark and relayout all panels including restored ones
                 self._probe_container.unpark_panel(anchor)
                 logger.debug(f"Panel restored: {anchor_key}")
                 self._status_bar.showMessage(f"Restored: {anchor.symbol}")
