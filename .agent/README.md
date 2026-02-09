@@ -112,6 +112,30 @@ A: launched `python -m pyprobe ...` repeatedly, waited for cmd completion
 R: GUI never completes, no output until user interaction
 A': ask user to: 1) launch, 2) interact, 3) share terminal output
 
+#### L14 2026-02-10 orphaned-code-debug-print
+S: test expected debug print "MainWindow received data for x"
+A: found print in `_on_probe_value` method, assumed it was connected
+R: print never appeared - method was orphaned (never called)
+A': grep for signal.connect() or trace actual call path before assuming method is live
+Fix: added print to actual handler `_handle_probe_records`
+File: gui/main_window.py
+
+#### L15 2026-02-10 legacy-vs-plugin-widget
+S: added `get_plot_data()` to plugin `ScalarHistoryWidget`
+A: assumed plugin class was being used for scalar history
+R: actual runtime used legacy `ScalarHistoryChart`, get_plot_data missing
+A': check actual widget type at runtime (log `type(panel._plot)`) before adding methods
+Fix: added get_plot_data() to BOTH legacy ScalarHistoryChart AND plugin ScalarHistoryWidget
+File: plots/scalar_history_chart.py, plugins/builtins/scalar_history.py
+
+#### L16 2026-02-10 gui-export-timing
+S: exporting graph data immediately after script end
+A: called `get_plot_data()` in `_on_script_ended()` synchronously
+R: data empty - GUI history buffers not yet populated
+A': delay export until after GUI update cycle completes (QTimer.singleShot)
+Fix: 500ms delay before `_export_plot_data()` call
+File: gui/main_window.py
+
 ### DESIGN LESSONS (architecture/philosophy)
 
 #### L3 2026-02-06 filter-vs-degrade
@@ -205,6 +229,8 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - deferred capture in loops: must track object ID, var_exists alone triggers on stale value from prev iteration
 - QScrollArea.layout() returns None; panels are in widget().layout()
 - QGridLayout.itemAt() has gaps; iterate _panels dict not layout for reliable widget access
+- legacy plots (plots/*.py) and plugin plots (plugins/builtins/*.py) coexist; check actual runtime type before assuming which is used
+- GUI widget updates are async; exporting data immediately after script end gets empty buffers; use QTimer.singleShot delay
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?
