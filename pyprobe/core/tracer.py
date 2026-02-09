@@ -17,6 +17,7 @@ from .data_classifier import (
 )
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
+from .deferred_capture import DeferredCaptureManager
 from pyprobe.logging import trace_print
 
 
@@ -62,7 +63,7 @@ class VariableTracer:
 
     Design decisions for minimizing overhead:
     1. Early exit in trace function for non-watched files/functions
-    2. Watch list stored as set for O(1) lookup
+    2. Anchor-based matching for O(1) lookup
     3. Throttling checked BEFORE accessing frame.f_locals (expensive)
     """
 
@@ -87,8 +88,6 @@ class VariableTracer:
         self._anchor_batch_callback = anchor_batch_callback
         self._target_files = target_files
         self._target_functions = target_functions
-        self._watches: Dict[str, WatchConfig] = {}
-        self._watch_names: Set[str] = set()  # Fast O(1) lookup
         self._enabled = False
         self._global_throttle_ms = 16.67  # ~60 FPS max update rate
 
@@ -98,7 +97,7 @@ class VariableTracer:
             '<string>',
         )
 
-        # M1: Anchor-based watching
+        # Anchor-based watching
         self._anchor_matcher = AnchorMatcher()
         self._anchor_watches: Dict[ProbeAnchor, WatchConfig] = {}
         
@@ -107,142 +106,13 @@ class VariableTracer:
         self._location_throttle: Dict[tuple, float] = {}  # (file, line) -> last_capture_time
         self._location_throttle_ms = 50.0  # Default throttle for location-based captures
         
-        # Pending deferred captures: frame_id -> list of (anchor, original_line)
-        # Used to delay capture of assignment targets until after the line executes
-        # We track original_line to only flush when on a DIFFERENT line (statement complete)
-        self._pending_deferred: Dict[int, List[tuple]] = {}  # frame_id -> [(anchor, line), ...]
-
-    def add_watch(self, config: WatchConfig) -> None:
-        """Add a variable to the watch list."""
-        self._watches[config.var_name] = config
-        self._watch_names.add(config.var_name)
-
-    def remove_watch(self, var_name: str) -> None:
-        """Remove a variable from the watch list."""
-        self._watches.pop(var_name, None)
-        self._watch_names.discard(var_name)
-
-    def set_throttle(self, var_name: str, strategy: ThrottleStrategy, param: float) -> None:
-        """Update throttling for a specific variable."""
-        if var_name in self._watches:
-            self._watches[var_name].throttle_strategy = strategy
-            self._watches[var_name].throttle_param = param
-
-    def start(self) -> None:
-        """Enable tracing."""
-        self._enabled = True
-        sys.settrace(self._trace_func)
+        # Deferred capture manager for assignment targets
+        self._deferred = DeferredCaptureManager()
 
     def stop(self) -> None:
         """Disable tracing."""
         self._enabled = False
         sys.settrace(None)
-
-    def _trace_func(self, frame, event: str, arg) -> Optional[Callable]:
-        """
-        The trace function called by Python interpreter.
-
-        CRITICAL PERFORMANCE PATH - every microsecond counts here.
-        """
-        # Fast exit if disabled
-        if not self._enabled:
-            return None
-
-        # Only process 'line' events (not 'call', 'return', 'exception')
-        if event != 'line':
-            return self._trace_func
-
-        # Fast file filter
-        code = frame.f_code
-        filename = code.co_filename
-
-        # Skip frozen/internal modules
-        if filename.startswith(self._skip_prefixes):
-            return self._trace_func
-
-        # Filter to target files if specified
-        if self._target_files is not None:
-            if filename not in self._target_files:
-                return self._trace_func
-
-        # Fast function filter
-        if self._target_functions is not None:
-            if code.co_name not in self._target_functions:
-                return self._trace_func
-
-        # No watches? Nothing to do
-        if not self._watch_names:
-            return self._trace_func
-
-        # Check if any watched variables are in this frame's locals
-        # Use set intersection for O(min(watches, locals))
-        local_names = set(frame.f_locals.keys())
-        watched_in_frame = self._watch_names & local_names
-
-        if not watched_in_frame:
-            return self._trace_func
-
-        # Now check throttling and capture
-        current_time = time.perf_counter()
-
-        for var_name in watched_in_frame:
-            config = self._watches[var_name]
-
-            if not config.enabled:
-                continue
-
-            # Throttle check (BEFORE accessing the value)
-            if not self._should_capture(config, current_time):
-                continue
-
-            # Now access the variable value
-            value = frame.f_locals[var_name]
-
-            # For CHANGE_DETECT, check if value actually changed
-            if config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
-                if not self._value_changed(value, config):
-                    continue
-
-            # Classify and capture
-            captured = self._create_capture(
-                var_name, value, filename,
-                frame.f_lineno, code.co_name, current_time
-            )
-
-            # Update throttle state
-            config.last_send_time = current_time
-            if config.throttle_strategy == ThrottleStrategy.SAMPLE_EVERY_N:
-                config.iteration_count = 0  # Reset after capture
-
-            # Send to callback (non-blocking)
-            try:
-                self._data_callback(captured)
-            except Exception:
-                pass  # Don't let callback errors break tracing
-
-        return self._trace_func
-
-    def _should_capture(self, config: WatchConfig, current_time: float) -> bool:
-        """Check if we should capture based on throttle strategy."""
-        strategy = config.throttle_strategy
-
-        if strategy == ThrottleStrategy.NONE:
-            return True
-
-        elif strategy == ThrottleStrategy.TIME_BASED:
-            elapsed_ms = (current_time - config.last_send_time) * 1000
-            return elapsed_ms >= config.throttle_param
-
-        elif strategy == ThrottleStrategy.SAMPLE_EVERY_N:
-            config.iteration_count += 1
-            return config.iteration_count >= config.throttle_param
-
-        elif strategy == ThrottleStrategy.CHANGE_DETECT:
-            # Still apply a minimum time throttle
-            elapsed_ms = (current_time - config.last_send_time) * 1000
-            return elapsed_ms >= self._global_throttle_ms
-
-        return True
 
     def _value_changed(self, value: Any, config: WatchConfig) -> bool:
         """Check if value changed significantly (for CHANGE_DETECT strategy)."""
@@ -320,26 +190,7 @@ class VariableTracer:
         
         return value
 
-    def _create_capture(
-        self, name: str, value: Any, filename: str,
-        lineno: int, func_name: str, timestamp: float
-    ) -> CapturedVariable:
-        """Create a CapturedVariable with proper type classification."""
-        dtype, shape = classify_data(value)
-        serialized_value = self._serialize_value(value)
-
-        return CapturedVariable(
-            name=name,
-            value=serialized_value,
-            dtype=dtype,
-            shape=shape,
-            timestamp=timestamp,
-            source_file=filename,
-            line_number=lineno,
-            function_name=func_name
-        )
-
-    # === M1: Anchor-based tracing methods ===
+    # === Anchor-based tracing methods ===
 
     def add_anchor_watch(self, anchor: ProbeAnchor, config: Optional[WatchConfig] = None) -> None:
         """Add anchor-based watch."""
@@ -357,120 +208,11 @@ class VariableTracer:
         self._anchor_matcher.remove(anchor)
         self._anchor_watches.pop(anchor, None)
 
-    def _flush_deferred(self, frame, event: str) -> None:
-        """
-        Process any pending deferred captures for this frame.
-        
-        Only flushes captures when:
-        1. Event is 'line' (a new statement is starting)
-        2. We're on a DIFFERENT line than where they were deferred
-        3. The variable exists in scope
-        
-        This ensures the assignment statement completes before capture,
-        but capture happens IMMEDIATELY on the next line - not later when
-        the variable may have been modified by subsequent statements.
-        
-        Args:
-            frame: The current stack frame
-            event: The trace event type ('line', 'return', 'call', 'exception')
-        """
-        # Only flush on 'line' events - this ensures the previous statement completed
-        if event != 'line':
-            return
-        
-        frame_id = id(frame)
-        pending = self._pending_deferred.get(frame_id)
-        if not pending:
-            return
-        
-        current_line = frame.f_lineno
-        
-        # Separate into ready-to-flush (different line + var exists) vs still pending
-        ready_to_flush = []
-        still_pending = []
-        
-        for anchor, original_line, old_id in pending:
-            # CRITICAL: Only flush if we're on a DIFFERENT line than where registered
-            # This ensures we capture right after the assignment, not later
-            trace_print(f"_flush_deferred: anchor={anchor.symbol}, original_line={original_line}, current_line={current_line}")
-            if current_line == original_line:
-                # Still on the same line - keep pending
-                trace_print(f"_flush_deferred: Same line, keeping pending")
-                still_pending.append((anchor, original_line, old_id))
-                continue
-            
-            # We're on a different line - check if variable now exists AND has a new ID
-            symbol = anchor.symbol
-            if symbol in frame.f_locals:
-                current_id = id(frame.f_locals[symbol])
-            elif symbol in frame.f_globals:
-                current_id = id(frame.f_globals[symbol])
-            else:
-                # Variable doesn't exist yet
-                still_pending.append((anchor, original_line, old_id))
-                continue
-            
-            # Only flush if the object ID has changed (meaning a new assignment happened)
-            if current_id != old_id:
-                ready_to_flush.append(anchor)
-            else:
-                # Same object as before - assignment hasn't happened yet, keep pending
-                trace_print(f"_flush_deferred: Same object ID, keeping pending")
-                still_pending.append((anchor, original_line, old_id))
-        
-        # Update pending list
-        if still_pending:
-            self._pending_deferred[frame_id] = still_pending
-        else:
-            self._pending_deferred.pop(frame_id, None)
-        
-        if not ready_to_flush:
-            return
-
-        # Capture them using current state
-        current_time = time.perf_counter()
-        batch = []
-        
-        for anchor in ready_to_flush:
-            try:
-                # Value should now be available (post-execution of the ORIGINAL line)
-                if anchor.symbol in frame.f_locals:
-                    value = frame.f_locals[anchor.symbol]
-                else:
-                    value = frame.f_globals[anchor.symbol]
-                
-                # Debug: print value info for complex arrays
-                import numpy as np
-                if isinstance(value, np.ndarray) and np.iscomplexobj(value):
-                    trace_print(f"_flush_deferred CAPTURE: {anchor.symbol} at line {anchor.line}, current_line={current_line}, mean={value.mean():.4f}")
-                
-                captured = self._create_anchor_capture(anchor, value, current_time)
-                batch.append((anchor, captured))
-            except KeyError:
-                continue
-            except Exception:
-                continue
-                
-        # Send batch
-        if batch:
-            try:
-                if self._anchor_batch_callback is not None:
-                    self._anchor_batch_callback(batch)
-                elif self._anchor_data_callback is not None:
-                    for anchor, captured in batch:
-                        self._anchor_data_callback(anchor, captured)
-                else:
-                    for anchor, captured in batch:
-                        self._data_callback(captured)
-            except Exception:
-                pass
-
-
-    def _trace_func_anchored(self, frame, event: str, arg) -> Optional[Callable]:
+    def _trace_func(self, frame, event: str, arg) -> Optional[Callable]:
         """
         Trace function with anchor-based matching.
 
-        Similar to _trace_func but uses AnchorMatcher for O(1) lookup.
+        Uses AnchorMatcher for O(1) lookup.
         Batches all captures from this trace event for atomic GUI updates.
         """
         # Fast exit if disabled
@@ -478,11 +220,13 @@ class VariableTracer:
             return None
 
         # Always flush pending deferred captures (from previous line/event)
-        self._flush_deferred(frame, event)
+        flushed = self._deferred.flush(frame, event, self._create_anchor_capture)
+        if flushed:
+            self._send_batch(flushed)
 
         # Only process 'line' events for new matching
         if event != 'line':
-            return self._trace_func_anchored
+            return self._trace_func
 
         # Fast file filter
         code = frame.f_code
@@ -490,16 +234,16 @@ class VariableTracer:
 
         # Skip frozen/internal modules
         if filename.startswith(self._skip_prefixes):
-            return self._trace_func_anchored
+            return self._trace_func
 
         # Fast check: does this file have any anchors?
         if not self._anchor_matcher.has_file(filename):
-            return self._trace_func_anchored
+            return self._trace_func
 
         # Fast check: does this location have any anchors?
         lineno = frame.f_lineno
         if not self._anchor_matcher.has_location(filename, lineno):
-            return self._trace_func_anchored
+            return self._trace_func
 
         # Get local and global variable names
         local_names = set(frame.f_locals.keys())
@@ -508,45 +252,33 @@ class VariableTracer:
 
         # Find matching anchors
         matching_anchors = self._anchor_matcher.match(filename, lineno, all_names)
-        
-
 
         if not matching_anchors:
-            return self._trace_func_anchored
+            return self._trace_func
 
         # Capture for each matching anchor, batching all captures from this event
         current_time = time.perf_counter()
         
         # Location-based throttle: all anchors on this line share one throttle check
-        # This ensures probes on same line ALWAYS capture together (same frame)
         location_key = (filename, lineno)
         last_capture = self._location_throttle.get(location_key, 0.0)
         elapsed_ms = (current_time - last_capture) * 1000
         
         if elapsed_ms < self._location_throttle_ms:
-            return self._trace_func_anchored  # Skip ALL anchors on this line
+            return self._trace_func  # Skip ALL anchors on this line
         
-        # Initialize batch with any flushed captures (if we want to combine them)
-        # But flushed captures were already sent in _flush_deferred (or ideally added to a common batch context)
-        # For simplicity, we'll let _flush_deferred send its own batch, and we send ours.
-        # Merging them would require passing a 'batch' list to _flush_deferred.
         batch = []
+        frame_id = id(frame)
 
         for anchor in matching_anchors:
             config = self._anchor_watches.get(anchor)
             if config is None or not config.enabled:
                 continue
 
-            # NO per-anchor throttle check - location throttle handles it
-            
             # If this is an assignment target, defer capture to next line (post-execution)
             is_assign = getattr(anchor, 'is_assignment', False)
             if is_assign:
-                frame_id = id(frame)
-                if frame_id not in self._pending_deferred:
-                    self._pending_deferred[frame_id] = []
                 # Record the current object ID (or None if doesn't exist)
-                # This lets us detect when a NEW assignment has happened
                 symbol = anchor.symbol
                 if symbol in frame.f_locals:
                     old_id = id(frame.f_locals[symbol])
@@ -554,8 +286,7 @@ class VariableTracer:
                     old_id = id(frame.f_globals[symbol])
                 else:
                     old_id = None
-                trace_print(f"DEFER: {anchor.symbol} at anchor.line={anchor.line}, frame.f_lineno={lineno}, old_id={old_id}")
-                self._pending_deferred[frame_id].append((anchor, lineno, old_id))
+                self._deferred.defer(frame_id, anchor, lineno, old_id)
                 continue
 
             # Get the value (check locals first, then globals for module-level vars)
@@ -564,7 +295,7 @@ class VariableTracer:
             else:
                 value = frame.f_globals[anchor.symbol]
 
-            # For CHANGE_DETECT, still check if value changed (optional per-anchor)
+            # For CHANGE_DETECT, still check if value changed
             if config and config.throttle_strategy == ThrottleStrategy.CHANGE_DETECT:
                 if not self._value_changed(value, config):
                     continue
@@ -573,33 +304,34 @@ class VariableTracer:
             captured = self._create_anchor_capture(anchor, value, current_time)
             
             # Debug trace for immediate captures
-            import numpy as np
             if isinstance(value, np.ndarray) and np.iscomplexobj(value):
                 trace_print(f"IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
             
             batch.append((anchor, captured))
         
-        # Update location throttle time if we captured anything (or deferred anything)
-        if batch or (id(frame) in self._pending_deferred and self._pending_deferred[id(frame)]):
+        # Update location throttle time if we captured or deferred anything
+        if batch or self._deferred.has_pending(frame_id):
             self._location_throttle[location_key] = current_time
 
-        # Send batch to callback (prefer batch callback for atomic updates)
+        # Send batch
         if batch:
-            try:
-                if self._anchor_batch_callback is not None:
-                    self._anchor_batch_callback(batch)
-                elif self._anchor_data_callback is not None:
-                    # Fallback: send individually
-                    for anchor, captured in batch:
-                        self._anchor_data_callback(anchor, captured)
-                else:
-                    # Ultimate fallback
-                    for anchor, captured in batch:
-                        self._data_callback(captured)
-            except Exception:
-                pass
+            self._send_batch(batch)
 
-        return self._trace_func_anchored
+        return self._trace_func
+
+    def _send_batch(self, batch: list) -> None:
+        """Send a batch of captures to the appropriate callback."""
+        try:
+            if self._anchor_batch_callback is not None:
+                self._anchor_batch_callback(batch)
+            elif self._anchor_data_callback is not None:
+                for anchor, captured in batch:
+                    self._anchor_data_callback(anchor, captured)
+            else:
+                for anchor, captured in batch:
+                    self._data_callback(captured)
+        except Exception:
+            pass  # Don't let callback errors break tracing
 
     def _create_anchor_capture(
         self, anchor: ProbeAnchor, value: Any, timestamp: float
@@ -619,10 +351,13 @@ class VariableTracer:
             function_name=anchor.func
         )
 
-    def start_anchored(self) -> None:
+    def start(self) -> None:
         """Start tracing with anchor-based matching."""
         self._enabled = True
-        sys.settrace(self._trace_func_anchored)
+        sys.settrace(self._trace_func)
+
+    # Alias for backwards compatibility
+    start_anchored = start
 
     @property
     def anchor_count(self) -> int:

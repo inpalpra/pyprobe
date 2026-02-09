@@ -19,31 +19,6 @@
 
 ---
 
-## P1.5 - Refactoring (AI Agent Efficiency)
-
-### REFACTOR: Extract components from `main_window.py` (1061 lines)
-- **Problem**: God class with 34 methods handling script execution, IPC, probes, panels
-- **Extract**: `ScriptRunner`, `MessageHandler`, `ProbeController`
-- **Effort**: 2-3 days
-- **Impact**: Critical - every bug fix touches this file
-
-### REFACTOR: Split `probe_panel.py` (811 lines)
-- **Problem**: Two unrelated classes bundled (`ProbePanel` + `ProbePanelContainer`)
-- **Extract**: Move `ProbePanelContainer` to `panel_container.py`
-- **Effort**: 2 hours
-
-### REFACTOR: Consolidate `waveform_plot.py` + plugin `waveform.py`
-- **Problem**: 90% code duplication between legacy plot and plugin widget
-- **Action**: Migrate `plot_factory.py` to use plugin system, then delete legacy
-- **Effort**: 4 hours
-
-### REFACTOR: Simplify `tracer.py` (630 lines)
-- **Problem**: Dual trace paths (`_trace_func` and `_trace_func_anchored`)
-- **Action**: Deprecate legacy `_trace_func`, extract `DeferredCaptureManager`
-- **Effort**: 1 day
-
----
-
 ## P2 - Medium Priority
 
 ### Custom probes per symbol type
