@@ -220,6 +220,16 @@ class ProbePanel(QFrame):
         dtype = buffer.last_dtype or self._dtype
         shape = buffer.last_shape
 
+        # If dtype changed, we MUST call update_data to allow widget recreation
+        # before trying to use update_history (which would bypass the dtype-change logic)
+        if dtype != self._dtype:
+            self.update_data(values[-1], dtype, shape)
+            # After widget recreation, immediately replace with full buffer
+            # to restore append-then-replace behavior
+            if self._plot and hasattr(self._plot, "update_history"):
+                self._plot.update_history(values)
+            return
+
         # Prefer update_history for widgets that support it (like ScalarHistoryWidget)
         if hasattr(self._plot, "update_history"):
             self._plot.update_history(values)
@@ -256,11 +266,15 @@ class ProbePanel(QFrame):
         if self._toolbar:
             self._on_toolbar_mode_changed(self._toolbar.current_mode)
         
-        # Re-apply data if we had any - defer with QTimer to ensure widget is realized
+        # Re-apply data if we had any - but ONLY if widget doesn't support update_history.
+        # For widgets with update_history (like ScalarHistoryWidget), update_from_buffer
+        # will call update_history() which replaces the full buffer, making this redundant
+        # and causing duplicate values.
         if hasattr(self, '_data') and self._data is not None:
-            # Capture current values in lambda closure
-            data, dtype, shape = self._data, self._dtype, getattr(self, '_shape', None)
-            QTimer.singleShot(0, lambda: plugin.update(self._plot, data, dtype, shape))
+            if not hasattr(self._plot, 'update_history'):
+                # Capture current values in lambda closure
+                data, dtype, shape = self._data, self._dtype, getattr(self, '_shape', None)
+                QTimer.singleShot(0, lambda: plugin.update(self._plot, data, dtype, shape))
 
     @property
     def current_lens(self) -> str:

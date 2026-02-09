@@ -57,10 +57,12 @@ class LayoutManager(QObject):
             logger.warning("Container has no _panels dict, falling back to layout iteration")
             return
         
-        for anchor, widget in panels_dict.items():
-            if widget is not panel and widget.isVisible():
-                self._hidden_panels.append((widget, anchor))
-                self.panel_park_requested.emit(anchor)
+        # _panels is Dict[ProbeAnchor, List[ProbePanel]]
+        for anchor, panel_list in panels_dict.items():
+            for widget in panel_list:
+                if widget is not panel and widget.isVisible():
+                    self._hidden_panels.append((widget, anchor))
+                    self.panel_park_requested.emit(anchor)
         
         logger.debug(f"Maximized panel, parked {len(self._hidden_panels)} others")
         self.layout_changed.emit(True)

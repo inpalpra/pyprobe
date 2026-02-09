@@ -71,8 +71,14 @@ class CaptureManager:
         anchor: ProbeAnchor,
         logical_order: int = 0,
         timestamp: Optional[int] = None,
+        old_object_id: Optional[int] = None,
     ) -> int:
-        """Reserve a sequence number for a deferred (LHS) capture."""
+        """Reserve a sequence number for a deferred (LHS) capture.
+        
+        Args:
+            old_object_id: If provided, flush will only happen when the 
+                           object ID of the variable changes (detecting new assignment).
+        """
         ts = self._clock() if timestamp is None else timestamp
         seq_num = self._seq_gen.next()
         pending = self._pending.setdefault(frame_id, [])
@@ -82,9 +88,10 @@ class CaptureManager:
                 seq_num=seq_num,
                 timestamp=ts,
                 logical_order=logical_order,
+                old_object_id=old_object_id,
             )
         )
-        trace_print(f"DEBUG: Deferred capture for {anchor.symbol} at {anchor.line}. Seq={seq_num}, frame={frame_id}")
+        trace_print(f"DEFER: {anchor.symbol}@{anchor.line} (LHS, old_id={old_object_id})")
         return seq_num
 
     def flush_deferred(
@@ -92,8 +99,14 @@ class CaptureManager:
         frame_id: int,
         event: str,
         resolve_value: Callable[[ProbeAnchor], Tuple[object, str, Optional[tuple]]],
+        get_object_id: Optional[Callable[[ProbeAnchor], Optional[int]]] = None,
     ) -> List[CaptureRecord]:
-        """Flush deferred captures on line/return/exception events."""
+        """Flush deferred captures on line/return/exception events.
+        
+        Args:
+            get_object_id: If provided, returns the current object ID for an anchor.
+                          Used to detect if a new assignment has occurred.
+        """
         if event not in ("line", "return", "exception"):
             return []
 
@@ -105,6 +118,21 @@ class CaptureManager:
         still_pending: List[_DeferredItem] = []
 
         for item in pending:
+            # Check if object ID has changed (indicating new assignment)
+            if item.old_object_id is not None and get_object_id is not None:
+                try:
+                    current_id = get_object_id(item.anchor)
+                    if current_id == item.old_object_id:
+                        # Still has old value - assignment hasn't completed yet
+                        if event == "line":
+                            still_pending.append(item)
+                            trace_print(f"SKIP: {item.anchor.symbol}@{item.anchor.line} (same object id={current_id}, waiting for new assignment)")
+                        continue
+                except KeyError:
+                    if event == "line":
+                        still_pending.append(item)
+                    continue
+            
             try:
                 value, dtype, shape = resolve_value(item.anchor)
             except KeyError:
@@ -123,6 +151,7 @@ class CaptureManager:
                     logical_order=item.logical_order,
                 )
             )
+            trace_print(f"FLUSH: {item.anchor.symbol}@{item.anchor.line} dtype={dtype}")
 
         if still_pending:
             self._pending[frame_id] = still_pending
@@ -143,3 +172,4 @@ class _DeferredItem:
     seq_num: int
     timestamp: int
     logical_order: int
+    old_object_id: Optional[int] = None  # Track object ID to detect new assignment

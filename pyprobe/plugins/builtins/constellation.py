@@ -217,6 +217,30 @@ class ConstellationWidget(QWidget):
             self._pin_indicator.update_layout(view_rect)
             self._pin_indicator.raise_()
 
+    def get_plot_data(self) -> dict:
+        """
+        Return the data currently plotted on the constellation.
+        
+        Returns:
+            dict with 'real', 'imag' keys containing lists of values,
+            'mean_real', 'mean_imag' for statistics verification,
+            and 'history_count' with number of frames stored.
+        """
+        if self._data is None or len(self._data) == 0:
+            return {
+                'real': [], 'imag': [],
+                'mean_real': 0.0, 'mean_imag': 0.0,
+                'history_count': 0
+            }
+        
+        return {
+            'real': self._data.real.tolist(),
+            'imag': self._data.imag.tolist(),
+            'mean_real': float(np.mean(self._data.real)),
+            'mean_imag': float(np.mean(self._data.imag)),
+            'history_count': len(self._history)
+        }
+
 
 class ConstellationPlugin(ProbePlugin):
     """Plugin for visualizing complex arrays as constellation diagrams."""

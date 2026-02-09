@@ -208,6 +208,7 @@ class VariableTracer:
             frame_id=id(frame),
             event=event,
             resolve_value=lambda anchor: self._resolve_anchor_value(frame, anchor),
+            get_object_id=lambda anchor: self._get_anchor_object_id(frame, anchor),
         )
         if flushed:
             self._send_record_batch(flushed)
@@ -219,9 +220,6 @@ class VariableTracer:
         # Fast file filter
         code = frame.f_code
         filename = code.co_filename
-        
-        # Aggressive debug for automated test
-        trace_print(f"TRACE_FUNC: {filename}:{frame.f_lineno} event={event}")
 
         # Skip frozen/internal modules
         if filename.startswith(self._skip_prefixes):
@@ -247,7 +245,7 @@ class VariableTracer:
         if not matching_anchors:
             return self._trace_func
         
-        trace_print(f"Matched {len(matching_anchors)} anchors at {filename}:{lineno}")
+        trace_print(f"LINE {lineno}: Matched {len(matching_anchors)} anchors: {[a.symbol for a in matching_anchors]}")
 
         # Capture for each matching anchor, batching all captures from this event
         timestamp = time.perf_counter_ns()
@@ -281,6 +279,7 @@ class VariableTracer:
                 logical_order=logical_order,
             )
             logical_order += 1
+            trace_print(f"CAPTURE: {anchor.symbol}@{anchor.line} dtype={dtype} (RHS immediate)")
 
             batch.append(record)
 
@@ -288,11 +287,14 @@ class VariableTracer:
             config = self._anchor_watches.get(anchor)
             if config is None or not config.enabled:
                 continue
+            # Get current object ID to detect when assignment completes
+            old_id = self._get_anchor_object_id(frame, anchor)
             self._capture_manager.defer_capture(
                 frame_id=frame_id,
                 anchor=anchor,
                 logical_order=logical_order,
                 timestamp=timestamp,
+                old_object_id=old_id,
             )
             logical_order += 1
 
@@ -355,6 +357,20 @@ class VariableTracer:
         dtype, shape = classify_data(value)
         serialized_value = self._serialize_value(value)
         return serialized_value, dtype, shape
+
+    def _get_anchor_object_id(
+        self, frame, anchor: ProbeAnchor
+    ) -> Optional[int]:
+        """Get the Python id() of the current value for an anchor.
+        
+        Returns None if the variable doesn't exist yet.
+        """
+        if anchor.symbol in frame.f_locals:
+            return id(frame.f_locals[anchor.symbol])
+        elif anchor.symbol in frame.f_globals:
+            return id(frame.f_globals[anchor.symbol])
+        else:
+            return None
 
     def start(self) -> None:
         """Start tracing with anchor-based matching."""

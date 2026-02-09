@@ -136,6 +136,24 @@ A': delay export until after GUI update cycle completes (QTimer.singleShot)
 Fix: 500ms delay before `_export_plot_data()` call
 File: gui/main_window.py
 
+#### L17 2026-02-10 deferred-plugin-update-append
+S: loop test got [9,8,7,9] instead of [9,8,7]
+A: assumed update_history replaces correctly, searched for buffer issues
+R: root cause not in buffer - deferred `plugin.update()` via QTimer.singleShot ran AFTER update_history
+A': add traceback to duplicate-causing method to find exact caller
+R': traceback shows `probe_panel._on_lens_changed:273` deferred call
+Fix: skip deferred plugin.update for widgets with update_history (update_from_buffer handles it)
+File: gui/probe_panel.py:269-277
+
+#### L18 2026-02-10 trace-stack-for-async-bugs
+S: 3 IPC receives but 4 values in PLOT_DATA
+A: analyzed sync code paths, checked buffer counts
+R: missed async QTimer.singleShot call scheduled earlier
+A': add traceback.print_stack() to suspect method, run, trace caller
+R': immediately identified probe_panel line 273 as culprit
+Fix: for async/timing bugs, traceback.print_stack() > code reading
+File: process
+
 ### DESIGN LESSONS (architecture/philosophy)
 
 #### L3 2026-02-06 filter-vs-degrade
@@ -231,6 +249,9 @@ source /Users/ppal/repos/pyprobe/.venv/bin/activate && python -m pyprobe ...
 - QGridLayout.itemAt() has gaps; iterate _panels dict not layout for reliable widget access
 - legacy plots (plots/*.py) and plugin plots (plugins/builtins/*.py) coexist; check actual runtime type before assuming which is used
 - GUI widget updates are async; exporting data immediately after script end gets empty buffers; use QTimer.singleShot delay
+- `_on_lens_changed` deferred plugin.update via QTimer.singleShot(0,...) runs AFTER update_from_buffer completes; skip for widgets w/ update_history to avoid duplicate values
+- update_data APPENDS to history; update_history REPLACES history; mixing calls (append then replace) is correct flow but deferred appends AFTER replace corrupt data
+- when dtype changes, update_from_buffer must call BOTH update_data (widget recreation) AND update_history (buffer sync)
 
 ## INVARIANTS TO CHECK
 - [ ] Qt obj lifetime: parent set? ref stored?

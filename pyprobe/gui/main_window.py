@@ -805,6 +805,9 @@ class MainWindow(QMainWindow):
         
         Outputs JSON lines to stderr in format:
         PLOT_DATA:{"symbol": "x", "y": [9, 8, 7]}
+        
+        For constellation data (complex arrays):
+        PLOT_DATA:{"symbol": "x", "real": [...], "imag": [...], "mean_real": 0.1, "mean_imag": -0.2}
         """
         import json
         for anchor, panel_list in self._probe_panels.items():
@@ -813,8 +816,17 @@ class MainWindow(QMainWindow):
                 export_record = {
                     'symbol': anchor.symbol,
                     'line': anchor.line,
-                    'y': plot_data.get('y', [])
                 }
+                # Include standard y values if present
+                if 'y' in plot_data:
+                    export_record['y'] = plot_data.get('y', [])
+                # Include constellation data if present (real/imag pairs)
+                if 'real' in plot_data and 'imag' in plot_data:
+                    export_record['real'] = plot_data['real']
+                    export_record['imag'] = plot_data['imag']
+                    export_record['mean_real'] = plot_data.get('mean_real', 0.0)
+                    export_record['mean_imag'] = plot_data.get('mean_imag', 0.0)
+                    export_record['history_count'] = plot_data.get('history_count', 0)
                 print(f"PLOT_DATA:{json.dumps(export_record)}", file=sys.stderr)
 
     # === M2.5: Park / Restore / Overlay ===
