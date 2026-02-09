@@ -220,9 +220,12 @@ class ProbePanel(QFrame):
         dtype = buffer.last_dtype or self._dtype
         shape = buffer.last_shape
 
-        self.update_data(values[-1], dtype, shape)
+        # Prefer update_history for widgets that support it (like ScalarHistoryWidget)
         if hasattr(self._plot, "update_history"):
             self._plot.update_history(values)
+        else:
+            # Fallback to updating with just the latest value
+            self.update_data(values[-1], dtype, shape)
 
     def _on_lens_changed(self, plugin_name: str):
         """Handle lens change - swap out the plot widget."""

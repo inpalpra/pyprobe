@@ -7,6 +7,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from .anchor import ProbeAnchor
 from .capture_record import CaptureRecord
 from .sequence import SequenceGenerator
+from pyprobe.logging import trace_print
 
 
 class CaptureManager:
@@ -83,6 +84,7 @@ class CaptureManager:
                 logical_order=logical_order,
             )
         )
+        trace_print(f"DEBUG: Deferred capture for {anchor.symbol} at {anchor.line}. Seq={seq_num}, frame={frame_id}")
         return seq_num
 
     def flush_deferred(
@@ -98,7 +100,7 @@ class CaptureManager:
         pending = self._pending.get(frame_id)
         if not pending:
             return []
-
+        
         records: List[CaptureRecord] = []
         still_pending: List[_DeferredItem] = []
 

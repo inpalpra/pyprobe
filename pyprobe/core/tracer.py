@@ -277,10 +277,6 @@ class VariableTracer:
             )
             logical_order += 1
 
-            # Debug trace for immediate captures
-            if isinstance(value, np.ndarray) and np.iscomplexobj(value):
-                trace_print(f"IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
-
             batch.append(record)
 
         for anchor in lhs_anchors:

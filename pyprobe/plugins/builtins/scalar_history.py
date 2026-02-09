@@ -116,6 +116,36 @@ class ScalarHistoryWidget(QWidget):
         self._value_label.setText(f"{float_value:.6g}")
         self._update_stats()
 
+    def update_history(self, values: list) -> None:
+        """Replace history with full buffer and redraw."""
+        if not values:
+            return
+
+        converted = []
+        for value in values:
+            try:
+                if isinstance(value, complex):
+                    converted.append(abs(value))
+                elif isinstance(value, np.ndarray) and value.ndim == 0:
+                    converted.append(float(value.item()))
+                else:
+                    converted.append(float(value))
+            except (ValueError, TypeError):
+                return
+
+        self._has_data = True
+        self._history = deque(converted, maxlen=self.DEFAULT_HISTORY_LENGTH)
+        
+        # Update plot
+        self._curve.setData(list(self._history))
+        
+        # Update current value
+        if converted:
+             self._value_label.setText(f"{converted[-1]:.6g}")
+
+        # Update stats
+        self._update_stats()
+
     def _update_stats(self):
         """Update min/max/mean statistics."""
         if not self._history:
