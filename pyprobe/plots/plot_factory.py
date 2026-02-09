@@ -1,12 +1,16 @@
 """
 Factory for creating appropriate plot widgets based on data type.
+
+DEPRECATED: The primary widget creation path now uses PluginRegistry.
+This module is retained as a fallback for edge cases.
 """
 
 from typing import Optional
 from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QColor
 
 from .base_plot import BasePlot
-from .waveform_plot import WaveformPlot
+from ..plugins.builtins.waveform import WaveformWidget
 from .constellation import ConstellationPlot
 from .scalar_history_chart import ScalarHistoryChart
 from ..core.data_classifier import (
@@ -20,22 +24,28 @@ def create_plot(
     var_name: str,
     dtype: str,
     parent: Optional[QWidget] = None
-) -> BasePlot:
+) -> QWidget:
+    """Create a plot widget for the given data type.
+    
+    DEPRECATED: Use PluginRegistry.get_default_plugin() instead.
+    This factory is retained as a fallback for edge cases.
     """
-    """
+    # Default color for fallback widgets (cyan)
+    default_color = QColor('#00ffff')
+    
     if dtype == DTYPE_ARRAY_COMPLEX:
         return ConstellationPlot(var_name, parent)
     elif dtype == DTYPE_ARRAY_1D:
-        return WaveformPlot(var_name, parent)
+        return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_WAVEFORM_REAL:
-        return WaveformPlot(var_name, parent)
+        return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_WAVEFORM_COLLECTION:
-        return WaveformPlot(var_name, parent)
+        return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_ARRAY_COLLECTION:
-        return WaveformPlot(var_name, parent)
+        return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_ARRAY_2D:
         # For now, use waveform plot (flattened) for 2D arrays
-        return WaveformPlot(var_name, parent)
+        return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_SCALAR:
         return ScalarHistoryChart(var_name, parent)
     else:

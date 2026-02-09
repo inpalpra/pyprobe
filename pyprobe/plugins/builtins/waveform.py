@@ -14,6 +14,8 @@ from ...core.data_classifier import (
 )
 from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
+from ...plots.editable_axis import EditableAxisItem
+from ...gui.axis_editor import AxisEditor
 
 # Deterministic color palette for multi-row plots (10 colors, cycling)
 ROW_COLORS = [
@@ -48,6 +50,7 @@ class WaveformWidget(QWidget):
         # M2.5: Axis controller and pin indicator
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
+        self._axis_editor: Optional[AxisEditor] = None
         
         self._setup_ui()
     
@@ -116,6 +119,14 @@ class WaveformWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+        
+        # M2.5: Setup editable axes
+        self._setup_editable_axes()
+        
+        # M2.5: Axis editor (inline text editor)
+        self._axis_editor = AxisEditor(self._plot_widget)
+        self._axis_editor.value_committed.connect(self._on_axis_value_committed)
+        self._axis_editor.editing_cancelled.connect(self._on_axis_edit_cancelled)
     
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         """Handle axis pin state change from AxisController."""
@@ -127,6 +138,79 @@ class WaveformWidget(QWidget):
         """Access the axis controller for external use (e.g., keyboard shortcuts)."""
         return self._axis_controller
     
+    # === Editable Axes ===
+    
+    def _setup_editable_axes(self) -> None:
+        """Replace standard axes with editable ones that support double-click editing."""
+        plot_item = self._plot_widget.getPlotItem()
+
+        # Create editable axes
+        bottom_axis = EditableAxisItem('bottom')
+        left_axis = EditableAxisItem('left')
+
+        # Style them to match probe color
+        axis_pen = pg.mkPen(color=self._color.name(), width=1)
+        bottom_axis.setPen(axis_pen)
+        bottom_axis.setTextPen(axis_pen)
+        left_axis.setPen(axis_pen)
+        left_axis.setTextPen(axis_pen)
+
+        # Replace existing axes
+        plot_item.setAxisItems({'bottom': bottom_axis, 'left': left_axis})
+
+        # Connect edit signals
+        bottom_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('x', 'min', val))
+        bottom_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('x', 'max', val))
+        left_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y', 'min', val))
+        left_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y', 'max', val))
+
+    def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
+        """Start inline editing of an axis min/max value."""
+        if self._axis_editor is None:
+            return
+
+        # Store context for commit
+        self._axis_editor.setProperty('edit_axis', axis)
+        self._axis_editor.setProperty('edit_endpoint', endpoint)
+
+        # Position near the axis
+        if axis == 'x':
+            x = 40 if endpoint == 'min' else self._plot_widget.width() - 60
+            y = self._plot_widget.height() - 20
+        else:
+            x = 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
+
+        self._axis_editor.show_at(x, y, current_value)
+
+    def _on_axis_value_committed(self, value: float) -> None:
+        """Handle axis editor value committed."""
+        axis = self._axis_editor.property('edit_axis')
+        endpoint = self._axis_editor.property('edit_endpoint')
+        plot_item = self._plot_widget.getPlotItem()
+        view_box = plot_item.getViewBox()
+
+        if axis == 'x':
+            current_range = view_box.viewRange()[0]
+            if endpoint == 'min':
+                plot_item.setXRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setXRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('x', True)
+        elif axis == 'y':
+            current_range = view_box.viewRange()[1]
+            if endpoint == 'min':
+                plot_item.setYRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setYRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('y', True)
+
+    def _on_axis_edit_cancelled(self) -> None:
+        """Handle axis editor cancelled. Nothing to do."""
+        pass
+
     def showEvent(self, event) -> None:
         """Trigger layout update when widget is shown."""
         super().showEvent(event)
