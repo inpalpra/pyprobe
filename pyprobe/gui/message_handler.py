@@ -50,6 +50,7 @@ class MessageHandler(QObject):
         self._script_runner = script_runner
         self._tracer = tracer
         self._frame_count = 0
+        self._end_received = False
         
         # Polling timer
         self._poll_timer = QTimer(self)
@@ -122,6 +123,9 @@ class MessageHandler(QObject):
                     {"subprocess_alive": subprocess_alive, "msg_num": messages_this_poll}
                 )
             self._dispatch(msg)
+
+        if self._end_received:
+            self._drain_after_end()
         
         # If subprocess died but we didn't get DATA_SCRIPT_END, that's a bug!
         # But only fire this once by checking is_running
@@ -171,7 +175,7 @@ class MessageHandler(QObject):
                     "DATA_SCRIPT_END", 
                     {"subprocess_alive": proc.is_alive() if proc else False}
                 )
-            self.script_ended.emit()
+            self._end_received = True
 
         elif msg.msg_type == MessageType.DATA_EXCEPTION:
             self.exception_raised.emit(msg.payload)
@@ -181,6 +185,23 @@ class MessageHandler(QObject):
 
         elif msg.msg_type == MessageType.DATA_STDERR:
             pass  # Could display in a console widget
+
+    def _drain_after_end(self) -> None:
+        """Drain remaining messages before emitting script_ended."""
+        ipc = self._script_runner.ipc
+        if ipc is None:
+            return
+
+        for _ in range(200):
+            msg = ipc.receive_data(timeout=0)
+            if msg is None:
+                break
+            if msg.msg_type == MessageType.DATA_SCRIPT_END:
+                continue
+            self._dispatch(msg)
+
+        self._end_received = False
+        self.script_ended.emit()
 
     def _payload_to_record(self, payload: dict) -> Optional[CaptureRecord]:
         """Convert a probe payload dict into a CaptureRecord."""

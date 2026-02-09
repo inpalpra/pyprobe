@@ -293,6 +293,14 @@ class MainWindow(QMainWindow):
                 for panel in self._probe_panels[anchor]:
                     panel.update_from_buffer(buffer)
 
+    def _force_redraw(self) -> None:
+        """Redraw all dirty buffers regardless of throttle."""
+        dirty = self._redraw_throttler.get_dirty_buffers()
+        for anchor, buffer in dirty.items():
+            if anchor in self._probe_panels:
+                for panel in self._probe_panels[anchor]:
+                    panel.update_from_buffer(buffer)
+
     def _setup_script_runner(self):
         """Configure the script runner with callbacks and connect signals."""
         # Connect signals from ScriptRunner
@@ -602,6 +610,9 @@ class MainWindow(QMainWindow):
         logger.debug("_on_script_ended called")
         self._tracer.trace_ipc_received("script_ended signal", {})
         self._status_bar.showMessage("Script finished")
+
+        # Ensure final buffered data is rendered after fast runs
+        self._force_redraw()
         
         # Check loop BEFORE cleanup to decide how to handle
         should_loop = self._control_bar.is_loop_enabled and not self._script_runner.user_stopped
