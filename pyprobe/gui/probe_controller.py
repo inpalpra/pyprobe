@@ -432,6 +432,18 @@ class ProbeController(QObject):
         
         from pyprobe.plugins.builtins.waveform import ROW_COLORS
         
+        def ensure_legend():
+            """Create legend on-demand and add primary curve if needed."""
+            if not hasattr(plot, '_legend') or plot._legend is None:
+                plot._legend = plot._plot_widget.addLegend(
+                    offset=(10, 10),
+                    labelTextColor='#ffffff',
+                    brush=pg.mkBrush('#1a1a1a80')
+                )
+                # Add primary curve(s) to legend
+                if hasattr(plot, '_curves') and plot._curves:
+                    plot._legend.addItem(plot._curves[0], plot._var_name)
+        
         # Check if complex data
         is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
         
@@ -446,12 +458,11 @@ class ProbeController(QObject):
                 color = ROW_COLORS[color_idx % len(ROW_COLORS)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
-                    antialias=False,
-                    name=f"{symbol} (real)"
+                    antialias=False
                 )
                 plot._overlay_curves[real_key] = curve
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, f"{symbol} (real)")
+                ensure_legend()
+                plot._legend.addItem(curve, f"{symbol} (real)")
             
             # Create imag curve if needed
             if imag_key not in plot._overlay_curves:
@@ -459,12 +470,11 @@ class ProbeController(QObject):
                 color = ROW_COLORS[color_idx % len(ROW_COLORS)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine),
-                    antialias=False,
-                    name=f"{symbol} (imag)"
+                    antialias=False
                 )
                 plot._overlay_curves[imag_key] = curve
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, f"{symbol} (imag)")
+                ensure_legend()
+                plot._legend.addItem(curve, f"{symbol} (imag)")
             
             # Update curve data
             real_data = data.real.copy()
@@ -487,13 +497,12 @@ class ProbeController(QObject):
                 
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
-                    antialias=False,
-                    name=symbol
+                    antialias=False
                 )
                 plot._overlay_curves[symbol] = curve
                 
-                if hasattr(plot, '_legend') and plot._legend is not None:
-                    plot._legend.addItem(curve, symbol)
+                ensure_legend()
+                plot._legend.addItem(curve, symbol)
                 logger.debug(f"Created overlay curve for {symbol}")
             
             # Update the curve data

@@ -4,9 +4,9 @@
 
 ## P1 - High Priority
 
-### BUG: Missing plot legends after drag-drop overlay
-- After drag-dropping a variable onto an existing graph, no plot legend is created for the newly added traces.
-- Example: dragging `received_symbols` to `signal_i`'s graph shows real/imag parts plotted, but without corresponding legend entries.
+*No P1 items*
+
+---
 
 ---
 
