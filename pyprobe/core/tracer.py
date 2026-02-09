@@ -258,15 +258,13 @@ class VariableTracer:
 
         # Capture for each matching anchor, batching all captures from this event
         current_time = time.perf_counter()
-        
+
         # Location-based throttle: all anchors on this line share one throttle check
         location_key = (filename, lineno)
         last_capture = self._location_throttle.get(location_key, 0.0)
         elapsed_ms = (current_time - last_capture) * 1000
-        
-        if elapsed_ms < self._location_throttle_ms:
-            return self._trace_func  # Skip ALL anchors on this line
-        
+        is_throttled = elapsed_ms < self._location_throttle_ms
+
         batch = []
         frame_id = id(frame)
 
@@ -276,6 +274,7 @@ class VariableTracer:
                 continue
 
             # If this is an assignment target, defer capture to next line (post-execution)
+            # ALWAYS defer LHS captures even when throttled - we want the final value
             is_assign = getattr(anchor, 'is_assignment', False)
             if is_assign:
                 # Record the current object ID (or None if doesn't exist)
@@ -287,6 +286,10 @@ class VariableTracer:
                 else:
                     old_id = None
                 self._deferred.defer(frame_id, anchor, lineno, old_id)
+                continue
+
+            # For immediate (RHS) captures, respect throttle
+            if is_throttled:
                 continue
 
             # Get the value (check locals first, then globals for module-level vars)
@@ -302,11 +305,11 @@ class VariableTracer:
 
             # Create capture with anchor context
             captured = self._create_anchor_capture(anchor, value, current_time)
-            
+
             # Debug trace for immediate captures
             if isinstance(value, np.ndarray) and np.iscomplexobj(value):
                 trace_print(f"IMMEDIATE CAPTURE: {anchor.symbol} at line {anchor.line}, is_assignment={anchor.is_assignment}, mean={value.mean():.4f}")
-            
+
             batch.append((anchor, captured))
         
         # Update location throttle time if we captured or deferred anything

@@ -80,8 +80,10 @@ class DeferredCaptureManager:
         Returns:
             List of (anchor, captured_variable) tuples ready to send
         """
-        # Only flush on 'line' events - this ensures the previous statement completed
-        if event != 'line':
+        # Flush on 'line' events (normal case) and 'return' events (end of function)
+        # 'return' is critical to capture deferred assignments at the end of loops
+        # where there's no subsequent 'line' event before the frame disappears
+        if event not in ('line', 'return'):
             return []
         
         frame_id = id(frame)
