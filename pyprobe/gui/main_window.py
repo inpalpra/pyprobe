@@ -215,6 +215,11 @@ class MainWindow(QMainWindow):
 
         # M2.5: Dock bar restore
         self._dock_bar.panel_restore_requested.connect(self._on_dock_bar_restore)
+        
+        # M2.5: Layout manager maximize/restore via dock bar
+        lm = self._probe_container.layout_manager
+        lm.panel_park_requested.connect(self._on_panel_park_requested)
+        lm.panel_unpark_requested.connect(self._on_dock_bar_restore_anchor)
 
     def _setup_fps_timer(self):
         """Set up timer for FPS counter."""
@@ -559,6 +564,10 @@ class MainWindow(QMainWindow):
                 logger.debug(f"Panel restored: {anchor_key}")
                 self._status_bar.showMessage(f"Restored: {anchor.symbol}")
                 break
+
+    def _on_dock_bar_restore_anchor(self, anchor: ProbeAnchor) -> None:
+        """Restore a panel from the dock bar by anchor (for layout manager)."""
+        self._on_dock_bar_restore(anchor.identity_label())
 
     def _on_overlay_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
         """Handle overlay drop request - delegate to ProbeController."""

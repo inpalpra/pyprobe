@@ -16,15 +16,20 @@ class LayoutManager(QObject):
     
     Signals:
         layout_changed(bool): Emitted when maximize state changes (True=maximized)
+        panel_park_requested(object): Emitted when a panel should be parked (passes ProbeAnchor)
+        panel_unpark_requested(object): Emitted when a panel should be unparked (passes ProbeAnchor)
     """
     
     layout_changed = pyqtSignal(bool)
+    panel_park_requested = pyqtSignal(object)  # ProbeAnchor
+    panel_unpark_requested = pyqtSignal(object)  # ProbeAnchor
     
     def __init__(self, container: QWidget):
         super().__init__(container)
         self._container = container
         self._maximized_panel: Optional[QWidget] = None
-        self._hidden_panels: list = []
+        self._hidden_panels: list = []  # list of (panel, anchor) tuples
+        self._get_anchor_for_panel = None  # Callback to get anchor from panel
     
     def toggle_maximize(self, panel: QWidget) -> None:
         """Toggle maximize state for a panel.
@@ -33,6 +38,7 @@ class LayoutManager(QObject):
         If another panel is maximized, restore that one and maximize this.
         If none maximized, maximize this panel.
         """
+        print(f"[TRACE] LayoutManager.toggle_maximize called for panel={panel}")
         if self._maximized_panel is panel:
             self.restore()
         elif self._maximized_panel is not None:
@@ -42,42 +48,44 @@ class LayoutManager(QObject):
             self._maximize(panel)
     
     def _maximize(self, panel: QWidget) -> None:
-        """Maximize a single panel, hiding others."""
+        """Maximize a single panel, parking others to dock bar."""
         self._maximized_panel = panel
         self._hidden_panels = []
         
-        # Find all sibling panels in the container's layout
-        layout = self._container.layout()
-        if layout is None:
+        # Get all panels from container's _panels dict (more reliable than layout iteration)
+        panels_dict = getattr(self._container, '_panels', None)
+        if panels_dict is None:
+            logger.warning("Container has no _panels dict, falling back to layout iteration")
             return
         
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            if item is None:
-                continue
-            widget = item.widget()
-            if widget is None:
-                continue
-            if widget is not panel and widget.isVisible():
-                widget.hide()
-                self._hidden_panels.append(widget)
+        print(f"[TRACE] _maximize: iterating {len(panels_dict)} panels from _panels dict")
         
-        logger.debug(f"Maximized panel, hid {len(self._hidden_panels)} others")
+        for anchor, widget in panels_dict.items():
+            print(f"[TRACE] _maximize: panel={anchor.symbol}, is_target={widget is panel}, visible={widget.isVisible()}")
+            if widget is not panel and widget.isVisible():
+                self._hidden_panels.append((widget, anchor))
+                print(f"[TRACE] _maximize: parking {anchor.symbol}")
+                self.panel_park_requested.emit(anchor)
+        
+        logger.debug(f"Maximized panel, parked {len(self._hidden_panels)} others")
         self.layout_changed.emit(True)
     
     def restore(self) -> None:
-        """Restore all panels to grid layout."""
+        """Restore all parked panels from dock bar."""
         if self._maximized_panel is None:
             return
         
-        # Show all hidden panels
-        for widget in self._hidden_panels:
-            widget.show()
+        # Unpark all hidden panels
+        for widget, anchor in self._hidden_panels:
+            if anchor is not None:
+                self.panel_unpark_requested.emit(anchor)
+            else:
+                widget.show()
         
         self._hidden_panels.clear()
         self._maximized_panel = None
         
-        logger.debug("Restored all panels")
+        logger.debug("Restored all panels from dock bar")
         self.layout_changed.emit(False)
     
     @property

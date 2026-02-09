@@ -448,7 +448,7 @@ class ProbePanel(QFrame):
 
     def mouseDoubleClickEvent(self, event) -> None:
         """Toggle maximize on double-click of plot background."""
-        # Only trigger on empty background, not axis/trace areas
+        print(f"[TRACE] ProbePanel.mouseDoubleClickEvent triggered on {self._anchor.symbol}")
         self.maximize_requested.emit()
         event.accept()
 
@@ -545,6 +545,10 @@ class ProbePanel(QFrame):
         elif key == Qt.Key.Key_R:
             if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
                 self._plot.axis_controller.reset()
+        elif key == Qt.Key.Key_M:
+            # M for Maximize toggle
+            print(f"[TRACE] ProbePanel.keyPressEvent: M key pressed on {self._anchor.symbol}")
+            self.maximize_requested.emit()
         elif key == Qt.Key.Key_Escape:
             if self._toolbar:
                 self._toolbar.set_mode(InteractionMode.POINTER)
