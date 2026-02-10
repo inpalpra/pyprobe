@@ -72,6 +72,10 @@ class ProbeController(QObject):
         
         # Probe metadata (lens preferences, dtype, overlay target)
         self._probe_metadata: Dict[ProbeAnchor, dict] = {}
+        
+        # Pending overlay data: buffered when panel._plot is None
+        # Key: id(panel), Value: list of (overlay_key, payload) tuples
+        self._pending_overlays: Dict[int, list] = {}
     
     @property
     def probe_panels(self) -> Dict[ProbeAnchor, List[QWidget]]:
@@ -405,15 +409,30 @@ class ProbeController(QObject):
 
                 # Forward data to this panel's plot as overlay
                 plot = panel._plot
-                if plot is None:
-                    continue
-
-                # Use unique key that includes is_assignment to distinguish LHS/RHS
-                overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
                 # Add overlay data to the waveform or constellation plot
                 from pyprobe.plugins.builtins.waveform import WaveformWidget
                 from pyprobe.plugins.builtins.constellation import ConstellationWidget
+
+                if plot is None or not isinstance(plot, (WaveformWidget, ConstellationWidget)):
+                    # Buffer for later: plot widget not created yet or is still a
+                    # placeholder type (e.g. ScalarHistoryChart) that will be replaced
+                    # once the primary signal's data arrives and determines the final type.
+                    panel_id = id(panel)
+                    if panel_id not in self._pending_overlays:
+                        self._pending_overlays[panel_id] = []
+                    overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
+                    self._pending_overlays[panel_id].append({
+                        'overlay_key': overlay_key,
+                        'value': payload['value'],
+                        'dtype': payload['dtype'],
+                        'shape': payload.get('shape'),
+                    })
+                    logger.debug(f"Buffered overlay data for {anchor.symbol} (plot={type(plot).__name__ if plot else 'None'})")
+                    continue
+
+                # Use unique key that includes is_assignment to distinguish LHS/RHS
+                overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
                 if isinstance(plot, WaveformWidget):
                     self._add_overlay_to_waveform(
@@ -430,7 +449,61 @@ class ProbeController(QObject):
                         payload['value'],
                         payload['dtype'],
                         payload.get('shape')
-                )
+                    )
+    
+    def flush_pending_overlays(self):
+        """
+        Apply any buffered overlay data to panels whose plot widgets now exist.
+        
+        Called after _maybe_redraw() / _force_redraw() which may create plot widgets.
+        """
+        if not self._pending_overlays:
+            return
+        
+        from pyprobe.plugins.builtins.waveform import WaveformWidget
+        from pyprobe.plugins.builtins.constellation import ConstellationWidget
+        
+        flushed_ids = []
+        
+        for panel_list in self._probe_panels.values():
+            for panel in panel_list:
+                panel_id = id(panel)
+                if panel_id not in self._pending_overlays:
+                    continue
+                
+                plot = panel._plot
+                if plot is None:
+                    continue  # Still not ready
+                
+                # Only flush if plot is now a supported overlay target type
+                if not isinstance(plot, (WaveformWidget, ConstellationWidget)):
+                    continue  # Plot still placeholder (e.g. ScalarHistoryChart), keep buffered
+                
+                # Apply all pending overlay data
+                for pending in self._pending_overlays[panel_id]:
+                    if isinstance(plot, WaveformWidget):
+                        self._add_overlay_to_waveform(
+                            plot,
+                            pending['overlay_key'],
+                            pending['value'],
+                            pending['dtype'],
+                            pending['shape']
+                        )
+                    elif isinstance(plot, ConstellationWidget):
+                        self._add_overlay_to_constellation(
+                            plot,
+                            pending['overlay_key'],
+                            pending['value'],
+                            pending['dtype'],
+                            pending['shape']
+                        )
+                    logger.debug(f"Flushed pending overlay: {pending['overlay_key']}")
+                
+                flushed_ids.append(panel_id)
+        
+        # Clean up flushed entries
+        for pid in flushed_ids:
+            del self._pending_overlays[pid]
     
     def _add_overlay_to_waveform(
         self, 

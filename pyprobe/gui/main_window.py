@@ -77,7 +77,8 @@ class MainWindow(QMainWindow):
         watches: Optional[List[str]] = None,
         overlays: Optional[List[str]] = None,
         auto_run: bool = False,
-        auto_quit: bool = False
+        auto_quit: bool = False,
+        auto_quit_timeout: Optional[float] = None
     ):
         super().__init__()
 
@@ -87,6 +88,7 @@ class MainWindow(QMainWindow):
         self._cli_overlays = overlays or []
         self._auto_run = auto_run
         self._auto_quit = auto_quit
+        self._auto_quit_timeout = auto_quit_timeout
         self._runner_process: Optional[mp.Process] = None
         self._ipc: Optional[IPCChannel] = None
         self._is_running = False  # Flag to track if script is running
@@ -120,7 +122,8 @@ class MainWindow(QMainWindow):
         self._setup_script_runner()
         self._setup_message_handler()
         self._setup_fps_timer()
-        
+        self._setup_auto_quit_timeout()
+
         # Initialize ProbeController (after UI setup)
         self._probe_controller = ProbeController(
             registry=self._probe_registry,
@@ -395,6 +398,21 @@ class MainWindow(QMainWindow):
         self._fps_timer.timeout.connect(self._update_fps)
         self._fps_timer.setInterval(1000)  # Every second
 
+    def _setup_auto_quit_timeout(self):
+        """Set up timeout timer for forced auto-quit."""
+        if self._auto_quit_timeout is not None:
+            timeout_ms = int(self._auto_quit_timeout * 1000)
+            logger.info(f"Auto-quit timeout set to {self._auto_quit_timeout} seconds")
+            QTimer.singleShot(timeout_ms, self._force_quit)
+
+    def _force_quit(self):
+        """Force quit the application due to timeout."""
+        logger.info("Auto-quit timeout reached, forcing application exit")
+        self._export_plot_data()
+        sys.stderr.flush()
+        sys.stdout.flush()
+        os._exit(0)
+
     def _setup_message_handler(self):
         """Connect MessageHandler signals to slots."""
         self._message_handler.probe_record.connect(self._on_probe_record)
@@ -446,6 +464,9 @@ class MainWindow(QMainWindow):
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
                     panel.update_from_buffer(buffer)
+        
+        # Flush any pending overlay data now that plot widgets may exist
+        self._probe_controller.flush_pending_overlays()
 
     def _force_redraw(self) -> None:
         """Redraw all dirty buffers regardless of throttle."""
@@ -454,6 +475,9 @@ class MainWindow(QMainWindow):
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
                     panel.update_from_buffer(buffer)
+        
+        # Flush any pending overlay data now that plot widgets may exist
+        self._probe_controller.flush_pending_overlays()
 
     def _setup_script_runner(self):
         """Configure the script runner with callbacks and connect signals."""
@@ -863,17 +887,30 @@ class MainWindow(QMainWindow):
     def _export_plot_data(self) -> None:
         """
         Export plot data from all probe panels for test verification.
-        
+
         Outputs JSON lines to stderr in format:
         PLOT_DATA:{"symbol": "x", "y": [9, 8, 7]}
-        
+
         For constellation data (complex arrays):
         PLOT_DATA:{"symbol": "x", "real": [...], "imag": [...], "mean_real": 0.1, "mean_imag": -0.2}
-        
+
         For waveform with overlays (list of curve dicts):
         PLOT_DATA:{"symbol": "x", "curves": [{"name": "x", "y": [...], "is_overlay": false}, ...]}
         """
         import json
+        import numpy as np
+
+        class NumpyEncoder(json.JSONEncoder):
+            """JSON encoder that handles numpy types."""
+            def default(self, obj):
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                if isinstance(obj, np.floating):
+                    return float(obj)
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                return super().default(obj)
+
         for anchor, panel_list in self._probe_panels.items():
             for panel in panel_list:
                 plot_data = panel.get_plot_data()
@@ -904,7 +941,7 @@ class MainWindow(QMainWindow):
                         export_record['mean_real'] = plot_data.get('mean_real', 0.0)
                         export_record['mean_imag'] = plot_data.get('mean_imag', 0.0)
                         export_record['history_count'] = plot_data.get('history_count', 0)
-                print(f"PLOT_DATA:{json.dumps(export_record)}", file=sys.stderr)
+                print(f"PLOT_DATA:{json.dumps(export_record, cls=NumpyEncoder)}", file=sys.stderr)
 
     # === M2.5: Park / Restore / Overlay ===
 

@@ -15,19 +15,18 @@ without requiring GUI mouse interaction.
 
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
 import unittest
-from typing import Dict, List, Optional
+from typing import Dict
 
 
 def run_pyprobe_with_overlay(
     script_path: str,
     probe_spec: str,
     overlay_spec: str,
-    timeout: int = 25,
+    timeout: int = 10,
 ) -> Dict:
     """
     Run pyprobe with a probe and an overlay, return captured PLOT_DATA.
@@ -46,7 +45,7 @@ def run_pyprobe_with_overlay(
     cmd = [
         python_exe, "-m", "pyprobe",
         "--auto-run",
-        "--auto-quit",
+        "--auto-quit-timeout", str(timeout),
         "--loglevel", "WARNING",
         "--probe", probe_spec,
         "--overlay", overlay_spec,
@@ -62,7 +61,7 @@ def run_pyprobe_with_overlay(
             stderr=tmp_out,
             text=True,
             env=env,
-            timeout=timeout,
+            timeout=timeout + 10,
         )
         
         tmp_out.seek(0)
@@ -71,31 +70,28 @@ def run_pyprobe_with_overlay(
     if result.returncode != 0:
         raise RuntimeError(f"PyProbe failed with code {result.returncode}:\n{output}")
     
-    # Parse PLOT_DATA lines from output
-    matches = re.findall(r'PLOT_DATA:(\{.*?\})', output)
-    
-    # Also try multi-line JSON (curves array may span)
-    # Use a more permissive regex for JSON with nested arrays
-    matches_full = re.findall(r'PLOT_DATA:(\{[^}]*"curves":\s*\[.*?\]\})', output, re.DOTALL)
-    
-    all_matches = matches_full if matches_full else matches
-    
-    for match in all_matches:
+    # Parse PLOT_DATA lines from output (each is a single line of JSON)
+    for line in output.splitlines():
+        if not line.startswith('PLOT_DATA:'):
+            continue
+        json_str = line[len('PLOT_DATA:'):]
         try:
-            data = json.loads(match)
-            # Return the first match that has curves (overlay data)
+            data = json.loads(json_str)
             if 'curves' in data:
                 return data
         except json.JSONDecodeError:
             continue
-    
-    # Fallback: return first match if any
-    for match in matches:
+
+    # Fallback: return first parseable PLOT_DATA if none had curves
+    for line in output.splitlines():
+        if not line.startswith('PLOT_DATA:'):
+            continue
+        json_str = line[len('PLOT_DATA:'):]
         try:
-            return json.loads(match)
+            return json.loads(json_str)
         except json.JSONDecodeError:
             continue
-    
+
     return {}
 
 

@@ -32,6 +32,12 @@ def main():
         help="Automatically quit the application when the script finishes"
     )
     parser.add_argument(
+        "--auto-quit-timeout",
+        type=float,
+        default=None,
+        help="Force quit after specified seconds, even if errors prevent normal auto-quit (default: infinite)"
+    )
+    parser.add_argument(
         "-p", "--probe",
         action="append",
         help="Add graphical probe. Format: line:symbol:instance (e.g., 4:x:1)"
@@ -96,7 +102,8 @@ def main():
         watches=args.watch,
         overlays=args.overlay,
         auto_run=args.auto_run,
-        auto_quit=args.auto_quit
+        auto_quit=args.auto_quit,
+        auto_quit_timeout=args.auto_quit_timeout
     ))
 
 

@@ -38,7 +38,8 @@ def run_app(
     watches: Optional[List[str]] = None,
     overlays: Optional[List[str]] = None,
     auto_run: bool = False,
-    auto_quit: bool = False
+    auto_quit: bool = False,
+    auto_quit_timeout: Optional[float] = None
 ) -> int:
     """Run the PyProbe application."""
     app = create_app()
@@ -49,7 +50,8 @@ def run_app(
         watches=watches,
         overlays=overlays,
         auto_run=auto_run,
-        auto_quit=auto_quit
+        auto_quit=auto_quit,
+        auto_quit_timeout=auto_quit_timeout
     )
     window.show()
 
