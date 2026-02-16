@@ -75,3 +75,10 @@ except Exception as e:
 
 print("Script finished.")
 tracer.stop()
+
+
+--- 
+
+LIVE reload upon edit saved
+save and load?
+python decoration for probing?
