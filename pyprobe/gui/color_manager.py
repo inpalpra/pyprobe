@@ -67,6 +67,35 @@ class ColorManager:
         self._assignments[anchor] = color_index
         return self.PALETTE[color_index]
 
+    def reserve_color(self, anchor: ProbeAnchor, color: QColor) -> None:
+        """
+        Manually assign a specific color to an anchor, useful when loading saved presets.
+        Tries to match it with the standard palette to remove it from the pool.
+        """
+        if anchor in self._assignments:
+            self._assignments.move_to_end(anchor)
+            return
+
+        # Find if this exact color string exists in the palette pool
+        color_hex = color.name().lower()
+        matched_index = -1
+        for idx in self._available_indices:
+            if self.PALETTE[idx].name().lower() == color_hex:
+                matched_index = idx
+                break
+                
+        if matched_index >= 0:
+            # We found it in the pool, reserve it properly
+            self._available_indices.remove(matched_index)
+            self._assignments[anchor] = matched_index
+        else:
+            # Color is either custom or already assigned to someone else.
+            # We'll just append this new custom color to the end of the palette
+            # and act like it's a standard one.
+            new_idx = len(self.PALETTE)
+            self.PALETTE.append(color)
+            self._assignments[anchor] = new_idx
+
     def release_color(self, anchor: ProbeAnchor) -> None:
         """Release color when probe is removed, making it available for reuse."""
         if anchor in self._assignments:

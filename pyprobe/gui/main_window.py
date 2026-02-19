@@ -46,6 +46,11 @@ from .probe_controller import ProbeController
 from .scalar_watch_window import ScalarWatchSidebar
 from .redraw_throttler import RedrawThrottler
 
+# === PERSISTENCE IMPORTS ===
+from ..core.probe_persistence import (
+    load_probe_settings, save_probe_settings, ProbeSettings, ProbeSpec, WatchSpec, OverlaySpec
+)
+
 
 class MainWindow(QMainWindow):
     """
@@ -155,28 +160,56 @@ class MainWindow(QMainWindow):
         if not self._script_path:
             return
 
-        def parse_target(target_str: str) -> tuple[int, str, int]:
-            # Format: line:symbol[:instance]
+        def parse_target(target_str: str) -> dict:
+            # Formats:
+            # 1. line:symbol (instance=1, color=None, lens=None)
+            # 2. line:symbol:instance (color=None, lens=None)
+            # 3. line:symbol:color (instance=1, lens=None)
+            # 4. line:symbol:color:lens (instance=1)
             parts = target_str.split(':')
             if len(parts) >= 2:
                 try:
-                    line = int(parts[0])
-                    symbol = parts[1]
-                    instance = int(parts[2]) if len(parts) > 2 else 1
-                    return line, symbol, instance
+                    result = {
+                        "line": int(parts[0]),
+                        "symbol": parts[1],
+                        "instance": 1,
+                        "color": None,
+                        "lens": None
+                    }
+                    if len(parts) == 3:
+                        # Could be instance (int) or color (hex/name)
+                        try:
+                            result["instance"] = int(parts[2])
+                        except ValueError:
+                            result["color"] = parts[2]
+                    elif len(parts) >= 4:
+                        result["color"] = parts[2]
+                        result["lens"] = parts[3]
+                    return result
                 except ValueError:
                     pass
-            logger.warning(f"Invalid probe format: {target_str}. Expected line:symbol[:instance]")
+            logger.warning(f"Invalid probe format: {target_str}")
             return None
 
+        # Deduplicate CLI lists (tests might append same probes as loaded sidecars)
+        self._cli_probes = list(dict.fromkeys(self._cli_probes))
+        self._cli_watches = list(dict.fromkeys(self._cli_watches))
+        self._cli_overlays = list(dict.fromkeys(self._cli_overlays))
+
         # Process graphical probes
+        seen_probe_locs = set()
         for probe_str in self._cli_probes:
             target = parse_target(probe_str)
             if not target:
                 continue
             
-            line, symbol, instance = target
-            logger.debug(f"Processing CLI probe: {symbol} at line {line}, instance {instance}")
+            line = target["line"]
+            symbol = target["symbol"]
+            instance = target["instance"]
+            color_str = target["color"]
+            lens_str = target["lens"]
+            
+            logger.debug(f"Processing CLI probe: {symbol} at line {line}")
             
             # Find variable instance
             vars_on_line = self._code_viewer.ast_locator.get_all_variables_on_line(line)
@@ -185,6 +218,12 @@ class MainWindow(QMainWindow):
             
             if 1 <= instance <= len(matches):
                 var_loc = matches[instance - 1]
+                
+                # Deduplicate by line/col immediately to prevent doubling
+                if (line, var_loc.col_start) in seen_probe_locs:
+                    continue
+                seen_probe_locs.add((line, var_loc.col_start))
+                
                 # Create anchor
                 func_name = self._code_viewer.ast_locator.get_enclosing_function(line) or ""
                 anchor = ProbeAnchor(
@@ -195,7 +234,21 @@ class MainWindow(QMainWindow):
                     func=func_name,
                     is_assignment=var_loc.is_lhs
                 )
+                
+                # Apply color mapping if specified
+                if color_str:
+                    logger.debug(f"Reserving color {color_str} for {symbol}")
+                    color = QColor(color_str)
+                    if color.isValid():
+                        self._probe_registry._color_manager.reserve_color(anchor, color)
+                
+                # Add probe
                 self._on_probe_requested(anchor)
+                
+                # Apply lens if specified
+                if lens_str and anchor in self._probe_controller._probe_metadata:
+                    self._probe_controller._probe_metadata[anchor]['lens'] = lens_str
+                    
                 logger.info(f"Added CLI probe for {symbol} at {line}:{var_loc.col_start}")
             else:
                 logger.warning(f"Could not find instance {instance} of {symbol} on line {line}")
@@ -206,7 +259,9 @@ class MainWindow(QMainWindow):
             if not target:
                 continue
             
-            line, symbol, instance = target
+            line = target["line"]
+            symbol = target["symbol"]
+            instance = target["instance"]
             logger.debug(f"Processing CLI watch: {symbol} at line {line}, instance {instance}")
             
             # Find variable instance
@@ -367,17 +422,23 @@ class MainWindow(QMainWindow):
 
         # Scalar watch sidebar
         self._scalar_watch_sidebar.scalar_removed.connect(self._on_watch_scalar_removed)
+        self._scalar_watch_sidebar.scalar_removed.connect(self._save_probe_settings)
 
         # === M1: Code viewer signals ===
         self._code_viewer.probe_requested.connect(self._on_probe_requested)
         self._code_viewer.probe_removed.connect(self._on_probe_remove_requested)
         self._code_viewer.watch_probe_requested.connect(self._on_watch_probe_requested)
+        
+        # Connect addition signals for autosave
+        self._code_viewer.probe_requested.connect(self._save_probe_settings)
+        self._code_viewer.watch_probe_requested.connect(self._save_probe_settings)
 
         # === M1: File watcher signals ===
         self._file_watcher.file_changed.connect(self._on_file_changed)
 
         # === M1: Probe registry signals ===
         self._probe_registry.probe_state_changed.connect(self._on_probe_state_changed)
+        self._probe_registry.probe_state_changed.connect(self._save_probe_settings)
 
         # Internal signals (for thread-safe GUI updates)
         self.variable_received.connect(self._on_variable_data)
@@ -594,6 +655,8 @@ class MainWindow(QMainWindow):
         self._file_watcher.watch_file(path)
         self._last_source_content = self._code_viewer.toPlainText()
 
+        self._load_probe_settings()
+
         # Process CLI probes and overlays after loading
         self._process_cli_probes()
         self._process_cli_overlays()
@@ -601,6 +664,80 @@ class MainWindow(QMainWindow):
         # Auto-run if requested
         if self._auto_run:
             QTimer.singleShot(500, self._on_run_script)
+
+    def _load_probe_settings(self):
+        """Load probe settings from the sidecar file."""
+        if not self._script_path:
+            return
+            
+        settings = load_probe_settings(self._script_path)
+        
+        # Load probes
+        for p in settings.probes:
+            # Format: line:symbol or line:symbol:color or line:symbol:color:lens
+            # We construct a cli string to reuse existing parsing logic
+            cli_str = f"{p.line}:{p.symbol}"
+            if p.color:
+                cli_str += f":{p.color}"
+                if p.lens:
+                    cli_str += f":{p.lens}"
+            self._cli_probes.append(cli_str)
+            
+        # Load watches
+        for w in settings.watches:
+            self._cli_watches.append(f"{w.line}:{w.symbol}")
+            
+        # Load overlays
+        for o in settings.overlays:
+            self._cli_overlays.append(f"{o.target.symbol}:{o.overlay.line}:{o.overlay.symbol}:1")
+            
+        logger.info(f"Loaded {len(settings.probes)} probes from sidecar")
+
+    @pyqtSlot()
+    def _save_probe_settings(self):
+        """Save current probe settings to the sidecar file."""
+        if not self._script_path:
+            return
+            
+        settings = ProbeSettings()
+        
+        # Save active probes from registry
+        for anchor in self._probe_registry.active_anchors:
+            spec = ProbeSpec.from_anchor(anchor)
+            
+            # Extract color
+            color = self._probe_registry.get_color(anchor)
+            if color:
+                spec.color = color.name()
+                
+            # Extract lens if available in controller metadata
+            if hasattr(self, '_probe_controller') and anchor in self._probe_controller._probe_metadata:
+                metadata = self._probe_controller._probe_metadata[anchor]
+                # Only save active probes (not purely overlay sources)
+                if metadata.get('overlay_target') is not None:
+                    continue
+                spec.lens = metadata.get('lens')
+                
+            settings.probes.append(spec)
+            
+        # Save watches from sidebar
+        for anchor in self._scalar_watch_sidebar.get_watched_anchors():
+            settings.watches.append(WatchSpec.from_anchor(anchor))
+            
+        # Save overlays from probe controller panels
+        if hasattr(self, '_probe_controller'):
+            for target_anchor, panel_list in self._probe_controller._probe_panels.items():
+                if not panel_list:
+                    continue
+                target_panel = panel_list[-1]
+                if hasattr(target_panel, '_overlay_anchors'):
+                    for overlay_anchor in target_panel._overlay_anchors:
+                        settings.overlays.append(OverlaySpec(
+                            target=ProbeSpec.from_anchor(target_anchor),
+                            overlay=ProbeSpec.from_anchor(overlay_anchor)
+                        ))
+                        
+        save_probe_settings(self._script_path, settings)
 
     @pyqtSlot()
     def _on_action_clicked(self):
