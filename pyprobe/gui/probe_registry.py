@@ -177,3 +177,8 @@ class ProbeRegistry(QObject):
     def is_full(self) -> bool:
         """Check if registry is at capacity (no colors available)."""
         return self._color_manager.is_full()
+
+    def clear(self) -> None:
+        """Remove all probes and release all colors."""
+        for anchor in list(self._probes.keys()):
+            self.remove_probe(anchor)

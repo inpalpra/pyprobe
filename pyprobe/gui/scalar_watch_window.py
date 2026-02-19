@@ -224,3 +224,8 @@ class ScalarWatchSidebar(QWidget):
     def get_watched_anchors(self) -> list:
         """Get all watched anchors."""
         return list(self._scalars.keys())
+
+    def clear(self) -> None:
+        """Remove all watched scalars."""
+        for anchor in list(self._scalars.keys()):
+            self._remove_scalar(anchor)

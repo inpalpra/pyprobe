@@ -45,6 +45,7 @@ from .message_handler import MessageHandler
 from .probe_controller import ProbeController
 from .scalar_watch_window import ScalarWatchSidebar
 from .redraw_throttler import RedrawThrottler
+from .file_tree import FileTreePanel
 
 # === PERSISTENCE IMPORTS ===
 from ..core.probe_persistence import (
@@ -88,6 +89,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._script_path: Optional[str] = script_path
+        self._folder_path: Optional[str] = None
         self._cli_probes = probes or []
         self._cli_watches = watches or []
         self._cli_overlays = overlays or []
@@ -365,6 +367,11 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_vlayout.addWidget(splitter)
 
+        # === File tree panel (hidden until folder opened) ===
+        self._file_tree = FileTreePanel()
+        self._file_tree.setVisible(False)
+        splitter.addWidget(self._file_tree)
+
         # === M1: Code viewer with gutter (replaces watch list) ===
         code_container = QWidget()
         code_layout = QHBoxLayout(code_container)
@@ -390,7 +397,7 @@ class MainWindow(QMainWindow):
         
         # Store reference to splitter for resizing
         self._main_splitter = splitter
-        splitter.setSizes([400, 800, 0])  # Sidebar starts collapsed
+        splitter.setSizes([0, 400, 800, 0])  # Tree hidden, sidebar collapsed
 
         # M2.5: Dock bar at bottom (hidden when empty)
         self._dock_bar = DockBar(self)
@@ -413,12 +420,14 @@ class MainWindow(QMainWindow):
     def _setup_signals(self):
         """Connect signals and slots."""
         # Control bar signals
-        # Control bar signals
         self._control_bar.open_clicked.connect(self._on_open_script)
+        self._control_bar.open_folder_clicked.connect(self._on_open_folder)
         self._control_bar.action_clicked.connect(self._on_action_clicked)
-        # self._control_bar.pause_clicked.connect(self._on_pause_script) # Removed
         self._control_bar.stop_clicked.connect(self._on_stop_script)
         self._control_bar.watch_clicked.connect(self._on_toggle_watch_window)
+
+        # File tree signals
+        self._file_tree.file_selected.connect(self._on_file_tree_selected)
 
         # Scalar watch sidebar
         self._scalar_watch_sidebar.scalar_removed.connect(self._on_watch_scalar_removed)
@@ -635,14 +644,67 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_open_script(self):
         """Open file dialog to select a Python script."""
+        start_dir = self._folder_path or ""
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Python Script",
-            "",
+            start_dir,
             "Python Files (*.py);;All Files (*)"
         )
         if path:
             self._load_script(path)
+            if self._folder_path:
+                self._file_tree.highlight_file(path)
+
+    def _on_open_folder(self):
+        """Open folder dialog for folder browsing."""
+        folder = QFileDialog.getExistingDirectory(self, "Open Folder", "")
+        if folder:
+            self._load_folder(folder)
+
+    def _load_folder(self, folder_path: str):
+        """Load a folder into the file tree panel."""
+        self._folder_path = os.path.abspath(folder_path)
+        self._file_tree.set_root(self._folder_path)
+        self._file_tree.setVisible(True)
+        # Resize splitter to show tree
+        sizes = self._main_splitter.sizes()
+        sizes[0] = 200  # file tree width
+        self._main_splitter.setSizes(sizes)
+        self._status_bar.showMessage(f"Opened folder: {os.path.basename(folder_path)}")
+
+    def _on_file_tree_selected(self, file_path: str):
+        """Handle file selection from file tree."""
+        if file_path == self._script_path:
+            return  # already loaded
+        self._clear_all_probes()
+        self._load_script(file_path)
+        self._file_tree.highlight_file(file_path)
+
+    def _clear_all_probes(self):
+        """Remove all active probes for clean file switching."""
+        # Save current probes first
+        self._save_probe_settings()
+
+        # Remove all probe panels (skip animation for bulk clear)
+        for anchor in list(self._probe_panels.keys()):
+            for panel in list(self._probe_panels.get(anchor, [])):
+                self._probe_container.remove_probe_panel(panel=panel)
+            self._code_viewer.remove_probe(anchor)
+            self._code_gutter.clear_probed_line(anchor.line)
+        self._probe_controller._probe_panels.clear()
+        self._probe_controller._probe_metadata.clear()
+
+        # Clear registry
+        self._probe_registry.clear()
+
+        # Clear scalar watch sidebar
+        self._scalar_watch_sidebar.clear()
+
+        # Reset CLI probe lists (will be re-populated from sidecar)
+        self._cli_probes = []
+        self._cli_watches = []
+        self._cli_overlays = []
 
     def _load_script(self, path: str):
         """Load a script file."""

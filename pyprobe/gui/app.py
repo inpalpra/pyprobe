@@ -34,6 +34,7 @@ def create_app() -> QApplication:
 
 def run_app(
     script_path: str = None,
+    folder_path: str = None,
     probes: Optional[List[str]] = None,
     watches: Optional[List[str]] = None,
     overlays: Optional[List[str]] = None,
@@ -53,6 +54,8 @@ def run_app(
         auto_quit=auto_quit,
         auto_quit_timeout=auto_quit_timeout
     )
+    if folder_path:
+        window._load_folder(folder_path)
     window.show()
 
     return app.exec()

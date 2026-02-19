@@ -8,6 +8,7 @@ Usage:
 """
 
 import sys
+import os
 import argparse
 
 
@@ -95,9 +96,17 @@ def main():
     # Import here to avoid slow startup for --help
     from .gui.app import run_app
 
+    # Auto-detect file vs. folder
+    script_path = args.script
+    folder_path = None
+    if script_path and os.path.isdir(script_path):
+        folder_path = os.path.abspath(script_path)
+        script_path = None
+
     # Run the application
     sys.exit(run_app(
-        script_path=args.script,
+        script_path=script_path,
+        folder_path=folder_path,
         probes=args.probe,
         watches=args.watch,
         overlays=args.overlay,

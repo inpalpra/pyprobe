@@ -4,7 +4,7 @@ Control bar with Run/Pause/Stop buttons and script selection.
 
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QToolBar, QToolButton, QWidget, QLabel, QHBoxLayout
+    QToolBar, QToolButton, QWidget, QLabel, QHBoxLayout, QMenu
 )
 from PyQt6.QtCore import pyqtSignal, QTimer
 
@@ -16,6 +16,7 @@ class ControlBar(QToolBar):
 
     # Signals
     open_clicked = pyqtSignal()
+    open_folder_clicked = pyqtSignal()
     action_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
     watch_clicked = pyqtSignal()  # Toggle scalar watch window
@@ -40,11 +41,18 @@ class ControlBar(QToolBar):
         """Create the toolbar UI."""
         self.setMovable(False)
 
-        # Open button
+        # Open button with dropdown menu
         self._open_btn = QToolButton()
         self._open_btn.setText("Open")
-        self._open_btn.setToolTip("Open Python script (Ctrl+O)")
-        self._open_btn.clicked.connect(self.open_clicked.emit)
+        self._open_btn.setToolTip("Open file or folder")
+        self._open_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        
+        open_menu = QMenu(self._open_btn)
+        open_file_action = open_menu.addAction("Open File...\tCtrl+O")
+        open_folder_action = open_menu.addAction("Open Folder...\tCtrl+Shift+O")
+        open_file_action.triggered.connect(self.open_clicked.emit)
+        open_folder_action.triggered.connect(self.open_folder_clicked.emit)
+        self._open_btn.setMenu(open_menu)
         self.addWidget(self._open_btn)
 
         self.addSeparator()
