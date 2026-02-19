@@ -4,6 +4,9 @@ numpy>=1.24.0
 pytest>=9.0.2
 matplotlib>=3.10.8
 scipy>=1.15.3
+pytest-qt>=4.5.0
+pytest-xdist>=3.8.0
+pytest-forked>=1.6.0
 
 [dev]
 pytest>=7.0.0

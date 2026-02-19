@@ -105,6 +105,12 @@ class AxisEditor(QLineEdit):
     
     def _cancel(self) -> None:
         """Cancel editing and hide."""
-        self.hide()
-        logger.debug("AxisEditor cancelled")
-        self.editing_cancelled.emit()
+        if getattr(self, '_is_canceling', False) or not self.isVisible():
+            return
+        self._is_canceling = True
+        try:
+            self.hide()
+            logger.debug("AxisEditor cancelled")
+            self.editing_cancelled.emit()
+        finally:
+            self._is_canceling = False

@@ -33,6 +33,7 @@ pyprobe/gui/code_viewer.py
 pyprobe/gui/color_manager.py
 pyprobe/gui/constrained_viewbox.py
 pyprobe/gui/control_bar.py
+pyprobe/gui/debug_overlay.py
 pyprobe/gui/dock_bar.py
 pyprobe/gui/drag_helpers.py
 pyprobe/gui/file_watcher.py
@@ -62,8 +63,10 @@ pyprobe/plots/__init__.py
 pyprobe/plots/axis_controller.py
 pyprobe/plots/base_plot.py
 pyprobe/plots/constellation.py
+pyprobe/plots/draw_mode.py
 pyprobe/plots/editable_axis.py
 pyprobe/plots/pin_indicator.py
+pyprobe/plots/pin_layout_mixin.py
 pyprobe/plots/plot_factory.py
 pyprobe/plots/scalar_display.py
 pyprobe/plots/scalar_history_chart.py
@@ -81,6 +84,7 @@ tests/test_axis_editor.py
 tests/test_capture_pipeline.py
 tests/test_cli_automation.py
 tests/test_code_viewer_highlight.py
+tests/test_color_manager.py
 tests/test_constellation_verify.py
 tests/test_dock_bar.py
 tests/test_e2e_capture_pipeline.py
@@ -89,4 +93,5 @@ tests/test_layout_manager.py
 tests/test_overlay_drag_drop_single_frame.py
 tests/test_overlay_drag_drop_two_frames.py
 tests/test_plot_toolbar.py
+tests/test_plugin_registry.py
 tests/test_signal_overlay.py

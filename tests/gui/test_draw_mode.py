@@ -72,7 +72,10 @@ class TestWaveformDrawMode:
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_default_draw_mode_is_line(self, waveform):
         """Initial draw mode is LINE."""
@@ -148,7 +151,10 @@ class TestComplexRIDrawMode:
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_series_keys(self, ri_widget):
         assert ri_widget.series_keys == ['Real', 'Imag']
@@ -180,7 +186,10 @@ class TestComplexMADrawMode:
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_series_keys(self, ma_widget):
         assert ma_widget.series_keys == ['Log Mag', 'Phase']
@@ -203,7 +212,10 @@ class TestSingleCurveDrawMode:
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_series_keys(self, single_widget):
         assert single_widget.series_keys == ['Log Mag (dB)']

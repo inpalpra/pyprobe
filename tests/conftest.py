@@ -14,14 +14,7 @@ from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.capture_record import CaptureRecord
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Session-scoped QApplication — shared by all tests."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
-
+# Replaced by pytest-qt's built-in `qapp` fixture
 
 @pytest.fixture
 def sample_anchor():

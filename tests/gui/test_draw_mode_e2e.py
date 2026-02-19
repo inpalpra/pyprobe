@@ -113,7 +113,10 @@ class TestWaveformE2E:
         qapp.processEvents()
         w.update_data(real_data, DTYPE_ARRAY_1D)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         """Widget starts in LINE mode with data on curve."""
@@ -172,7 +175,10 @@ class TestWaveform2DE2E:
         ])
         w.update_data(data, DTYPE_ARRAY_2D, shape=data.shape)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_two_curves_exist(self, widget):
         assert len(widget._curves) == 2
@@ -214,7 +220,10 @@ class TestComplexRIE2E:
         w.show()
         w.update_data(complex_data)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         _assert_mode(widget._real_curve, DrawMode.LINE)
@@ -279,7 +288,10 @@ class TestComplexMAE2E:
         w.show()
         w.update_data(complex_data)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         _assert_mode(widget._mag_curve, DrawMode.LINE)
@@ -331,7 +343,10 @@ class _SingleCurvePluginMixin:
         w.show()
         plugin.update(w, complex_data, DTYPE_ARRAY_COMPLEX)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_is_single_curve(self, widget):
         assert isinstance(widget, SingleCurveWidget)
@@ -406,7 +421,10 @@ class TestWaveformPluginE2E:
         w.show()
         plugin.update(w, real_data, DTYPE_ARRAY_1D)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         _assert_mode(widget._curves[0], DrawMode.LINE)
@@ -450,7 +468,10 @@ class TestComplexRIPluginE2E:
         w.show()
         plugin.update(w, complex_data, DTYPE_ARRAY_COMPLEX)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         _assert_mode(widget._real_curve, DrawMode.LINE)
@@ -487,7 +508,10 @@ class TestComplexMAPluginE2E:
         w.show()
         plugin.update(w, complex_data, DTYPE_ARRAY_COMPLEX)
         qapp.processEvents()
-        return w
+        yield w
+        w.hide()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_initial_line(self, widget):
         _assert_mode(widget._mag_curve, DrawMode.LINE)

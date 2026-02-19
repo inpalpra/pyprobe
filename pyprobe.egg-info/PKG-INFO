@@ -23,6 +23,9 @@ Requires-Dist: numpy>=1.24.0
 Requires-Dist: pytest>=9.0.2
 Requires-Dist: matplotlib>=3.10.8
 Requires-Dist: scipy>=1.15.3
+Requires-Dist: pytest-qt>=4.5.0
+Requires-Dist: pytest-xdist>=3.8.0
+Requires-Dist: pytest-forked>=1.6.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-qt>=4.0.0; extra == "dev"

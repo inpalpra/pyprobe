@@ -1,0 +1,16 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/high_freq.py",
+      "line": 8,
+      "col": 8,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}
