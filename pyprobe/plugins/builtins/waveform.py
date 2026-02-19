@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QRectF
 
+from ...plots.pin_layout_mixin import PinLayoutMixin
+
 from ..base import ProbePlugin
 from ...core.data_classifier import (
     DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_ARRAY_COMPLEX,
@@ -32,7 +34,7 @@ ROW_COLORS = [
 ]
 
 
-class WaveformWidget(QWidget):
+class WaveformWidget(PinLayoutMixin, QWidget):
     """The actual plot widget created by WaveformPlugin."""
     
     MAX_DISPLAY_POINTS = 5000
@@ -211,40 +213,7 @@ class WaveformWidget(QWidget):
         """Handle axis editor cancelled. Nothing to do."""
         pass
 
-    def showEvent(self, event) -> None:
-        """Trigger layout update when widget is shown."""
-        super().showEvent(event)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(0, self._update_pin_layout)
 
-    def resizeEvent(self, event) -> None:
-        """Reposition pin indicator buttons on resize."""
-        super().resizeEvent(event)
-        self._update_pin_layout()
-
-    def _update_pin_layout(self) -> None:
-        """Update the position of pin indicators."""
-        if self._pin_indicator and self._plot_widget:
-            # Resize indicator overlay to cover full widget
-            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
-            
-            plot_item = self._plot_widget.getPlotItem()
-            
-            def get_mapped_rect(item):
-                scene_rect = item.sceneBoundingRect()
-                view_poly = self._plot_widget.mapFromScene(scene_rect)
-                view_rect = view_poly.boundingRect()
-                # Map top-left to self (WaveformWidget) coordinates
-                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
-                return QRectF(
-                    float(tl_mapped.x()), float(tl_mapped.y()),
-                    view_rect.width(), view_rect.height()
-                )
-
-            view_rect = get_mapped_rect(plot_item.getViewBox())
-            
-            self._pin_indicator.update_layout(view_rect)
-            self._pin_indicator.raise_()
         
     def _get_row_color(self, row_index: int) -> str:
         """Get deterministic color for row index (cycles after 10)."""

@@ -146,16 +146,24 @@ class ScalarHistoryWidget(QWidget):
         # Update stats
         self._update_stats()
 
+    def clear_history(self):
+        """Clear the history buffer and reset the display."""
+        self._history.clear()
+        self._curve.setData([])
+        self._value_label.setText("--")
+        self._stats_label.setText("Min: -- | Max: -- | Mean: --")
+        self._has_data = False
+
     def _update_stats(self):
         """Update min/max/mean statistics."""
         if not self._history:
             return
-        
+
         data = np.array(self._history)
         min_val = np.min(data)
         max_val = np.max(data)
         mean_val = np.mean(data)
-        
+
         self._stats_label.setText(f"Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}")
 
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:

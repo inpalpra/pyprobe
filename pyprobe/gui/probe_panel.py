@@ -57,6 +57,7 @@ class ProbePanel(QFrame):
         self._lens_dropdown: Optional[LensDropdown] = None
         self._toolbar: Optional[PlotToolbar] = None
         self._focus_style_base = ""
+        self._debug_overlay = None  # Ctrl+Shift+D layout debug overlay
         
         # Track interaction mode and saved ranges for axis-constrained zoom
         self._current_interaction_mode = InteractionMode.POINTER
@@ -377,6 +378,10 @@ class ProbePanel(QFrame):
                 self.height() - self._toolbar.sizeHint().height() - 8
             )
             self._toolbar.raise_()  # Ensure topmost z-order
+            
+            # Pass toolbar geometry to pin indicator for dynamic positioning
+            if self._plot and hasattr(self._plot, '_pin_indicator') and self._plot._pin_indicator:
+                self._plot._pin_indicator.set_toolbar_rect(self._toolbar.geometry())
 
     # === M2.5: Toolbar mode handling ===
 
@@ -574,8 +579,60 @@ class ProbePanel(QFrame):
         elif key == Qt.Key.Key_Escape:
             if self._toolbar:
                 self._toolbar.set_mode(InteractionMode.POINTER)
+        elif key == Qt.Key.Key_D and event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
+            self._toggle_debug_overlay()
         else:
             super().keyPressEvent(event)
+
+    # === Phase 4: Debug overlay ===
+
+    def _toggle_debug_overlay(self) -> None:
+        """Toggle the Ctrl+Shift+D layout debug overlay."""
+        from .debug_overlay import DebugOverlay
+
+        if self._debug_overlay is None:
+            self._debug_overlay = DebugOverlay(self)
+
+        if self._debug_overlay.isVisible():
+            self._debug_overlay.hide()
+        else:
+            self._refresh_debug_overlay()
+            self._debug_overlay.show()
+
+    def _refresh_debug_overlay(self) -> None:
+        """Collect bounding boxes and push them to the debug overlay."""
+        if self._debug_overlay is None:
+            return
+
+        self._debug_overlay.setGeometry(0, 0, self.width(), self.height())
+
+        regions: dict = {}
+
+        # Toolbar
+        if self._toolbar:
+            regions['toolbar'] = self._toolbar.geometry()
+
+        # Plot area (ViewBox)
+        if self._plot and hasattr(self._plot, '_plot_widget'):
+            pw = self._plot._plot_widget
+            vb = pw.getPlotItem().getViewBox()
+            from pyprobe.plots.pin_layout_mixin import PinLayoutMixin
+            regions['plot_area'] = PinLayoutMixin._get_mapped_rect(pw, self, vb)
+
+        # Pin buttons
+        if self._plot and hasattr(self._plot, '_pin_indicator') and self._plot._pin_indicator:
+            pi = self._plot._pin_indicator
+            # Map pin button positions from pin indicator to self
+            x_geo = pi._x_btn.geometry()
+            y_geo = pi._y_btn.geometry()
+            x_tl = pi.mapTo(self, x_geo.topLeft())
+            y_tl = pi.mapTo(self, y_geo.topLeft())
+            from PyQt6.QtCore import QRectF
+            regions['x_pin'] = QRectF(float(x_tl.x()), float(x_tl.y()), x_geo.width(), x_geo.height())
+            regions['y_pin'] = QRectF(float(y_tl.x()), float(y_tl.y()), y_geo.width(), y_geo.height())
+
+        self._debug_overlay.set_regions(regions)
+        self._debug_overlay.raise_()
 
     @property
     def anchor(self) -> ProbeAnchor:

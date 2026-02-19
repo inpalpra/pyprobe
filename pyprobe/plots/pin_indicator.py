@@ -85,6 +85,7 @@ class PinIndicator(QWidget):
         super().__init__(parent)
         self._x_pinned = False
         self._y_pinned = False
+        self._toolbar_rect = None  # Set by ProbePanel to avoid hardcoded offsets
         self._setup_ui()
     
     def _setup_ui(self) -> None:
@@ -114,6 +115,17 @@ class PinIndicator(QWidget):
         # Set minimum size to contain both buttons with some margin
         self.setMinimumSize(100, 100)
     
+    def set_toolbar_rect(self, rect) -> None:
+        """Store the actual toolbar geometry for dynamic positioning.
+        
+        Called by ProbePanel.resizeEvent() so we can position the X lock
+        button relative to the real toolbar instead of a hardcoded offset.
+        
+        Args:
+            rect: QRect of the toolbar in parent (ProbePanel) coordinates.
+        """
+        self._toolbar_rect = rect
+    
     def _on_x_clicked(self) -> None:
         logger.debug("X pin button clicked")
         self.x_pin_clicked.emit()
@@ -129,16 +141,17 @@ class PinIndicator(QWidget):
             view_rect: The main plot area (ViewBox) in parent coordinates.
         """
         # Y lock: Inside plot area at top-left
-        # view_rect.left() is the left edge of the plot area
         y_x = view_rect.left() + 4
         y_y = view_rect.top() + 4
         self._y_btn.move(int(y_x), int(y_y))
         
-        # X lock: Inside plot area at bottom-right, but clear of toolbar
-        # "Near X axis, on the right side"
-        # Toolbar is ~130px wide at bottom-right
-        TOOLBAR_WIDTH_CLEARANCE = 130
-        x_x = view_rect.right() - self._x_btn.width() - TOOLBAR_WIDTH_CLEARANCE
+        # X lock: Inside plot area at bottom, to the left of toolbar
+        if self._toolbar_rect is not None:
+            # Dynamic: position just left of the actual toolbar
+            x_x = self._toolbar_rect.left() - self._x_btn.width() - 8
+        else:
+            # Fallback: right edge of view rect with small margin
+            x_x = view_rect.right() - self._x_btn.width() - 8
         x_y = view_rect.bottom() - self._x_btn.height() - 4
         self._x_btn.move(int(x_x), int(x_y))
         

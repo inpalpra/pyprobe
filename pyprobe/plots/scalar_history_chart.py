@@ -13,14 +13,15 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont
-from PyQt6.QtCore import QRectF, QTimer
+from PyQt6.QtCore import QRectF
 
 from .base_plot import BasePlot
 from .axis_controller import AxisController
 from .pin_indicator import PinIndicator
+from .pin_layout_mixin import PinLayoutMixin
 
 
-class ScalarHistoryChart(BasePlot):
+class ScalarHistoryChart(PinLayoutMixin, BasePlot):
     """
     Real-time scrolling chart for scalar values.
 
@@ -237,34 +238,3 @@ class ScalarHistoryChart(BasePlot):
         y_data = list(self._history)
         x_data = list(range(len(y_data)))
         return {'x': x_data, 'y': y_data}
-
-    def showEvent(self, event) -> None:
-        """Trigger layout update when widget is shown."""
-        super().showEvent(event)
-        QTimer.singleShot(0, self._update_pin_layout)
-
-    def resizeEvent(self, event) -> None:
-        """Reposition pin indicator on resize."""
-        super().resizeEvent(event)
-        self._update_pin_layout()
-
-    def _update_pin_layout(self) -> None:
-        """Update the position of pin indicators relative to plot area."""
-        if self._pin_indicator and self._plot_widget:
-            self._pin_indicator.setGeometry(0, 0, self.width(), self.height())
-            
-            plot_item = self._plot_widget.getPlotItem()
-            
-            def get_mapped_rect(item):
-                scene_rect = item.sceneBoundingRect()
-                view_poly = self._plot_widget.mapFromScene(scene_rect)
-                view_rect = view_poly.boundingRect()
-                tl_mapped = self._plot_widget.mapTo(self, view_rect.topLeft())
-                return QRectF(
-                    float(tl_mapped.x()), float(tl_mapped.y()),
-                    view_rect.width(), view_rect.height()
-                )
-
-            view_rect = get_mapped_rect(plot_item.getViewBox())
-            self._pin_indicator.update_layout(view_rect)
-            self._pin_indicator.raise_()
