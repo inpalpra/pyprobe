@@ -917,6 +917,8 @@ class MainWindow(QMainWindow):
                 export_record = {
                     'symbol': anchor.symbol,
                     'line': anchor.line,
+                    'col': anchor.col,
+                    'is_assignment': anchor.is_assignment,
                 }
                 # Handle list-of-dicts format (waveform with potential overlays)
                 if isinstance(plot_data, list) and plot_data:

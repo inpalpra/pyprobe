@@ -314,6 +314,40 @@ class ProbePanel(QFrame):
             # Use default argument to capture loop variable
             action.triggered.connect(lambda checked, name=plugin.name: self._lens_dropdown.set_lens(name))
         
+        # Draw Mode submenu
+        if self._plot and hasattr(self._plot, 'series_keys') and hasattr(self._plot, 'set_draw_mode'):
+            from ..plots.draw_mode import DrawMode
+            menu.addSeparator()
+            
+            keys = self._plot.series_keys
+            if len(keys) == 1:
+                # Single series: flat submenu
+                draw_menu = menu.addMenu("Draw Mode")
+                key = keys[0]
+                current = self._plot.get_draw_mode(key)
+                for mode in DrawMode:
+                    label = mode.name.capitalize()
+                    action = draw_menu.addAction(label)
+                    action.setCheckable(True)
+                    action.setChecked(current == mode)
+                    action.triggered.connect(
+                        lambda checked, k=key, m=mode: self._plot.set_draw_mode(k, m)
+                    )
+            elif len(keys) > 1:
+                # Multi-series: nested per-series submenus
+                draw_menu = menu.addMenu("Draw Mode")
+                for key in keys:
+                    series_menu = draw_menu.addMenu(str(key))
+                    current = self._plot.get_draw_mode(key)
+                    for mode in DrawMode:
+                        label = mode.name.capitalize()
+                        action = series_menu.addAction(label)
+                        action.setCheckable(True)
+                        action.setChecked(current == mode)
+                        action.triggered.connect(
+                            lambda checked, k=key, m=mode: self._plot.set_draw_mode(k, m)
+                        )
+        
         # M2.5: Park to bar action
         menu.addSeparator()
         park_action = menu.addAction("Park to Bar")

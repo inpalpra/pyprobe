@@ -7,6 +7,7 @@ from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QRectF
 
 from ...plots.pin_layout_mixin import PinLayoutMixin
+from ...plots.draw_mode import DrawMode, apply_draw_mode
 
 from ..base import ProbePlugin
 from ...core.data_classifier import (
@@ -53,6 +54,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
         self._axis_editor: Optional[AxisEditor] = None
+        
+        # Per-curve draw mode: curve_index -> DrawMode
+        self._draw_modes: dict = {}  # int -> DrawMode
         
         self._setup_ui()
     
@@ -108,6 +112,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             antialias=False
         )]
         self._row_visible = [True]
+        self._draw_modes[0] = DrawMode.LINE
         
         self._plot_widget.setMouseEnabled(x=True, y=True)
         
@@ -249,11 +254,14 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             )
             self._curves.append(curve)
             self._row_visible.append(True)
+            self._draw_modes[idx] = DrawMode.LINE
         
         # Remove excess curves if needed
         while len(self._curves) > num_rows:
+            removed_idx = len(self._curves) - 1
             curve = self._curves.pop()
             self._row_visible.pop()
+            self._draw_modes.pop(removed_idx, None)
             self._plot_widget.removeItem(curve)
         
         # Create legend for multi-row (>1 row)
@@ -390,6 +398,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         # Ensure single curve
         self._ensure_curves(1)
         self._curves[0].setPen(pg.mkPen(color=self._color.name(), width=1.5)) # Ensure probe color
+        # Re-apply draw mode in case it was reset by _ensure_curves
+        mode = self._draw_modes.get(0, DrawMode.LINE)
+        apply_draw_mode(self._curves[0], mode, self._color.name())
 
         # Downsample if needed
         display_data = self.downsample(self._data)
@@ -523,6 +534,27 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._stats_label.setText(
             f"{prefix_str}Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
         )
+
+    def set_draw_mode(self, curve_index: int, mode: DrawMode) -> None:
+        """Set the draw mode for a curve by index."""
+        if curve_index < 0 or curve_index >= len(self._curves):
+            return
+        self._draw_modes[curve_index] = mode
+        # Determine color for this curve
+        if len(self._curves) == 1:
+            color = self._color.name()
+        else:
+            color = self._get_row_color(curve_index)
+        apply_draw_mode(self._curves[curve_index], mode, color)
+
+    def get_draw_mode(self, curve_index: int) -> DrawMode:
+        """Get the current draw mode for a curve by index."""
+        return self._draw_modes.get(curve_index, DrawMode.LINE)
+
+    @property
+    def series_keys(self) -> list:
+        """Return the list of curve indices as series keys."""
+        return list(range(len(self._curves)))
 
     def get_plot_data(self) -> list:
         """

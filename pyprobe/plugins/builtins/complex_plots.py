@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, List
+from typing import Any, Optional, Tuple, List, Dict
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
@@ -9,6 +9,7 @@ from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
 from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
+from ...plots.draw_mode import DrawMode, apply_draw_mode
 
 MAX_DISPLAY_POINTS = 5000
 
@@ -43,6 +44,11 @@ class ComplexWidget(QWidget):
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
+        
+        # Per-series draw mode: series_key -> DrawMode
+        self._draw_modes: Dict[str, DrawMode] = {}
+        # Series key -> (curve, color_hex) for apply_draw_mode
+        self._series_curves: Dict[str, tuple] = {}
         
         self._setup_ui()
         self._configure_plot()
@@ -84,6 +90,28 @@ class ComplexWidget(QWidget):
 
     def update_info(self, text: str):
         self._info_label.setText(text)
+
+    def _register_series(self, key: str, curve, color_hex: str) -> None:
+        """Register a named series for draw mode control."""
+        self._draw_modes[key] = DrawMode.LINE
+        self._series_curves[key] = (curve, color_hex)
+
+    def set_draw_mode(self, series_key: str, mode: DrawMode) -> None:
+        """Set the draw mode for a named series."""
+        if series_key not in self._series_curves:
+            return
+        self._draw_modes[series_key] = mode
+        curve, color_hex = self._series_curves[series_key]
+        apply_draw_mode(curve, mode, color_hex)
+
+    def get_draw_mode(self, series_key: str) -> DrawMode:
+        """Get the current draw mode for a named series."""
+        return self._draw_modes.get(series_key, DrawMode.LINE)
+
+    @property
+    def series_keys(self) -> list:
+        """Return the list of registered series keys."""
+        return list(self._draw_modes.keys())
 
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         """Handle axis pin state change from AxisController."""
@@ -134,6 +162,8 @@ class ComplexRIWidget(ComplexWidget):
         self._real_curve = self._plot_widget.plot(pen=pg.mkPen('#00ffff', width=1.5), name="Real")
         self._imag_curve = self._plot_widget.plot(pen=pg.mkPen('#ff00ff', width=1.5), name="Imag")
         self._plot_widget.setLabel('left', 'Amplitude')
+        self._register_series('Real', self._real_curve, '#00ffff')
+        self._register_series('Imag', self._imag_curve, '#ff00ff')
 
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
@@ -167,11 +197,14 @@ class ComplexMAWidget(ComplexWidget):
         self._p2.setXLink(self._p1)
         self._p1.getAxis('right').setLabel('Phase (rad)', color='#00ff00')
         
-        self._phase_curve = pg.PlotCurveItem(pen=pg.mkPen('#00ff7f', width=1.5))
+        self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
         self._p2.addItem(self._phase_curve)
         
         self._plot_legend.addItem(self._mag_curve, "Log Mag")
         self._plot_legend.addItem(self._phase_curve, "Phase")
+        
+        self._register_series('Log Mag', self._mag_curve, '#ffff00')
+        self._register_series('Phase', self._phase_curve, '#00ff7f')
         
         # Handle view resize
         self._p1.vb.sigResized.connect(self._update_views)
@@ -209,8 +242,10 @@ class SingleCurveWidget(ComplexWidget):
     
     def __init__(self, var_name: str, color: QColor, title: str, parent: Optional[QWidget] = None):
         super().__init__(var_name, color, parent)
+        self._title = title
         self._curve = self._plot_widget.plot(pen=pg.mkPen(color.name(), width=1.5), name=title)
         self._plot_widget.setLabel('left', title)
+        self._register_series(title, self._curve, color.name())
 
     def set_data(self, data: np.ndarray, info: str):
         self._curve.setData(downsample(data))
