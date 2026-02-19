@@ -1,0 +1,46 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
+      "line": 4,
+      "col": 4,
+      "symbol": "a",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
+      "line": 4,
+      "col": 7,
+      "symbol": "b",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
+      "line": 4,
+      "col": 11,
+      "symbol": "b",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#eed52b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
+      "line": 4,
+      "col": 14,
+      "symbol": "a",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#9d2bee",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}

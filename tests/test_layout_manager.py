@@ -32,6 +32,8 @@ def panels(container):
     layout.addWidget(p2, 0, 1)
     layout.addWidget(p3, 1, 0)
     container.show()
+    # LayoutManager._maximize needs container._panels dict to find panels
+    container._panels = {"a0": [p1], "a1": [p2], "a2": [p3]}
     return [p1, p2, p3]
 
 

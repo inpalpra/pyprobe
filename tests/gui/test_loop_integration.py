@@ -144,8 +144,6 @@ def test_loop_continuous_execution():
     print(f"\nTotal loops completed: {harness.loop_count}")
     assert harness.loop_count >= 5, f"Expected at least 5 loops, got {harness.loop_count}"
     print("✓ Loop continuous execution test PASSED")
-    
-    return harness.state_log
 
 
 def test_loop_stop_by_user():

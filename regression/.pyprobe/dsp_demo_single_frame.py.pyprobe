@@ -1,0 +1,39 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/dsp_demo_single_frame.py",
+      "line": 46,
+      "col": 4,
+      "symbol": "signal_i",
+      "func": "generate_qam_signal",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": [
+    {
+      "target": {
+        "file": "/Users/ppal/repos/pyprobe/regression/dsp_demo_single_frame.py",
+        "line": 46,
+        "col": 4,
+        "symbol": "signal_i",
+        "func": "generate_qam_signal",
+        "is_assignment": true,
+        "color": null,
+        "lens": null
+      },
+      "overlay": {
+        "file": "/Users/ppal/repos/pyprobe/regression/dsp_demo_single_frame.py",
+        "line": 43,
+        "col": 4,
+        "symbol": "received_symbols",
+        "func": "generate_qam_signal",
+        "is_assignment": true,
+        "color": null,
+        "lens": null
+      }
+    }
+  ]
+}

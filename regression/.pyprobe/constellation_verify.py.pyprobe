@@ -1,0 +1,16 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/constellation_verify.py",
+      "line": 60,
+      "col": 8,
+      "symbol": "received_symbols",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}

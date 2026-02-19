@@ -1,0 +1,26 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/ternary.py",
+      "line": 3,
+      "col": 8,
+      "symbol": "a",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#2bee64",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/ternary.py",
+      "line": 3,
+      "col": 4,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}

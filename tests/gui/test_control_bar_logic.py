@@ -3,8 +3,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from pyprobe.gui.control_bar import ControlBar
 
-def test_control_bar_logic():
-    app = QApplication(sys.argv)
+def test_control_bar_logic(qapp):
     bar = ControlBar()
     
     print("Initial State:")
@@ -46,9 +45,8 @@ def test_control_bar_logic():
     
     print("\nExiting test successfully.")
 
-def test_loop_state_transitions():
+def test_loop_state_transitions(qapp):
     """Test loop button state transitions per button-state-diagrams.md"""
-    app = QApplication.instance() or QApplication(sys.argv)
     bar = ControlBar()
     
     bar.set_script_loaded(True, "/tmp/test.py")

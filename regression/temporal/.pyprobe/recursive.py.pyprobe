@@ -1,0 +1,16 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/recursive.py",
+      "line": 2,
+      "col": 4,
+      "symbol": "x",
+      "func": "countdown",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}
