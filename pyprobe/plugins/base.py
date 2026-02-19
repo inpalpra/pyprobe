@@ -17,6 +17,14 @@ class ProbePlugin(ABC):
     2. ProbePanel calls create_widget() to get the visualization
     3. Data flows via update() calls from IPC
     4. Color is provided for consistent styling
+
+        Theme integration contract for plugin widgets:
+        - Read current theme from ThemeManager.instance().current during widget setup.
+        - Subscribe to ThemeManager.instance().theme_changed and re-apply local styles.
+        - Prefer theme semantic tokens (theme.colors/theme.plot_colors/theme.row_colors)
+            instead of hardcoded colors.
+        - Plugins that do not implement this remain functional but may not visually match
+            active themes.
     """
     
     # Human-readable name shown in lens dropdown

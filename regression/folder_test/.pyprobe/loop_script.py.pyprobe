@@ -1,0 +1,16 @@
+{
+  "probes": [
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/folder_test/loop_script.py",
+      "line": 2,
+      "col": 8,
+      "symbol": "y",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    }
+  ],
+  "watches": [],
+  "overlays": []
+}

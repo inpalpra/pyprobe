@@ -16,43 +16,59 @@ class ScalarDisplayWidget(QWidget):
         self._var_name = var_name
         self._color = color
         self._has_data = False
+        self._theme_colors: dict = {}
         self._setup_ui()
-    
+
+        from ...gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self):
         """Create the scalar display widget."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(4)
-        
+
         # Header
         self._name_label = QLabel(self._var_name)
         self._name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
         self._name_label.setStyleSheet(f"color: {self._color.name()};")
         layout.addWidget(self._name_label)
-        
+
         # Value
         self._value_label = QLabel("Nothing to show")
         self._value_label.setFont(QFont("JetBrains Mono", 14))
-        self._value_label.setStyleSheet("color: #666666;")
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._value_label)
-        
+
         # Info
         self._info_label = QLabel("")
         self._info_label.setFont(QFont("JetBrains Mono", 9))
-        self._info_label.setStyleSheet("color: #888888;")
         self._info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._info_label)
-        
+
         layout.addStretch()
         self.setMinimumSize(150, 100)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self._theme_colors = c
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
+        if self._has_data:
+            self._value_label.setStyleSheet(f"color: {c['text_primary']};")
+        else:
+            self._value_label.setStyleSheet(f"color: {c['text_muted']};")
+
 
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the display with new scalar value."""
         if not self._has_data:
             self._has_data = True
             self._value_label.setFont(QFont("JetBrains Mono", 24, QFont.Weight.Bold))
-            self._value_label.setStyleSheet("color: #ffffff;")
+            c = self._theme_colors
+            self._value_label.setStyleSheet(f"color: {c.get('text_primary', '#ffffff')};")
+
         
         if value is None:
             display_text = "--"

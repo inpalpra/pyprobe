@@ -48,6 +48,11 @@ class FileTreePanel(QWidget):
         self._root_path: Optional[str] = None
         self._setup_ui()
 
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -55,11 +60,6 @@ class FileTreePanel(QWidget):
 
         # Header label
         self._header = QLabel("FILES")
-        self._header.setStyleSheet(
-            "color: #00ffff; background-color: #0a0a0a; "
-            "padding: 6px 8px; font-weight: bold; font-size: 10px; "
-            "border-bottom: 1px solid #333333;"
-        )
         layout.addWidget(self._header)
 
         # File system model
@@ -83,44 +83,50 @@ class FileTreePanel(QWidget):
         for col in (1, 2, 3):
             self._tree.setColumnHidden(col, True)
 
-        # Style
-        self._tree.setStyleSheet("""
-            QTreeView {
-                background-color: #0a0a0a;
-                border: none;
-                color: #aaaaaa;
-                font-size: 11px;
-            }
-            QTreeView::item {
-                padding: 3px 4px;
-                border: none;
-            }
-            QTreeView::item:hover {
-                background-color: #1a1a1a;
-                color: #ffffff;
-            }
-            QTreeView::item:selected {
-                background-color: #1a1a1a;
-                color: #00ffff;
-                border-left: 2px solid #00ffff;
-            }
-            QTreeView::branch {
-                background-color: #0a0a0a;
-            }
-            QTreeView::branch:has-children:!has-siblings:closed,
-            QTreeView::branch:closed:has-children:has-siblings {
-                image: none;
-                border-image: none;
-            }
-            QTreeView::branch:open:has-children:!has-siblings,
-            QTreeView::branch:open:has-children:has-siblings {
-                image: none;
-                border-image: none;
-            }
-        """)
-
         self._tree.clicked.connect(self._on_clicked)
         layout.addWidget(self._tree)
+
+    def _apply_theme(self, theme):
+        c = theme.colors
+        self._header.setStyleSheet(
+            f"color: {c['accent_primary']}; background-color: {c['bg_darkest']}; "
+            f"padding: 6px 8px; font-weight: bold; font-size: 10px; "
+            f"border-bottom: 1px solid {c['border_default']};"
+        )
+        self._tree.setStyleSheet(f"""
+            QTreeView {{
+                background-color: {c['bg_darkest']};
+                border: none;
+                color: {c['text_secondary']};
+                font-size: 11px;
+            }}
+            QTreeView::item {{
+                padding: 3px 4px;
+                border: none;
+            }}
+            QTreeView::item:hover {{
+                background-color: {c['bg_medium']};
+                color: {c['text_primary']};
+            }}
+            QTreeView::item:selected {{
+                background-color: {c['bg_medium']};
+                color: {c['accent_primary']};
+                border-left: 2px solid {c['accent_primary']};
+            }}
+            QTreeView::branch {{
+                background-color: {c['bg_darkest']};
+            }}
+            QTreeView::branch:has-children:!has-siblings:closed,
+            QTreeView::branch:closed:has-children:has-siblings {{
+                image: none;
+                border-image: none;
+            }}
+            QTreeView::branch:open:has-children:!has-siblings,
+            QTreeView::branch:open:has-children:has-siblings {{
+                image: none;
+                border-image: none;
+            }}
+        """)
 
     def set_root(self, folder_path: str):
         """Set the root directory for the file tree."""

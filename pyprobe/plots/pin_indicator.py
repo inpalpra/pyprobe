@@ -17,39 +17,46 @@ logger = get_logger(__name__)
 
 class PinButton(QPushButton):
     """A single pin button with opacity toggle."""
-    
+
     def __init__(self, icon_path: str, tooltip: str, parent: QWidget = None):
         super().__init__(parent)
         self._pinned = False
-        
+
         # Setup appearance
         self.setFixedSize(20, 20)
         self.setCheckable(True)
         self.setToolTip(tooltip)
-        
+
         if os.path.exists(icon_path):
             self.setIcon(QIcon(icon_path))
-        
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(13, 13, 13, 180);
-                border: 1px solid #00ffff;
-                border-radius: 3px;
-                padding: 2px;
-            }
-            QPushButton:hover {
-                background-color: rgba(0, 255, 255, 60);
-            }
-            QPushButton:checked {
-                background-color: rgba(0, 255, 255, 100);
-                border: 2px solid #00ffff;
-            }
-        """)
-        
+
         # Setup opacity effect
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self._opacity_effect)
         self._set_opacity(False)
+
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(13, 13, 13, 180);
+                border: 1px solid {c['accent_primary']};
+                border-radius: 3px;
+                padding: 2px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(0, 255, 255, 60);
+            }}
+            QPushButton:checked {{
+                background-color: rgba(0, 255, 255, 100);
+                border: 2px solid {c['accent_primary']};
+            }}
+        """)
     
     def _set_opacity(self, active: bool) -> None:
         """Set opacity based on pin state."""

@@ -57,12 +57,18 @@ class CodeViewer(QPlainTextEdit):
         # Hover state
         self._hover_anchor: Optional[ProbeAnchor] = None
         self._hover_var_location: Optional[VariableLocation] = None
+        self._hover_border_color = QColor("#00ffff")
 
         # M2.5: Drag state for signal overlay
         self._drag_start_pos: Optional[QPoint] = None
         self._drag_start_anchor: Optional[ProbeAnchor] = None
 
         self._setup_ui()
+
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
 
     def _setup_ui(self) -> None:
         """Configure the code viewer UI."""
@@ -77,25 +83,39 @@ class CodeViewer(QPlainTextEdit):
         # This ensures col_start * char_width calculation remains valid
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
-        # Configure font - Menlo 11pt monospace
+        # Configure default font before theme applies
         font = QFont("Menlo", 11)
         font.setStyleHint(QFont.StyleHint.Monospace)
         font.setFixedPitch(True)
         self.setFont(font)
 
-        # Dark theme colors
-        self.setStyleSheet("""
-            QPlainTextEdit {
-                background-color: #0d0d0d;
-                color: #ffffff;
-                border: none;
-                selection-background-color: #00ffff;
-                selection-color: #0d0d0d;
-            }
-        """)
-
         # Configure cursor
         self.setCursorWidth(0)  # Hide text cursor
+
+    def _apply_theme(self, theme) -> None:
+        """Apply active theme colors and typography to the code viewer."""
+        c = theme.colors
+        mono_font = QFont()
+        mono_font.setFamilies([
+            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace"
+        ])
+        mono_font.setPointSize(11)
+        mono_font.setStyleHint(QFont.StyleHint.Monospace)
+        mono_font.setFixedPitch(True)
+        self.setFont(mono_font)
+
+        self._hover_border_color = QColor(c['accent_primary'])
+        self._hover_border_color.setAlpha(110)
+
+        self.setStyleSheet(f"""
+            QPlainTextEdit {{
+                background-color: {c['bg_dark']};
+                color: {c['text_primary']};
+                border: none;
+                selection-background-color: {c['accent_primary']};
+                selection-color: {c['bg_darkest']};
+            }}
+        """)
 
     def load_file(self, file_path: str) -> bool:
         """Load a Python file into the viewer.
@@ -506,11 +526,7 @@ class CodeViewer(QPlainTextEdit):
         if rect is None:
             return
 
-        # Subtle cyan border for hover
-        hover_color = QColor("#00ffff")
-        hover_color.setAlpha(100)
-
-        painter.setPen(QPen(hover_color, 1, Qt.PenStyle.DashLine))
+        painter.setPen(QPen(self._hover_border_color, 1, Qt.PenStyle.DashLine))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(rect, 2, 2)
 

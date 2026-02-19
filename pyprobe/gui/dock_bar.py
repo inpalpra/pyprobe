@@ -34,46 +34,58 @@ class ColorDot(QWidget):
 
 class DockBarItem(QFrame):
     """Single item in the dock bar representing a parked panel."""
-    
+
     restore_requested = pyqtSignal()
-    
+
     def __init__(self, title: str, color: QColor, parent: QWidget = None):
         super().__init__(parent)
         self._title = title
         self._color = color
+        self._label: QLabel = None
         self._setup_ui()
-    
+
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self) -> None:
         self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
-        self.setStyleSheet("""
-            DockBarItem {
-                background-color: #1a1a2e;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 2px 6px;
-            }
-            DockBarItem:hover {
-                border-color: #00ffff;
-                background-color: #1a1a3e;
-            }
-        """)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 3, 6, 3)
         layout.setSpacing(6)
-        
+
         # Color dot
         dot = ColorDot(self._color, self)
         layout.addWidget(dot)
-        
+
         # Title
-        label = QLabel(self._title)
-        label.setFont(QFont("JetBrains Mono", 9))
-        label.setStyleSheet("color: #cccccc; background: transparent; border: none;")
-        layout.addWidget(label)
-        
+        self._label = QLabel(self._title)
+        self._label.setFont(QFont("JetBrains Mono", 9))
+        layout.addWidget(self._label)
+
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self.setStyleSheet(f"""
+            DockBarItem {{
+                background-color: {c['bg_medium']};
+                border: 1px solid {c['border_default']};
+                border-radius: 4px;
+                padding: 2px 6px;
+            }}
+            DockBarItem:hover {{
+                border-color: {c['accent_primary']};
+                background-color: {c['bg_light']};
+            }}
+        """)
+        if self._label:
+            self._label.setStyleSheet(
+                f"color: {c['text_secondary']}; background: transparent; border: none;"
+            )
     
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -95,14 +107,13 @@ class DockBar(QWidget):
         super().__init__(parent)
         self._items: Dict[str, DockBarItem] = {}
         self._setup_ui()
-    
+
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self) -> None:
-        self.setStyleSheet("""
-            DockBar {
-                background-color: #0a0a1a;
-                border-top: 1px solid #333333;
-            }
-        """)
         self.setFixedHeight(40)
         
         self._layout = QHBoxLayout(self)
@@ -146,6 +157,15 @@ class DockBar(QWidget):
         """Whether the dock bar has no items."""
         return len(self._items) == 0
     
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self.setStyleSheet(f"""
+            DockBar {{
+                background-color: {c['bg_darkest']};
+                border-top: 1px solid {c['border_default']};
+            }}
+        """)
+
     def update_data(self, anchor_key: str, data) -> None:
         """Update data for a parked panel (for sparkline, future use)."""
         pass  # Sparkline is P1, not implemented yet

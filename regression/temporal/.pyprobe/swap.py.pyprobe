@@ -13,6 +13,16 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
       "line": 4,
+      "col": 4,
+      "symbol": "a",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
+      "line": 4,
       "col": 7,
       "symbol": "b",
       "func": "main",
@@ -28,16 +38,6 @@
       "func": "main",
       "is_assignment": false,
       "color": "#9d2bee",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/swap.py",
-      "line": 4,
-      "col": 4,
-      "symbol": "a",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#ee2b2b",
       "lens": null
     }
   ],

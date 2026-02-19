@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QStatusBar, QFileDialog, QMessageBox
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QAction, QActionGroup
 import multiprocessing as mp
 import os
 import sys
@@ -21,7 +21,6 @@ logger = get_logger(__name__)
 from .probe_panel import ProbePanel
 from .panel_container import ProbePanelContainer
 from .control_bar import ControlBar
-from .theme.cyberpunk import apply_cyberpunk_theme
 from ..ipc.channels import IPCChannel
 from ..ipc.messages import Message, MessageType, make_add_probe_cmd, make_remove_probe_cmd
 from ..core.runner import run_script_subprocess
@@ -51,6 +50,8 @@ from .file_tree import FileTreePanel
 from ..core.probe_persistence import (
     load_probe_settings, save_probe_settings, ProbeSettings, ProbeSpec, WatchSpec, OverlaySpec
 )
+from ..core.settings import set_setting
+from .theme.theme_manager import ThemeManager
 
 
 # Splitter pane indices — update these when adding/removing panes.
@@ -120,9 +121,6 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_signals()
-
-        # Apply cyberpunk theme
-        apply_cyberpunk_theme(self)
         
         # Initialize state tracer
         self._tracer = get_tracer()
@@ -426,6 +424,58 @@ class MainWindow(QMainWindow):
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
         self._status_bar.showMessage("Ready - Open a Python script to begin")
+
+        self._setup_theme_menu()
+
+    def _setup_theme_menu(self) -> None:
+        """Create View -> Theme menu and wire runtime switching."""
+        view_menu = self.menuBar().addMenu("View")
+        theme_menu = view_menu.addMenu("Theme")
+
+        self._theme_actions: dict[str, QAction] = {}
+        self._theme_action_group = QActionGroup(self)
+        self._theme_action_group.setExclusive(True)
+
+        manager = ThemeManager.instance()
+        current_theme_id = manager.current.id
+
+        for theme in manager.available():
+            action = QAction(theme.name, self)
+            action.setCheckable(True)
+            action.setChecked(theme.id == current_theme_id)
+            action.triggered.connect(
+                lambda checked, theme_id=theme.id: self._on_theme_selected(theme_id, checked)
+            )
+            self._theme_action_group.addAction(action)
+            theme_menu.addAction(action)
+            self._theme_actions[theme.id] = action
+
+        manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_selected(self, theme_id: str, checked: bool) -> None:
+        """Handle a user selecting a theme from the menu."""
+        if not checked:
+            return
+
+        manager = ThemeManager.instance()
+        try:
+            manager.set_theme(theme_id)
+        except ValueError:
+            logger.warning(f"Unknown theme selected: {theme_id}")
+            return
+
+        set_setting("theme", theme_id)
+
+        self._status_bar.showMessage(f"Theme: {manager.current.name}", 3000)
+
+    @pyqtSlot(object)
+    def _on_theme_changed(self, theme) -> None:
+        """Sync checked theme action with current theme state."""
+        if not hasattr(self, "_theme_actions"):
+            return
+
+        for theme_id, action in self._theme_actions.items():
+            action.setChecked(theme_id == theme.id)
 
     def _setup_signals(self):
         """Connect signals and slots."""

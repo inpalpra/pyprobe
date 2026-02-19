@@ -23,6 +23,11 @@ class ScalarDisplay(BasePlot):
         self._value: Any = None
         self._setup_ui()
 
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self):
         """Create the scalar display widget."""
         layout = QVBoxLayout(self)
@@ -32,28 +37,34 @@ class ScalarDisplay(BasePlot):
         # Header with variable name
         self._name_label = QLabel(self._var_name)
         self._name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
-        self._name_label.setStyleSheet("color: #ffff00;")  # Yellow
         layout.addWidget(self._name_label)
 
         # Large value display
         self._value_label = QLabel("Nothing to show")
         self._value_label.setFont(QFont("JetBrains Mono", 14))
-        self._value_label.setStyleSheet("color: #666666;")  # Gray for placeholder
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._has_data = False  # Track if we've received data
+        self._has_data = False
         layout.addWidget(self._value_label)
 
         # Type/info label
         self._info_label = QLabel("")
         self._info_label.setFont(QFont("JetBrains Mono", 9))
-        self._info_label.setStyleSheet("color: #888888;")
         self._info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._info_label)
 
         layout.addStretch()
-
-        # Set minimum size
         self.setMinimumSize(150, 100)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self._name_label.setStyleSheet(f"color: {c['accent_marker']};")
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
+        if self._has_data:
+            self._value_label.setStyleSheet(f"color: {c['success']};")
+        else:
+            self._value_label.setStyleSheet(f"color: {c['text_muted']};")
+        # Store for use in update_data
+        self._theme_colors = c
 
     def update_data(
         self,
@@ -69,7 +80,8 @@ class ScalarDisplay(BasePlot):
         if not self._has_data:
             self._has_data = True
             self._value_label.setFont(QFont("JetBrains Mono", 24, QFont.Weight.Bold))
-            self._value_label.setStyleSheet("color: #00ff00;")  # Green
+            c = getattr(self, '_theme_colors', {})
+            self._value_label.setStyleSheet(f"color: {c.get('success', '#00ff00')};")  # Green
 
         # Format the value
         if value is None:

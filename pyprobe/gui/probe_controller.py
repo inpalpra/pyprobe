@@ -532,16 +532,24 @@ class ProbeController(QObject):
         # Get or create overlay curves dict on the plot
         if not hasattr(plot, '_overlay_curves'):
             plot._overlay_curves = {}
-        
-        from pyprobe.plugins.builtins.waveform import ROW_COLORS
+
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme = ThemeManager.instance().current
+        theme_palette = list(theme.row_colors)
+        marker_color = theme.colors.get('accent_marker', theme.plot_colors.get('marker', '#ffbf5f'))
+
+        overlay_palette = [marker_color]
+        overlay_palette.extend([c for c in theme_palette if c.lower() != marker_color.lower()])
+        if not overlay_palette:
+            overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
         
         def ensure_legend():
             """Create legend on-demand and add primary curve if needed."""
             if not hasattr(plot, '_legend') or plot._legend is None:
                 plot._legend = plot._plot_widget.addLegend(
                     offset=(10, 10),
-                    labelTextColor='#ffffff',
-                    brush=pg.mkBrush('#1a1a1a80')
+                    labelTextColor=theme.colors.get('text_primary', '#ffffff'),
+                    brush=pg.mkBrush(theme.colors.get('bg_medium', '#1a1a1a') + '80')
                 )
                 # Add primary curve(s) to legend
                 if hasattr(plot, '_curves') and plot._curves:
@@ -558,11 +566,12 @@ class ProbeController(QObject):
             # Create real curve if needed
             if real_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                color = overlay_palette[color_idx % len(overlay_palette)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False
                 )
+                curve.setZValue(20)
                 plot._overlay_curves[real_key] = curve
                 ensure_legend()
                 plot._legend.addItem(curve, f"{symbol} (real)")
@@ -570,11 +579,12 @@ class ProbeController(QObject):
             # Create imag curve if needed
             if imag_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                color = overlay_palette[color_idx % len(overlay_palette)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine),
                     antialias=False
                 )
+                curve.setZValue(20)
                 plot._overlay_curves[imag_key] = curve
                 ensure_legend()
                 plot._legend.addItem(curve, f"{symbol} (imag)")
@@ -596,12 +606,13 @@ class ProbeController(QObject):
             # Single real curve
             if symbol not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+                color = overlay_palette[color_idx % len(overlay_palette)]
                 
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False
                 )
+                curve.setZValue(20)
                 plot._overlay_curves[symbol] = curve
                 
                 ensure_legend()
@@ -650,9 +661,18 @@ class ProbeController(QObject):
         
         # Create or update the scatter for this symbol
         if symbol not in plot._overlay_scatters:
-            from pyprobe.plugins.builtins.waveform import ROW_COLORS
+            from pyprobe.gui.theme.theme_manager import ThemeManager
+
+            theme = ThemeManager.instance().current
+            theme_palette = list(theme.row_colors)
+            marker_color = theme.colors.get('accent_marker', theme.plot_colors.get('marker', '#ffbf5f'))
+            overlay_palette = [marker_color]
+            overlay_palette.extend([c for c in theme_palette if c.lower() != marker_color.lower()])
+            if not overlay_palette:
+                overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
+
             color_idx = len(plot._overlay_scatters) + 1
-            color = ROW_COLORS[color_idx % len(ROW_COLORS)]
+            color = overlay_palette[color_idx % len(overlay_palette)]
             
             scatter = pg.ScatterPlotItem(
                 pen=None,
@@ -660,6 +680,7 @@ class ProbeController(QObject):
                 size=6,
                 name=symbol
             )
+            scatter.setZValue(20)
             plot._plot_widget.addItem(scatter)
             plot._overlay_scatters[symbol] = scatter
             logger.debug(f"Created overlay scatter for {symbol}")

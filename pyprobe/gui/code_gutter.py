@@ -33,6 +33,8 @@ class CodeGutter(QWidget):
 
         self._code_viewer = code_viewer
         self._probed_lines: Dict[int, QColor] = {}  # line number -> color
+        self._bg_color = QColor("#0a0a0a")
+        self._line_number_color = QColor("#666666")
 
         # Configure font to match code viewer
         font = QFont("Menlo", 11)
@@ -44,15 +46,29 @@ class CodeGutter(QWidget):
         self._code_viewer.blockCountChanged.connect(self._update_width)
         self._code_viewer.updateRequest.connect(self._on_update_request)
 
-        # Set dark background
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0a0a0a;
-            }
-        """)
-
         # Initial width calculation
         self._update_width()
+
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        mono_font = QFont()
+        mono_font.setFamilies([
+            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace"
+        ])
+        mono_font.setPointSize(11)
+        mono_font.setStyleHint(QFont.StyleHint.Monospace)
+        mono_font.setFixedPitch(True)
+        self.setFont(mono_font)
+        self._bg_color = QColor(c['bg_darkest'])
+        self._line_number_color = QColor(c['text_muted'])
+        self.setStyleSheet(f"QWidget {{ background-color: {c['bg_darkest']}; }}")
+        self._update_width()
+        self.update()
 
     def _update_width(self) -> None:
         """Update gutter width based on line count."""
@@ -107,7 +123,7 @@ class CodeGutter(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Fill background
-        painter.fillRect(event.rect(), QColor("#0a0a0a"))
+        painter.fillRect(event.rect(), self._bg_color)
 
         # Get visible blocks
         block = self._code_viewer.firstVisibleBlock()
@@ -125,7 +141,7 @@ class CodeGutter(QWidget):
                 line_number = block_number + 1
 
                 # Draw line number (right-aligned in digit area)
-                painter.setPen(QColor("#666666"))
+                painter.setPen(self._line_number_color)
                 number_rect = QRectF(
                     8,  # left padding
                     top,

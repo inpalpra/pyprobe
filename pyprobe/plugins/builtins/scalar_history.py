@@ -28,15 +28,20 @@ class ScalarHistoryWidget(QWidget):
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
-        
+
         self._setup_ui()
+
+        from ...gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
     
     def _setup_ui(self):
         """Create the chart widget."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
-        
+
         # Header
         header = QHBoxLayout()
         self._name_label = QLabel(self._var_name)
@@ -44,24 +49,23 @@ class ScalarHistoryWidget(QWidget):
         self._name_label.setStyleSheet(f"color: {self._color.name()};")
         header.addWidget(self._name_label)
         header.addStretch()
-        
+
         self._value_label = QLabel("--")
         self._value_label.setFont(QFont("JetBrains Mono", 14, QFont.Weight.Bold))
-        self._value_label.setStyleSheet("color: #ffffff;")
         header.addWidget(self._value_label)
         layout.addLayout(header)
-        
+
         # Plot
         self._plot_widget = pg.PlotWidget()
         self._configure_plot()
         layout.addWidget(self._plot_widget)
-        
+
         # Stats
         self._stats_label = QLabel("Min: -- | Max: -- | Mean: --")
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
         self._stats_label.setStyleSheet(f"color: {self._color.name()};")
         layout.addWidget(self._stats_label)
-    
+
     def _configure_plot(self):
         """Configure plot."""
         self._plot_widget.setBackground('#0d0d0d')
@@ -69,13 +73,13 @@ class ScalarHistoryWidget(QWidget):
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setLabel('left', 'Value')
         self._plot_widget.setLabel('bottom', 'Sample')
-        
+
         axis_pen = pg.mkPen(color=self._color.name(), width=1)
         self._plot_widget.getAxis('left').setPen(axis_pen)
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
-        
+
         self._curve = self._plot_widget.plot(
             pen=pg.mkPen(color=self._color.name(), width=2),
             antialias=False
@@ -92,6 +96,18 @@ class ScalarHistoryWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        self._value_label.setStyleSheet(f"color: {c['text_primary']};")
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        for ax in ('left', 'bottom'):
+            self._plot_widget.getAxis(ax).setPen(axis_pen)
+            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
 
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the chart with a new scalar value."""

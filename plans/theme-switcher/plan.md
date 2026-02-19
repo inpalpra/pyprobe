@@ -2,7 +2,7 @@
 
 ## Goal
 
-Allow users to select from multiple bundled themes at runtime, with their choice persisted across sessions, including a high-end RF instrument-panel dark theme.
+Allow users to select from multiple bundled themes at runtime, with their choice persisted across sessions, including a high-end RF instrument-panel dark theme and an Anthropic-inspired theme focused on crisp terminal-like readability.
 
 ---
 
@@ -68,9 +68,10 @@ from .cyberpunk import CYBERPUNK_THEME
 from .monokai   import MONOKAI_THEME
 from .ocean     import OCEAN_THEME
 from .instrument_panel import INSTRUMENT_PANEL_THEME
+from .anthropic import ANTHROPIC_THEME
 
 THEMES: dict[str, Theme] = {
-    t.id: t for t in [CYBERPUNK_THEME, MONOKAI_THEME, OCEAN_THEME, INSTRUMENT_PANEL_THEME]
+    t.id: t for t in [CYBERPUNK_THEME, MONOKAI_THEME, OCEAN_THEME, INSTRUMENT_PANEL_THEME, ANTHROPIC_THEME]
 }
 DEFAULT_THEME_ID = "cyberpunk"
 ```
@@ -120,7 +121,7 @@ For PyQtGraph widgets: call `self.plot_widget.setBackground(theme.plot_colors['b
 
 ## Bundled Themes
 
-Ship four themes to start:
+Ship five themes:
 
 | ID | Name | Style |
 |----|------|-------|
@@ -128,6 +129,67 @@ Ship four themes to start:
 | `monokai` | Monokai Dark | Dark gray bg, warm orange/yellow/green accents |
 | `ocean` | Ocean Dark | Deep navy bg, blue/teal/white accents |
 | `instrument-panel` | Instrument Panel Dark | Charcoal panel surfaces, muted grays, amber markers, green pass-state accents, cyan trace highlights |
+| `anthropic` | Anthropic Dark | Clean dark neutral UI, restrained accent color, crisp text hierarchy, terminal-first readability |
+
+### New Theme Notes: Anthropic Dark
+
+- Visual target: calm, modern, high-clarity interface that feels like a polished coding terminal and editor workflow.
+- Styling principles:
+    - Minimal visual noise and low decorative saturation.
+    - Strong typographic hierarchy over heavy borders.
+    - Consistent spacing rhythm and predictable focus states.
+- Contrast strategy:
+    - High readability for code, axes, and numeric labels.
+    - Subtle grid and chrome so data/trace content dominates.
+    - Accent color used sparingly for active/selected/focus states.
+
+### Detailed Requirements: Anthropic Dark
+
+#### 1) Typography (Crisp Claude-Code UX Style)
+
+- Primary intent: terminal-grade legibility, especially for dense code and numeric readouts.
+- UI Sans stack (labels, menus, controls):
+    - Preferred: `Inter`.
+    - Fallbacks: `SF Pro Text` (macOS), `Segoe UI` (Windows), `Noto Sans`, `sans-serif`.
+- Code/Mono stack (code viewer, stats, probe values, axis ticks where feasible):
+    - Preferred: `SF Mono`, `JetBrains Mono`.
+    - Fallbacks: `Menlo`, `Consolas`, `Monaco`, `monospace`.
+- Font handling policy:
+    - Do not bundle proprietary fonts with the repository.
+    - If user-installed branded fonts are present on the system, they may be prepended to font-family lists locally.
+
+#### 2) Color and Surface System
+
+- Dark neutral surfaces with low chroma (background/panel separation visible but subtle).
+- Accent usage should be disciplined:
+    - Active selection/focus: single primary accent.
+    - Success/warning/error use semantic tokens but avoid neon intensity.
+- Text tiers:
+    - `text_primary`: high-contrast content.
+    - `text_secondary`: labels/unit metadata.
+    - `text_muted`: tertiary/help text.
+
+#### 3) Plot and Terminal-Like Readability
+
+- Grid must be present but intentionally quiet.
+- Plot/trace readability priorities:
+    - Primary data traces remain visually dominant.
+    - Marker/readout overlays remain clearly visible above traces.
+    - Axis labels and tick text preserve readability at compact sizes.
+- Include conservative `plot_colors` alpha defaults similar to instrument-panel philosophy (subdued grid).
+
+#### 4) Syntax Colors
+
+- Keep syntax palette restrained and readable for long sessions.
+- Avoid highly saturated keyword/string colors that cause visual fatigue.
+- Ensure comments remain legible but de-emphasized.
+
+#### 5) Acceptance Criteria
+
+- Theme appears in View → Theme menu and switches live without restart.
+- Theme persists via existing settings mechanism and restores on startup.
+- Code viewer, probe panels, and built-in plots remain readable at default scaling.
+- No hardcoded per-widget color regressions introduced for this theme.
 
 ### New Theme Notes: Instrument Panel Dark
 
@@ -285,7 +347,8 @@ View
         ○ Cyberpunk      ← checked if active
         ○ Monokai Dark
         ○ Ocean Dark
-                ○ Instrument Panel Dark
+    ○ Instrument Panel Dark
+    ○ Anthropic Dark
 ```
 
 Each action calls `ThemeManager.instance().set_theme(theme_id)` and `set_setting("theme", theme_id)`.
@@ -326,11 +389,25 @@ The menu is built dynamically from `ThemeManager.instance().available()` so addi
 - Switching theme live: `ThemeManager.set_theme()` propagates via signal with no restart required.
 - Persist new choice immediately on selection.
 
+### M6 — Anthropic Theme
+- Implement `anthropic.py` as a `Theme` instance with neutral dark palette and restrained accents.
+- Register `ANTHROPIC_THEME` in `pyprobe/gui/theme/__init__.py`.
+- Apply typography stack defaults for crisp terminal/editor readability (UI sans + code mono fallback stacks).
+- Verify readability in: code viewer, scalar history, waveform, constellation, and dense overlays.
+- Tune `plot_colors.grid_alpha` and `grid_origin_alpha` for low-noise background guidance.
+
 ---
 
-## Open Questions
+## Decisions (Resolved)
 
-- **Live switch vs restart**: M3 signal-based approach allows live switching. If wiring all widgets is too much work, an alternative is to write the setting and required a restart — but live is better UX and not that much harder once M2 tokens are centralized.
-- **Plugin-provided widgets**: Third-party plugins that hardcode colors won't inherit theme changes. A `ThemeManager.instance().current` getter and the `theme_changed` signal should be documented in the plugin API so plugin authors can opt in.
-- **ColorManager probe palette**: The golden-angle HSL color assignment already works on any dark background. For a light theme (stretch goal), saturation/lightness parameters would need to be theme-dependent.
-- **Contrast tuning in instrument theme**: If cyan/amber markers compete in busy plots, define explicit marker-vs-trace priority and minimum luminance contrast thresholds in `plot_colors`.
+- **Live switch vs restart**: Use live switching as the required behavior. Theme changes are applied immediately through ThemeManager and propagated by theme_changed. No restart prompt is shown. A restart-only fallback is not planned.
+
+- **Plugin-provided widgets**: Core app widgets are required to support theme_changed. Third-party plugins are best-effort and remain functional if not theme-aware, but may keep legacy colors. Plugin guidance should explicitly document ThemeManager.instance().current and theme_changed as the integration contract.
+
+- **ColorManager probe palette**: Keep the existing golden-angle HSL palette unchanged for current dark themes. Do not add theme-dependent palette logic yet. If a light theme is introduced later, add a separate light-profile palette tuning pass as a follow-up milestone.
+
+- **Contrast tuning in instrument theme**: Adopt explicit visual priority rules now:
+    - Marker and cursor overlays always render above traces.
+    - Marker/readout color uses accent_marker and should be visually distinct from primary trace color.
+    - Major grid remains subdued relative to all traces; minor grid remains fainter than major grid.
+    - Where practical, target minimum contrast of 4.5:1 for normal text and prefer higher contrast for critical readouts.

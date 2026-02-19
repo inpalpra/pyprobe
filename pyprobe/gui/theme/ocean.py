@@ -1,69 +1,53 @@
-"""
-Dark cyberpunk theme for PyProbe.
-Inspired by dark themes with neon accents.
-"""
-
-from PyQt6.QtWidgets import QApplication, QWidget
-from PyQt6.QtGui import QPalette, QColor, QFont
+"""Ocean dark theme for PyProbe."""
 
 from .base import Theme
 
 
-# Color Palette
 COLORS = {
-    # Backgrounds
-    'bg_darkest': '#0a0a0a',      # Main background
-    'bg_dark': '#0d0d0d',          # Panel background
-    'bg_medium': '#1a1a1a',        # Widget background
-    'bg_light': '#2a2a2a',         # Hover background
+    'bg_darkest': '#061622',
+    'bg_dark': '#0b1f2f',
+    'bg_medium': '#132b40',
+    'bg_light': '#1b3954',
 
-    # Borders
-    'border_dark': '#1f1f1f',
-    'border_medium': '#333333',
-    'border_light': '#444444',
+    'border_dark': '#1e3a52',
+    'border_medium': '#295071',
+    'border_light': '#35658f',
 
-    # Neon accents
-    'neon_cyan': '#00ffff',        # Primary accent (cyan)
-    'neon_magenta': '#ff00ff',     # Secondary accent (magenta)
-    'neon_green': '#00ff00',       # Success/data (green)
-    'neon_yellow': '#ffff00',      # Warning (yellow)
-    'neon_red': '#ff0044',         # Error/stop (red)
-    'neon_orange': '#ff8800',      # Alert (orange)
+    'neon_cyan': '#4fd1ff',
+    'neon_magenta': '#b38bff',
+    'neon_green': '#2de2a1',
+    'neon_yellow': '#ffd166',
+    'neon_red': '#ff6b6b',
+    'neon_orange': '#ff9f43',
 
-    # Text
-    'text_primary': '#ffffff',
-    'text_secondary': '#aaaaaa',
-    'text_muted': '#666666',
+    'text_primary': '#e8f3ff',
+    'text_secondary': '#b9d0e6',
+    'text_muted': '#7f9db8',
 
-    # Semantic aliases (same values as neon_*, used by theme-aware widgets)
-    'accent_primary': '#00ffff',
-    'accent_secondary': '#ff00ff',
-    'accent_marker': '#ffff00',
-    'success': '#00ff00',
-    'warning': '#ffff00',
-    'error': '#ff0044',
-    'border_default': '#333333',
-    'border_strong': '#444444',
+    'accent_primary': '#4fd1ff',
+    'accent_secondary': '#2de2a1',
+    'accent_marker': '#ffd166',
+    'success': '#2de2a1',
+    'warning': '#ff9f43',
+    'error': '#ff6b6b',
+    'border_default': '#295071',
+    'border_strong': '#35658f',
 }
 
 
 def _build_stylesheet(c: dict) -> str:
-    """Build the QSS stylesheet from a colors dict."""
     return f"""
-/* Main Window */
 QMainWindow {{
     background-color: {c['bg_darkest']};
 }}
 
-/* Central Widget */
 QWidget {{
     background-color: {c['bg_dark']};
     color: {c['text_primary']};
-    font-family: "Menlo", "Consolas", "Monaco", monospace;
-    font-size: 11px;
+    font-family: \"Inter\", \"SF Pro Text\", \"Segoe UI\", \"Noto Sans\", sans-serif;
+    font-size: 12px;
 }}
 
-/* Tool Bar */
 QToolBar {{
     background-color: {c['bg_darkest']};
     border-bottom: 1px solid {c['accent_primary']};
@@ -77,7 +61,7 @@ QToolBar QToolButton {{
     border-radius: 4px;
     padding: 6px 12px;
     color: {c['text_primary']};
-    font-weight: bold;
+    font-weight: 600;
 }}
 
 QToolBar QToolButton:hover {{
@@ -96,7 +80,6 @@ QToolBar QToolButton:disabled {{
     border-color: {c['border_dark']};
 }}
 
-/* Status Bar */
 QStatusBar {{
     background-color: {c['bg_darkest']};
     border-top: 1px solid {c['border_default']};
@@ -104,7 +87,6 @@ QStatusBar {{
     font-size: 11px;
 }}
 
-/* Splitter */
 QSplitter::handle {{
     background-color: {c['border_default']};
 }}
@@ -113,7 +95,6 @@ QSplitter::handle:hover {{
     background-color: {c['accent_primary']};
 }}
 
-/* List Widget (Watch List) */
 QListWidget {{
     background-color: {c['bg_darkest']};
     border: 1px solid {c['border_default']};
@@ -138,7 +119,6 @@ QListWidget::item:hover {{
     border-color: {c['accent_secondary']};
 }}
 
-/* Line Edit */
 QLineEdit {{
     background-color: {c['bg_medium']};
     border: 1px solid {c['border_default']};
@@ -157,22 +137,21 @@ QLineEdit::placeholder {{
     color: {c['text_muted']};
 }}
 
-/* Push Button */
 QPushButton {{
     background-color: {c['bg_medium']};
     border: 1px solid {c['accent_primary']};
     border-radius: 4px;
     padding: 8px 16px;
     color: {c['accent_primary']};
-    font-weight: bold;
+    font-weight: 600;
 }}
 
 QPushButton:hover {{
-    background-color: rgba(0, 255, 255, 0.1);
+    background-color: rgba(79, 209, 255, 0.12);
 }}
 
 QPushButton:pressed {{
-    background-color: rgba(0, 255, 255, 0.2);
+    background-color: rgba(79, 209, 255, 0.22);
 }}
 
 QPushButton:disabled {{
@@ -180,37 +159,33 @@ QPushButton:disabled {{
     color: {c['text_muted']};
 }}
 
-/* Run Button (special green) */
 QPushButton#runButton {{
     border-color: {c['success']};
     color: {c['success']};
 }}
 
 QPushButton#runButton:hover {{
-    background-color: rgba(0, 255, 0, 0.1);
+    background-color: rgba(45, 226, 161, 0.12);
 }}
 
-/* Stop Button (special red) */
 QPushButton#stopButton {{
     border-color: {c['error']};
     color: {c['error']};
 }}
 
 QPushButton#stopButton:hover {{
-    background-color: rgba(255, 0, 68, 0.1);
+    background-color: rgba(255, 107, 107, 0.12);
 }}
 
-/* Pause Button (special yellow) */
 QPushButton#pauseButton {{
     border-color: {c['warning']};
     color: {c['warning']};
 }}
 
 QPushButton#pauseButton:hover {{
-    background-color: rgba(255, 255, 0, 0.1);
+    background-color: rgba(255, 159, 67, 0.12);
 }}
 
-/* Scroll Bar */
 QScrollBar:vertical {{
     background-color: {c['bg_darkest']};
     width: 12px;
@@ -251,7 +226,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     width: 0px;
 }}
 
-/* Group Box (Probe Panels) */
 QGroupBox {{
     background-color: {c['bg_dark']};
     border: 1px solid {c['border_default']};
@@ -265,26 +239,22 @@ QGroupBox::title {{
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 0 8px;
-    font-weight: bold;
+    font-weight: 600;
 }}
 
-/* Label */
 QLabel {{
     background-color: transparent;
 }}
 
-/* Frame */
 QFrame {{
     border: none;
 }}
 
-/* Flow Layout Container */
 QScrollArea {{
     border: none;
     background-color: {c['bg_dark']};
 }}
 
-/* Message Box */
 QMessageBox {{
     background-color: {c['bg_dark']};
 }}
@@ -293,7 +263,6 @@ QMessageBox QLabel {{
     color: {c['text_primary']};
 }}
 
-/* Tooltip */
 QToolTip {{
     background-color: {c['bg_medium']};
     border: 1px solid {c['accent_primary']};
@@ -306,75 +275,40 @@ QToolTip {{
 
 STYLESHEET = _build_stylesheet(COLORS)
 
-
 SYNTAX_COLORS = {
-    'keyword': COLORS['neon_cyan'],
-    'string': COLORS['neon_green'],
-    'comment': COLORS['text_muted'],
-    'number': COLORS['neon_yellow'],
-    'function': COLORS['neon_magenta'],
-    'class': COLORS['neon_orange'],
-    'decorator': COLORS['neon_cyan'],
+    'keyword': '#67b7ff',
+    'string': '#52d6a3',
+    'comment': '#7f9db8',
+    'number': '#ffd166',
+    'function': '#4fd1ff',
+    'class': '#9ecbff',
+    'decorator': '#ff9f43',
 }
 
 PLOT_COLORS = {
-    'bg': COLORS['bg_darkest'],
-    'grid_major': COLORS['border_medium'],
-    'grid_minor': COLORS['border_dark'],
-    'grid_alpha': 0.30,
-    'grid_origin_alpha': 0.38,
-    'axis': COLORS['text_secondary'],
-    'marker': COLORS['neon_yellow'],
-    'selection': COLORS['neon_cyan'],
-    'success': COLORS['neon_green'],
-    'error': COLORS['neon_red'],
+    'bg': '#061622',
+    'grid_major': '#295071',
+    'grid_minor': '#1e3a52',
+    'grid_alpha': 0.24,
+    'grid_origin_alpha': 0.32,
+    'axis': '#b9d0e6',
+    'marker': '#ffd166',
+    'selection': '#4fd1ff',
+    'success': '#2de2a1',
+    'error': '#ff6b6b',
 }
 
 ROW_COLORS = [
-    '#00ffff', '#ff00ff', '#00ff00', '#ffff00', '#ff8800',
-    '#00aaff', '#ff44aa', '#88ff00', '#ffaa00', '#aa00ff',
+    '#4fd1ff', '#2de2a1', '#ffd166', '#b38bff', '#ff9f43',
+    '#7be0ff', '#75f0bf', '#ffe18e', '#d3b7ff', '#ffb972',
 ]
 
-CYBERPUNK_THEME = Theme(
-    name='Cyberpunk',
-    id='cyberpunk',
+OCEAN_THEME = Theme(
+    name='Ocean Dark',
+    id='ocean',
     colors=COLORS,
     stylesheet=STYLESHEET,
     syntax_colors=SYNTAX_COLORS,
     plot_colors=PLOT_COLORS,
     row_colors=ROW_COLORS,
 )
-
-
-def _apply_font_and_palette(app: QApplication) -> None:
-    """Apply legacy font + palette behavior for compatibility."""
-    font = QFont()
-    font.setFamilies(["Menlo", "Consolas", "Monaco", "monospace"])
-    font.setPointSize(10)
-    font.setStyleHint(QFont.StyleHint.Monospace)
-    app.setFont(font)
-
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(COLORS['bg_dark']))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(COLORS['text_primary']))
-    palette.setColor(QPalette.ColorRole.Base, QColor(COLORS['bg_medium']))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(COLORS['bg_light']))
-    palette.setColor(QPalette.ColorRole.Text, QColor(COLORS['text_primary']))
-    palette.setColor(QPalette.ColorRole.Button, QColor(COLORS['bg_medium']))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(COLORS['text_primary']))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(COLORS['neon_cyan']))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(COLORS['bg_darkest']))
-    app.setPalette(palette)
-
-
-def apply_cyberpunk_theme(widget: QWidget) -> None:
-    """Backward-compatible shim: apply cyberpunk theme globally."""
-    del widget  # Theme now applies application-wide.
-    app = QApplication.instance()
-    if app is None:
-        return
-
-    from .theme_manager import ThemeManager
-
-    ThemeManager.instance(app).set_theme(CYBERPUNK_THEME.id)
-    _apply_font_and_palette(app)

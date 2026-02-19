@@ -12,22 +12,22 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/conditional.py",
-      "line": 6,
-      "col": 8,
-      "symbol": "x",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#2bee64",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/conditional.py",
       "line": 7,
       "col": 8,
       "symbol": "x",
       "func": "main",
       "is_assignment": false,
       "color": "#9d2bee",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/conditional.py",
+      "line": 6,
+      "col": 8,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
       "lens": null
     }
   ],

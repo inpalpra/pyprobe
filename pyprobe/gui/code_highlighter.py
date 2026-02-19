@@ -67,51 +67,62 @@ class PythonHighlighter(QSyntaxHighlighter):
         self._triple_single = re.compile(r"'''")
         self._triple_double = re.compile(r'"""')
 
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _create_formats(self) -> dict:
-        """Create text formats for each token type."""
+        """Create text formats for each token type with default colors."""
+        return self._build_formats_from_colors({
+            'keyword': '#ff00ff',
+            'string': '#00ff00',
+            'comment': '#666666',
+            'number': '#ffff00',
+            'function': '#ff00ff',
+            'class': '#ff8800',
+            'decorator': '#ff8800',
+        }, '#ffffff', '#00cccc')
+
+    def _build_formats_from_colors(
+        self, syntax_colors: dict, text_primary: str, self_color: str
+    ) -> dict:
+        """Build QTextCharFormats from a syntax_colors dict."""
         formats = {}
 
-        # Keywords - Magenta
         keyword_format = QTextCharFormat()
-        keyword_format.setForeground(QColor("#ff00ff"))
+        keyword_format.setForeground(QColor(syntax_colors.get('keyword', '#ff00ff')))
         keyword_format.setFontWeight(QFont.Weight.Bold)
         formats['keyword'] = keyword_format
 
-        # Built-ins - Cyan
         builtin_format = QTextCharFormat()
-        builtin_format.setForeground(QColor("#00ffff"))
+        builtin_format.setForeground(QColor(syntax_colors.get('keyword', '#00ffff')))
         formats['builtin'] = builtin_format
 
-        # Strings - Green
         string_format = QTextCharFormat()
-        string_format.setForeground(QColor("#00ff00"))
+        string_format.setForeground(QColor(syntax_colors.get('string', '#00ff00')))
         formats['string'] = string_format
 
-        # Numbers - Yellow
         number_format = QTextCharFormat()
-        number_format.setForeground(QColor("#ffff00"))
+        number_format.setForeground(QColor(syntax_colors.get('number', '#ffff00')))
         formats['number'] = number_format
 
-        # Comments - Gray italic
         comment_format = QTextCharFormat()
-        comment_format.setForeground(QColor("#666666"))
+        comment_format.setForeground(QColor(syntax_colors.get('comment', '#666666')))
         comment_format.setFontItalic(True)
         formats['comment'] = comment_format
 
-        # Decorators - Orange
         decorator_format = QTextCharFormat()
-        decorator_format.setForeground(QColor("#ff8800"))
+        decorator_format.setForeground(QColor(syntax_colors.get('decorator', '#ff8800')))
         formats['decorator'] = decorator_format
 
-        # Function/class names - White (default, but slightly brighter)
         definition_format = QTextCharFormat()
-        definition_format.setForeground(QColor("#ffffff"))
+        definition_format.setForeground(QColor(text_primary))
         definition_format.setFontWeight(QFont.Weight.Bold)
         formats['definition'] = definition_format
 
-        # Self/cls - Cyan (dimmer)
         self_format = QTextCharFormat()
-        self_format.setForeground(QColor("#00cccc"))
+        self_format.setForeground(QColor(self_color))
         self_format.setFontItalic(True)
         formats['self'] = self_format
 
@@ -179,6 +190,19 @@ class PythonHighlighter(QSyntaxHighlighter):
             re.compile(r'#[^\n]*'),
             self._formats['comment']
         ))
+
+    def _apply_theme(self, theme) -> None:
+        """Rebuild syntax formats from theme colors and re-highlight."""
+        sc = theme.syntax_colors
+        c = theme.colors
+        # Derive a dimmer shade of accent_primary for self/cls
+        from PyQt6.QtGui import QColor as _QColor
+        accent = _QColor(c.get('accent_primary', '#00ffff'))
+        self_color = accent.darker(130).name()
+        self._formats = self._build_formats_from_colors(sc, c['text_primary'], self_color)
+        self._rules.clear()
+        self._build_rules()
+        self.rehighlight()
 
     def highlightBlock(self, text: str) -> None:
         """Apply syntax highlighting to a block of text.

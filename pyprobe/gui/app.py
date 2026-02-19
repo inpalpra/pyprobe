@@ -16,6 +16,9 @@ pg.setConfigOptions(
 )
 
 from .main_window import MainWindow
+from ..core.settings import get_setting
+from .theme import DEFAULT_THEME_ID, THEMES
+from .theme.theme_manager import ThemeManager
 
 
 def create_app() -> QApplication:
@@ -28,6 +31,12 @@ def create_app() -> QApplication:
     app = QApplication(sys.argv)
     app.setApplicationName("PyProbe")
     app.setOrganizationName("PyProbe")
+
+    manager = ThemeManager.instance(app)
+    configured_theme_id = get_setting("theme", DEFAULT_THEME_ID)
+    initial_theme_id = configured_theme_id if configured_theme_id in THEMES else DEFAULT_THEME_ID
+
+    manager.set_theme(initial_theme_id)
 
     return app
 

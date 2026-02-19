@@ -28,15 +28,20 @@ class ConstellationWidget(QWidget):
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
-        
+
         self._setup_ui()
+
+        from ...gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
     
     def _setup_ui(self):
         """Create the constellation plot widget."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
-        
+
         # Header
         header = QHBoxLayout()
         self._name_label = QLabel(self._var_name)
@@ -46,15 +51,14 @@ class ConstellationWidget(QWidget):
         header.addStretch()
         self._info_label = QLabel("")
         self._info_label.setFont(QFont("JetBrains Mono", 9))
-        self._info_label.setStyleSheet("color: #888888;")
         header.addWidget(self._info_label)
         layout.addLayout(header)
-        
+
         # PyQtGraph plot widget
         self._plot_widget = pg.PlotWidget()
         self._configure_plot()
         layout.addWidget(self._plot_widget)
-        
+
         # Stats bar
         self._stats_label = QLabel("Power: -- dB | Symbols: --")
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
@@ -67,20 +71,18 @@ class ConstellationWidget(QWidget):
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setAspectLocked(True)
-        
-        # Configure axes
         self._plot_widget.setLabel('left', 'Q (Imag)')
         self._plot_widget.setLabel('bottom', 'I (Real)')
-        
+
         axis_pen = pg.mkPen(color=self._color.name(), width=1)
         self._plot_widget.getAxis('left').setPen(axis_pen)
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
-        
+
         # Add cross-hair at origin
-        self._plot_widget.addLine(x=0, pen=pg.mkPen('#333333', width=1))
-        self._plot_widget.addLine(y=0, pen=pg.mkPen('#333333', width=1))
+        self._origin_x = self._plot_widget.addLine(x=0, pen=pg.mkPen('#333333', width=1))
+        self._origin_y = self._plot_widget.addLine(y=0, pen=pg.mkPen('#333333', width=1))
         
         # Create scatter plot items for history (fading effect)
         self._scatter_items: List[pg.ScatterPlotItem] = []
@@ -107,6 +109,24 @@ class ConstellationWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        origin_alpha = float(pc.get('grid_origin_alpha', min(1.0, grid_alpha + 0.08)))
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        for ax in ('left', 'bottom'):
+            self._plot_widget.getAxis(ax).setPen(axis_pen)
+            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
+        origin_color = QColor(pc['grid_major'])
+        origin_color.setAlphaF(origin_alpha)
+        grid_pen = pg.mkPen(color=origin_color, width=1)
+        self._origin_x.setPen(grid_pen)
+        self._origin_y.setPen(grid_pen)
 
     def downsample(self, data: np.ndarray) -> np.ndarray:
         """Randomly subsample for display."""

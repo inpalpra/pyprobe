@@ -72,19 +72,14 @@ class ProbePanel(QFrame):
         # M2.5: Accept drops for signal overlay
         self.setAcceptDrops(True)
 
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self):
         """Create the panel UI."""
         self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
-        self.setStyleSheet("""
-            ProbePanel {
-                border: 1px solid #333333;
-                border-radius: 6px;
-                background-color: #0d0d0d;
-            }
-            ProbePanel:hover {
-                border-color: #00ffff;
-            }
-        """)
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(4, 4, 4, 4)
@@ -122,12 +117,6 @@ class ProbePanel(QFrame):
 
         # Throttle indicator (hidden by default)
         self._throttle_label = QLabel("\u26a1")  # Lightning bolt
-        self._throttle_label.setStyleSheet("""
-            QLabel {
-                color: #ffff00;
-                font-size: 12px;
-            }
-        """)
         self._throttle_label.setToolTip("Data throttling active")
         self._throttle_label.hide()
         header.addWidget(self._throttle_label)
@@ -167,6 +156,24 @@ class ProbePanel(QFrame):
 
         # Store base stylesheet for focus indicator toggling
         self._focus_style_base = self.styleSheet()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        base_style = f"""
+            ProbePanel {{
+                border: 1px solid {c['border_default']};
+                border-radius: 6px;
+                background-color: {c['bg_dark']};
+            }}
+            ProbePanel:hover {{
+                border-color: {c['accent_primary']};
+            }}
+        """
+        self.setStyleSheet(base_style)
+        self._focus_style_base = base_style
+        self._throttle_label.setStyleSheet(
+            f"QLabel {{ color: {c['warning']}; font-size: 12px; }}"
+        )
 
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
@@ -284,20 +291,22 @@ class ProbePanel(QFrame):
 
     def contextMenuEvent(self, event):
         """Show context menu with View As... and Park options."""
+        from .theme.theme_manager import ThemeManager
+        c = ThemeManager.instance().current.colors
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1a1a2e;
-                color: #00ffff;
-                border: 1px solid #00ffff;
-            }
-            QMenu::item:selected {
-                background-color: #00ffff;
-                color: #1a1a2e;
-            }
-            QMenu::item:disabled {
-                color: #555555;
-            }
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {c['bg_medium']};
+                color: {c['accent_primary']};
+                border: 1px solid {c['accent_primary']};
+            }}
+            QMenu::item:selected {{
+                background-color: {c['accent_primary']};
+                color: {c['bg_medium']};
+            }}
+            QMenu::item:disabled {{
+                color: {c['text_muted']};
+            }}
         """)
         
         view_menu = menu.addMenu("View As...")
@@ -553,12 +562,14 @@ class ProbePanel(QFrame):
     def _show_drop_highlight(self, show: bool) -> None:
         """Show or hide green drop target highlight."""
         if show:
-            self.setStyleSheet("""
-                ProbePanel {
-                    border: 2px solid #00ff7f;
+            from .theme.theme_manager import ThemeManager
+            c = ThemeManager.instance().current.colors
+            self.setStyleSheet(f"""
+                ProbePanel {{
+                    border: 2px solid {c['success']};
                     border-radius: 6px;
-                    background-color: #0d0d0d;
-                }
+                    background-color: {c['bg_dark']};
+                }}
             """)
         else:
             self.setStyleSheet(self._focus_style_base)
@@ -578,12 +589,14 @@ class ProbePanel(QFrame):
     def _show_focus_indicator(self, focused: bool) -> None:
         """Toggle cyan border glow for focused state."""
         if focused:
-            self.setStyleSheet("""
-                ProbePanel {
-                    border: 1px solid #00ffff;
+            from .theme.theme_manager import ThemeManager
+            c = ThemeManager.instance().current.colors
+            self.setStyleSheet(f"""
+                ProbePanel {{
+                    border: 1px solid {c['accent_primary']};
                     border-radius: 6px;
-                    background-color: #0d0d0d;
-                }
+                    background-color: {c['bg_dark']};
+                }}
             """)
         else:
             self.setStyleSheet(self._focus_style_base)

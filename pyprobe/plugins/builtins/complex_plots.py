@@ -53,6 +53,11 @@ class ComplexWidget(QWidget):
         self._setup_ui()
         self._configure_plot()
 
+        from ...gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -87,6 +92,14 @@ class ComplexWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
 
     def update_info(self, text: str):
         self._info_label.setText(text)

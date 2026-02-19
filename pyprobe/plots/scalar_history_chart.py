@@ -44,12 +44,17 @@ class ScalarHistoryChart(PinLayoutMixin, BasePlot):
 
         self._history: deque = deque(maxlen=history_length)
         self._has_data = False
-        
+
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
-        
+
         self._setup_ui()
+
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
 
     def _setup_ui(self):
         """Create the chart widget."""
@@ -62,7 +67,6 @@ class ScalarHistoryChart(PinLayoutMixin, BasePlot):
 
         self._name_label = QLabel(self._var_name)
         self._name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
-        self._name_label.setStyleSheet("color: #ffff00;")  # Yellow
         header.addWidget(self._name_label)
 
         header.addStretch()
@@ -70,7 +74,6 @@ class ScalarHistoryChart(PinLayoutMixin, BasePlot):
         # Current value display (large, prominent)
         self._value_label = QLabel("--")
         self._value_label.setFont(QFont("JetBrains Mono", 14, QFont.Weight.Bold))
-        self._value_label.setStyleSheet("color: #00ff00;")  # Green
         header.addWidget(self._value_label)
 
         layout.addLayout(header)
@@ -83,38 +86,28 @@ class ScalarHistoryChart(PinLayoutMixin, BasePlot):
         # Stats bar
         self._stats_label = QLabel("Min: -- | Max: -- | Mean: --")
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
-        self._stats_label.setStyleSheet("color: #ff00ff;")  # Magenta
         layout.addWidget(self._stats_label)
 
     def _configure_plot(self):
         """Configure PyQtGraph plot appearance."""
         self._plot_widget.setBackground('#0d0d0d')
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
-
-        # Disable OpenGL for consistent rendering
         self._plot_widget.useOpenGL(False)
-
-        # Configure axes
         self._plot_widget.setLabel('left', 'Value')
         self._plot_widget.setLabel('bottom', 'Sample')
 
-        # Style axes - yellow to match variable name
         axis_pen = pg.mkPen(color='#ffff00', width=1)
         self._plot_widget.getAxis('left').setPen(axis_pen)
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
 
-        # Create plot curve
         self._curve = self._plot_widget.plot(
-            pen=pg.mkPen(color='#00ff00', width=2),  # Green
+            pen=pg.mkPen(color='#00ff00', width=2),
             antialias=False
         )
-
-        # Enable mouse interaction
         self._plot_widget.setMouseEnabled(x=True, y=True)
 
-        # Setup axis controller and pin indicator
         plot_item = self._plot_widget.getPlotItem()
         self._axis_controller = AxisController(plot_item)
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
@@ -124,6 +117,21 @@ class ScalarHistoryChart(PinLayoutMixin, BasePlot):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        self._name_label.setStyleSheet(f"color: {c['accent_marker']};")
+        self._value_label.setStyleSheet(f"color: {c['success']};")
+        self._stats_label.setStyleSheet(f"color: {c['accent_secondary']};")
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        for ax in ('left', 'bottom'):
+            self._plot_widget.getAxis(ax).setPen(axis_pen)
+            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
+        self._curve.setPen(pg.mkPen(color=c['success'], width=2))
 
     def update_data(
         self,

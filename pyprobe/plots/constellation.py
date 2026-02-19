@@ -7,7 +7,7 @@ from typing import Optional, List
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QRectF
 
 from .base_plot import BasePlot
@@ -35,12 +35,17 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
 
         self._data: Optional[np.ndarray] = None
         self._history: List[np.ndarray] = []
-        
+
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
-        
+
         self._setup_ui()
+
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
 
     def _setup_ui(self):
         """Create the constellation plot widget."""
@@ -53,14 +58,12 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
 
         self._name_label = QLabel(self._var_name)
         self._name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
-        self._name_label.setStyleSheet("color: #ff00ff;")  # Magenta
         header.addWidget(self._name_label)
 
         header.addStretch()
 
         self._info_label = QLabel("")
         self._info_label.setFont(QFont("JetBrains Mono", 9))
-        self._info_label.setStyleSheet("color: #888888;")
         header.addWidget(self._info_label)
 
         layout.addLayout(header)
@@ -73,25 +76,17 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         # Stats bar (power, etc.)
         self._stats_label = QLabel("Power: -- dB | Symbols: --")
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
-        self._stats_label.setStyleSheet("color: #00ffff;")
         layout.addWidget(self._stats_label)
 
     def _configure_plot(self):
         """Configure the constellation plot appearance."""
         self._plot_widget.setBackground('#0d0d0d')
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
-
-        # Disable OpenGL for consistent rendering
         self._plot_widget.useOpenGL(False)
-
-        # Set equal aspect ratio for proper constellation display
         self._plot_widget.setAspectLocked(True)
-
-        # Configure axes
         self._plot_widget.setLabel('left', 'Q (Imag)')
         self._plot_widget.setLabel('bottom', 'I (Real)')
 
-        # Style axes
         axis_pen = pg.mkPen(color='#ff00ff', width=1)
         self._plot_widget.getAxis('left').setPen(axis_pen)
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
@@ -99,8 +94,8 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
 
         # Add cross-hair at origin
-        self._plot_widget.addLine(x=0, pen=pg.mkPen('#333333', width=1))
-        self._plot_widget.addLine(y=0, pen=pg.mkPen('#333333', width=1))
+        self._origin_x = self._plot_widget.addLine(x=0, pen=pg.mkPen('#333333', width=1))
+        self._origin_y = self._plot_widget.addLine(y=0, pen=pg.mkPen('#333333', width=1))
 
         # Create scatter plot items for history (fading effect)
         self._scatter_items: List[pg.ScatterPlotItem] = []
@@ -109,13 +104,12 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         for i, alpha in enumerate(alphas):
             scatter = pg.ScatterPlotItem(
                 pen=None,
-                brush=pg.mkBrush(0, 255, 0, int(alpha * 255)),  # Green with varying alpha
+                brush=pg.mkBrush(0, 255, 0, int(alpha * 255)),
                 size=4 if i < self.HISTORY_LENGTH - 1 else 6
             )
             self._plot_widget.addItem(scatter)
             self._scatter_items.append(scatter)
 
-        # Setup axis controller and pin indicator
         plot_item = self._plot_widget.getPlotItem()
         self._axis_controller = AxisController(plot_item)
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
@@ -125,6 +119,33 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        origin_alpha = float(pc.get('grid_origin_alpha', min(1.0, grid_alpha + 0.08)))
+        self._name_label.setStyleSheet(f"color: {c['accent_secondary']};")
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
+        self._stats_label.setStyleSheet(f"color: {c['accent_primary']};")
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        for ax in ('left', 'bottom'):
+            self._plot_widget.getAxis(ax).setPen(axis_pen)
+            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
+        origin_color = QColor(pc['grid_major'])
+        origin_color.setAlphaF(origin_alpha)
+        grid_pen = pg.mkPen(color=origin_color, width=1)
+        self._origin_x.setPen(grid_pen)
+        self._origin_y.setPen(grid_pen)
+        # Update scatter brushes with success color
+        from PyQt6.QtGui import QColor as _QC
+        sc = _QC(c['success'])
+        r, g, b, _ = sc.getRgb()
+        alphas = np.linspace(0.1, 1.0, self.HISTORY_LENGTH)
+        for i, alpha in enumerate(alphas):
+            self._scatter_items[i].setBrush(pg.mkBrush(r, g, b, int(alpha * 255)))
 
     def update_data(
         self,

@@ -101,8 +101,13 @@ class ControlBar(QToolBar):
 
         # Script path label
         self._script_label = QLabel("No script loaded")
-        self._script_label.setStyleSheet("color: #888888; padding: 0 8px;")
         self.addWidget(self._script_label)
+
+        # Connect to theme
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
 
     @property
     def is_paused(self) -> bool:
@@ -212,3 +217,9 @@ class ControlBar(QToolBar):
                 background-color: rgba(0, {current_g}, 0, {current_alpha:.2f});
             }}
         """)
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self._script_label.setStyleSheet(
+            f"color: {c['text_secondary']}; padding: 0 8px;"
+        )

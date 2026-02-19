@@ -3,21 +3,21 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/double_ref.py",
       "line": 3,
-      "col": 8,
-      "symbol": "x",
-      "func": "main",
-      "is_assignment": false,
-      "color": "#ee2b2b",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/double_ref.py",
-      "line": 3,
       "col": 4,
       "symbol": "y",
       "func": "main",
       "is_assignment": true,
       "color": "#9d2bee",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/double_ref.py",
+      "line": 3,
+      "col": 8,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#ee2b2b",
       "lens": null
     },
     {

@@ -20,7 +20,7 @@ from ...plots.pin_indicator import PinIndicator
 from ...plots.editable_axis import EditableAxisItem
 from ...gui.axis_editor import AxisEditor
 
-# Deterministic color palette for multi-row plots (10 colors, cycling)
+# Default color palette (overridden at runtime by theme.row_colors)
 ROW_COLORS = [
     '#00ffff',  # 0: Cyan
     '#ff00ff',  # 1: Magenta
@@ -57,15 +57,21 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         # Per-curve draw mode: curve_index -> DrawMode
         self._draw_modes: dict = {}  # int -> DrawMode
-        
+        self._row_colors = list(ROW_COLORS)
+
         self._setup_ui()
+
+        from ...gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
     
     def _setup_ui(self):
         """Create the plot widget."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
-        
+
         # Header with variable name
         header = QHBoxLayout()
         self._name_label = QLabel(self._var_name)
@@ -75,15 +81,14 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         header.addStretch()
         self._info_label = QLabel("")
         self._info_label.setFont(QFont("JetBrains Mono", 9))
-        self._info_label.setStyleSheet("color: #888888;")
         header.addWidget(self._info_label)
         layout.addLayout(header)
-        
+
         # PyQtGraph plot
         self._plot_widget = pg.PlotWidget()
         self._configure_plot()
         layout.addWidget(self._plot_widget)
-        
+
         # Stats bar
         self._stats_label = QLabel("Min: -- | Max: -- | Mean: --")
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
@@ -95,18 +100,15 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._plot_widget.setBackground('#0d0d0d')
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self._plot_widget.useOpenGL(False)
-        
-        # Configure axes
         self._plot_widget.setLabel('left', 'Amplitude')
         self._plot_widget.setLabel('bottom', 'Sample Index')
-        
+
         axis_pen = pg.mkPen(color=self._color.name(), width=1)
         self._plot_widget.getAxis('left').setPen(axis_pen)
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
-        
-        # Create initial single curve (for 1D data) using PROBE COLOR
+
         self._curves = [self._plot_widget.plot(
             pen=pg.mkPen(color=self._color.name(), width=1.5),
             antialias=False
@@ -218,12 +220,23 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         """Handle axis editor cancelled. Nothing to do."""
         pass
 
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        pc = theme.plot_colors
+        grid_alpha = float(pc.get('grid_alpha', 0.28))
+        self._row_colors = list(theme.row_colors)
+        self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
+        self._plot_widget.setBackground(pc['bg'])
+        self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        for ax in ('left', 'bottom'):
+            self._plot_widget.getAxis(ax).setPen(axis_pen)
+            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
 
-        
     def _get_row_color(self, row_index: int) -> str:
-        """Get deterministic color for row index (cycles after 10)."""
-        # For multi-row, we use the palette to distinguish rows
-        return ROW_COLORS[row_index % len(ROW_COLORS)]
+        """Get deterministic color for row index (cycles through palette)."""
+        palette = self._row_colors
+        return palette[row_index % len(palette)]
 
     def _ensure_curves(self, num_rows: int):
         """Ensure we have the right number of curve objects."""
@@ -266,10 +279,12 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         # Create legend for multi-row (>1 row)
         if num_rows > 1:
+            from ...gui.theme.theme_manager import ThemeManager
+            tc = ThemeManager.instance().current.colors
             self._legend = self._plot_widget.addLegend(
                 offset=(10, 10),
-                labelTextColor='#ffffff',
-                brush=pg.mkBrush('#1a1a1a80')
+                labelTextColor=tc['text_primary'],
+                brush=pg.mkBrush(tc['bg_medium'] + '80')
             )
             for idx, curve in enumerate(self._curves):
                 self._legend.addItem(curve, f"Row {idx}")
