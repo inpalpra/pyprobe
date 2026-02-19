@@ -12,22 +12,22 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/nested_shadow.py",
-      "line": 4,
-      "col": 8,
-      "symbol": "x",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#2bee64",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/nested_shadow.py",
       "line": 2,
       "col": 4,
       "symbol": "x",
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/nested_shadow.py",
+      "line": 4,
+      "col": 8,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
       "lens": null
     }
   ],

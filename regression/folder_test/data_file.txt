@@ -1,0 +1,2 @@
+This file is intentionally not a Python script.
+It should not appear in the file tree.
