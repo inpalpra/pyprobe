@@ -154,6 +154,16 @@ R': immediately identified probe_panel line 273 as culprit
 Fix: for async/timing bugs, traceback.print_stack() > code reading
 File: process
 
+#### L19 2026-02-20 test-coverage-cli-args
+S: changed CLI parsing logic from tuple to dict
+T: support sidecar persistence args (color/lens) via CLI parser
+A: updated parse_target to return dict and updated _cli_probes extraction
+R: forgot to update _cli_watches extraction, crashing the app. tests passed anyway because E2E tests only use --probe
+A': verify ALL extraction sites when changing a shared utility's return type, or add E2E tests for missing CLI flags
+R': crash is caught instantly by the test suite
+Fix: updated watch/overlay unpacking to use dict keys instead of tuple unpacking
+File: gui/main_window.py
+
 ### DESIGN LESSONS (architecture/philosophy)
 
 #### L3 2026-02-06 filter-vs-degrade
