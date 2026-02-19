@@ -53,6 +53,13 @@ from ..core.probe_persistence import (
 )
 
 
+# Splitter pane indices — update these when adding/removing panes.
+SPLIT_TREE = 0
+SPLIT_CODE = 1
+SPLIT_PROBES = 2
+SPLIT_WATCH = 3
+
+
 class MainWindow(QMainWindow):
     """
     Main PyProbe window.
@@ -397,7 +404,10 @@ class MainWindow(QMainWindow):
         
         # Store reference to splitter for resizing
         self._main_splitter = splitter
-        splitter.setSizes([0, 400, 800, 0])  # Tree hidden, sidebar collapsed
+        init_sizes = [0] * 4
+        init_sizes[SPLIT_CODE] = 400
+        init_sizes[SPLIT_PROBES] = 800
+        splitter.setSizes(init_sizes)  # Tree hidden, sidebar collapsed
 
         # M2.5: Dock bar at bottom (hidden when empty)
         self._dock_bar = DockBar(self)
@@ -669,7 +679,7 @@ class MainWindow(QMainWindow):
         self._file_tree.setVisible(True)
         # Resize splitter to show tree
         sizes = self._main_splitter.sizes()
-        sizes[0] = 200  # file tree width
+        sizes[SPLIT_TREE] = 200
         self._main_splitter.setSizes(sizes)
         self._status_bar.showMessage(f"Opened folder: {os.path.basename(folder_path)}")
 
@@ -851,15 +861,19 @@ class MainWindow(QMainWindow):
         if self._scalar_watch_sidebar.isVisible():
             # Hide sidebar - collapse to 0 width
             sizes = self._main_splitter.sizes()
-            self._saved_sidebar_width = sizes[2] if sizes[2] > 0 else 200
+            self._saved_sidebar_width = sizes[SPLIT_WATCH] if sizes[SPLIT_WATCH] > 0 else 200
             self._scalar_watch_sidebar.setVisible(False)
-            self._main_splitter.setSizes([sizes[0], sizes[1] + sizes[2], 0])
+            sizes[SPLIT_PROBES] += sizes[SPLIT_WATCH]
+            sizes[SPLIT_WATCH] = 0
+            self._main_splitter.setSizes(sizes)
         else:
             # Show sidebar - restore width
             self._scalar_watch_sidebar.setVisible(True)
             sizes = self._main_splitter.sizes()
             sidebar_width = getattr(self, '_saved_sidebar_width', 200)
-            self._main_splitter.setSizes([sizes[0], sizes[1] - sidebar_width, sidebar_width])
+            sizes[SPLIT_PROBES] = max(0, sizes[SPLIT_PROBES] - sidebar_width)
+            sizes[SPLIT_WATCH] = sidebar_width
+            self._main_splitter.setSizes(sizes)
 
     # === M1: ANCHOR-BASED PROBE HANDLERS ===
 

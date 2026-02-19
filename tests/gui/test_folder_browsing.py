@@ -20,7 +20,7 @@ from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.probe_persistence import get_sidecar_path
 from pyprobe.gui.control_bar import ControlBar
 from pyprobe.gui.file_tree import FileTreePanel
-from pyprobe.gui.main_window import MainWindow
+from pyprobe.gui.main_window import MainWindow, SPLIT_TREE, SPLIT_CODE, SPLIT_PROBES, SPLIT_WATCH
 
 # ---------------------------------------------------------------------------
 # Path constants
@@ -98,7 +98,7 @@ def test_file_tree_hidden_on_startup(win, qapp):
     folder has been loaded.
     """
     assert not win._file_tree.isVisible(), "Tree must be hidden at startup"
-    assert win._main_splitter.sizes()[0] == 0, "File-tree splitter slot must have zero width"
+    assert win._main_splitter.sizes()[SPLIT_TREE] == 0, "File-tree splitter slot must have zero width"
 
 
 def test_file_tree_hidden_when_opening_single_file(win, qapp):
@@ -127,7 +127,7 @@ def test_file_tree_shown_on_folder_load(win, qapp):
     _pev(qapp)
 
     assert win._file_tree.isVisible(), "File tree must be visible after _load_folder"
-    assert win._main_splitter.sizes()[0] > 0, "File-tree splitter slot must have non-zero width"
+    assert win._main_splitter.sizes()[SPLIT_TREE] > 0, "File-tree splitter slot must have non-zero width"
     assert win._folder_path == os.path.abspath(FOLDER_TEST_DIR)
 
     expected_header = os.path.basename(FOLDER_TEST_DIR).upper()
@@ -468,6 +468,63 @@ def test_clear_all_probes_cleans_everything(win, qapp):
     assert win._cli_probes == [], "_cli_probes must be reset"
     assert win._cli_watches == [], "_cli_watches must be reset"
     assert win._cli_overlays == [], "_cli_overlays must be reset"
+
+
+# ===========================================================================
+# B12 — Splitter layout contract (observable-behaviour guard)
+# ===========================================================================
+
+def test_splitter_layout_contract(win, qapp):
+    """
+    B12: Verify the splitter pane layout matches the SPLIT_* constants.
+
+    This guards against the exact class of bug where a new pane is inserted
+    and every downstream index silently shifts.
+    """
+    sp = win._main_splitter
+    assert sp.widget(SPLIT_TREE) is win._file_tree
+    assert sp.widget(SPLIT_CODE) is not None          # code_container
+    assert sp.widget(SPLIT_PROBES) is win._probe_container
+    assert sp.widget(SPLIT_WATCH) is win._scalar_watch_sidebar
+    assert sp.count() == 4, (
+        f"Expected exactly 4 splitter panes, got {sp.count()}"
+    )
+
+
+def test_watch_toggle_affects_correct_pane(win, qapp):
+    """
+    B12b: Pressing the Watch button must change the watch sidebar's splitter
+    slot — not the probe container's.
+    """
+    win._load_script(REGRESSION_LOOP)
+    _pev(qapp)
+
+    sizes_before = win._main_splitter.sizes()
+    probes_before = sizes_before[SPLIT_PROBES]
+
+    # Show the watch sidebar
+    win._on_toggle_watch_window()
+    _pev(qapp)
+
+    sizes_after = win._main_splitter.sizes()
+    assert sizes_after[SPLIT_WATCH] > 0, (
+        "Watch sidebar must have non-zero width after toggle-on"
+    )
+    assert win._scalar_watch_sidebar.isVisible()
+
+    # Hide it again
+    win._on_toggle_watch_window()
+    _pev(qapp)
+
+    sizes_hidden = win._main_splitter.sizes()
+    assert sizes_hidden[SPLIT_WATCH] == 0, (
+        "Watch sidebar must have zero width after toggle-off"
+    )
+    assert not win._scalar_watch_sidebar.isVisible()
+    # Probe container should reclaim the space
+    assert sizes_hidden[SPLIT_PROBES] >= probes_before, (
+        "Probe container must reclaim width when watch sidebar is hidden"
+    )
 
 
 # ===========================================================================
