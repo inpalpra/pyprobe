@@ -97,6 +97,8 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self._script_path: Optional[str] = script_path
+        self._run_target_path: Optional[str] = None
+        self._explicit_run_target: bool = False
         self._folder_path: Optional[str] = None
         self._cli_probes = probes or []
         self._cli_watches = watches or []
@@ -150,6 +152,8 @@ class MainWindow(QMainWindow):
 
         # Load script if provided
         if script_path:
+            self._explicit_run_target = True
+            self._run_target_path = os.path.abspath(script_path)
             self._load_script(script_path)
     
     @property
@@ -485,6 +489,7 @@ class MainWindow(QMainWindow):
         self._control_bar.action_clicked.connect(self._on_action_clicked)
         self._control_bar.stop_clicked.connect(self._on_stop_script)
         self._control_bar.watch_clicked.connect(self._on_toggle_watch_window)
+        self._control_bar.files_clicked.connect(self._on_toggle_file_tree)
 
         # File tree signals
         self._file_tree.file_selected.connect(self._on_file_tree_selected)
@@ -712,6 +717,8 @@ class MainWindow(QMainWindow):
             "Python Files (*.py);;All Files (*)"
         )
         if path:
+            self._explicit_run_target = True
+            self._run_target_path = os.path.abspath(path)
             self._load_script(path)
             if self._folder_path:
                 self._file_tree.highlight_file(path)
@@ -733,13 +740,70 @@ class MainWindow(QMainWindow):
         self._main_splitter.setSizes(sizes)
         self._status_bar.showMessage(f"Opened folder: {os.path.basename(folder_path)}")
 
+    def _stash_current_file_visuals(self):
+        """Hide visual elements for current file's probes. Registry stays intact."""
+        # Save current file's probes to sidecar
+        self._save_probe_settings()
+
+        # Park (hide) probe panels for current file's anchors
+        for anchor in list(self._probe_panels.keys()):
+            if anchor.file == self._script_path:
+                for panel in self._probe_panels[anchor]:
+                    panel.hide()
+                self._probe_container.park_panel(anchor)
+
+        # Clear gutter marks (line numbers are file-specific)
+        self._code_gutter.clear_all_probes()
+
+        # Clear code viewer highlights (will be repopulated for new file)
+        self._code_viewer.clear_all_probes()
+
+        # Reset CLI probe lists (repopulated by new file's sidecar)
+        self._cli_probes = []
+        self._cli_watches = []
+        self._cli_overlays = []
+
+    def _restore_file_visuals(self, file_path: str):
+        """Restore visual elements for a file that already has probes in the registry."""
+        for anchor in list(self._probe_panels.keys()):
+            if anchor.file == file_path:
+                self._probe_container.unpark_panel(anchor)
+                for panel in self._probe_panels[anchor]:
+                    panel.show()
+                color = self._probe_registry.get_color(anchor)
+                if color:
+                    self._code_viewer.set_probe_active(anchor, color)
+                    self._code_gutter.set_probed_line(anchor.line, color)
+                    # Any anchor in _probe_panels is graphical
+                    self._code_viewer.set_probe_graphical(anchor)
+
     def _on_file_tree_selected(self, file_path: str):
         """Handle file selection from file tree."""
-        if file_path == self._script_path:
+        abs_path = os.path.abspath(file_path)
+        if abs_path == self._script_path:
             return  # already loaded
-        self._clear_all_probes()
-        self._load_script(file_path)
-        self._file_tree.highlight_file(file_path)
+
+        # Stash current file's visuals (keep registry intact)
+        self._stash_current_file_visuals()
+
+        # Check if new file already has probes in registry (returning to it)
+        has_stashed = any(a.file == abs_path for a in self._probe_registry.all_anchors)
+
+        if has_stashed:
+            # Quick restore: load code, show stashed panels
+            self._script_path = abs_path
+            if not self._explicit_run_target:
+                self._run_target_path = abs_path
+            self._control_bar.set_script_loaded(True, abs_path)
+            self._code_viewer.load_file(abs_path)
+            self._file_watcher.watch_file(abs_path)
+            self._last_source_content = self._code_viewer.toPlainText()
+            self._restore_file_visuals(abs_path)
+        else:
+            # First visit: full load from sidecar
+            self._load_script(abs_path)
+
+        self._file_tree.highlight_file(abs_path)
 
     def _clear_all_probes(self):
         """Remove all active probes for clean file switching."""
@@ -769,6 +833,8 @@ class MainWindow(QMainWindow):
     def _load_script(self, path: str):
         """Load a script file."""
         self._script_path = os.path.abspath(path)
+        if not self._explicit_run_target:
+            self._run_target_path = self._script_path
         self._status_bar.showMessage(f"Loaded: {path}")
         self._control_bar.set_script_loaded(True, path)
 
@@ -823,8 +889,10 @@ class MainWindow(QMainWindow):
             
         settings = ProbeSettings()
         
-        # Save active probes from registry
+        # Save active probes from registry (only those belonging to this file)
         for anchor in self._probe_registry.active_anchors:
+            if anchor.file != self._script_path:
+                continue  # Only save probes belonging to this file
             spec = ProbeSpec.from_anchor(anchor)
             
             # Extract color
@@ -842,13 +910,17 @@ class MainWindow(QMainWindow):
                 
             settings.probes.append(spec)
             
-        # Save watches from sidebar
+        # Save watches from sidebar (only those belonging to this file)
         for anchor in self._scalar_watch_sidebar.get_watched_anchors():
+            if anchor.file != self._script_path:
+                continue
             settings.watches.append(WatchSpec.from_anchor(anchor))
-            
-        # Save overlays from probe controller panels
+
+        # Save overlays from probe controller panels (only those belonging to this file)
         if hasattr(self, '_probe_controller'):
             for target_anchor, panel_list in self._probe_controller._probe_panels.items():
+                if target_anchor.file != self._script_path:
+                    continue
                 if not panel_list:
                     continue
                 target_panel = panel_list[-1]
@@ -874,10 +946,13 @@ class MainWindow(QMainWindow):
         """Start running the loaded script."""
         if not self._script_path:
             return
-        
+
+        # Use the run target (first loaded file) instead of currently viewed file
+        run_path = self._run_target_path or self._script_path
+
         # Configure and start the script runner
         self._script_runner.configure(
-            script_path=self._script_path,
+            script_path=run_path,
             get_active_anchors=lambda: list(self._probe_registry.active_anchors),
             tracer=self._tracer
         )
@@ -923,6 +998,26 @@ class MainWindow(QMainWindow):
             sidebar_width = getattr(self, '_saved_sidebar_width', 200)
             sizes[SPLIT_PROBES] = max(0, sizes[SPLIT_PROBES] - sidebar_width)
             sizes[SPLIT_WATCH] = sidebar_width
+            self._main_splitter.setSizes(sizes)
+
+    @pyqtSlot()
+    def _on_toggle_file_tree(self):
+        """Toggle the file tree panel visibility."""
+        if self._file_tree.isVisible():
+            # Hide tree - collapse to 0 width
+            sizes = self._main_splitter.sizes()
+            self._saved_tree_width = sizes[SPLIT_TREE] if sizes[SPLIT_TREE] > 0 else 200
+            self._file_tree.setVisible(False)
+            sizes[SPLIT_CODE] += sizes[SPLIT_TREE]
+            sizes[SPLIT_TREE] = 0
+            self._main_splitter.setSizes(sizes)
+        else:
+            # Show tree - restore width
+            self._file_tree.setVisible(True)
+            sizes = self._main_splitter.sizes()
+            tree_width = getattr(self, '_saved_tree_width', 200)
+            sizes[SPLIT_CODE] = max(0, sizes[SPLIT_CODE] - tree_width)
+            sizes[SPLIT_TREE] = tree_width
             self._main_splitter.setSizes(sizes)
 
     # === M1: ANCHOR-BASED PROBE HANDLERS ===

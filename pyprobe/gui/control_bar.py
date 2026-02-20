@@ -20,6 +20,7 @@ class ControlBar(QToolBar):
     action_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
     watch_clicked = pyqtSignal()  # Toggle scalar watch window
+    files_clicked = pyqtSignal()  # Toggle file explorer panel
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -88,7 +89,17 @@ class ControlBar(QToolBar):
         self.addWidget(self._loop_btn)
 
         self.addSeparator()
-        
+
+        # Files button (toggle file explorer panel)
+        self._files_btn = QToolButton()
+        self._files_btn.setText("Files")
+        self._files_btn.setObjectName("filesButton")
+        self._files_btn.setToolTip("Toggle file explorer panel")
+        self._files_btn.clicked.connect(self.files_clicked.emit)
+        self.addWidget(self._files_btn)
+
+        self.addSeparator()
+
         # Watch button (toggle scalar watch window)
         self._watch_btn = QToolButton()
         self._watch_btn.setText("Watch")

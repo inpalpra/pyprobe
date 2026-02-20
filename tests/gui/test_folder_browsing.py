@@ -1130,6 +1130,78 @@ def test_sidecar_not_created_if_no_probes(win, qapp, cleanup_sidecar):
 # D3 — Scalar watches cleared on file switch
 # ===========================================================================
 
+# ===========================================================================
+# D3.5 — Run target follows current file in folder mode
+# ===========================================================================
+
+def test_run_target_follows_current_file_in_folder_mode(win, qapp, cleanup_both_sidecars):
+    """
+    D3.5a: In folder mode (no explicit script), _run_target_path must update
+    to match the currently viewed file when navigating A -> B -> A.
+    """
+    win._load_folder(FOLDER_TEST_DIR)
+    _pev(qapp)
+
+    # Select file A
+    win._on_file_tree_selected(LOOP_SCRIPT)
+    _pev(qapp)
+    assert win._run_target_path == LOOP_SCRIPT, (
+        f"Expected _run_target_path={LOOP_SCRIPT!r}, got {win._run_target_path!r}"
+    )
+
+    # Select file B -- run target must follow
+    win._on_file_tree_selected(MAIN_ENTRY)
+    _pev(qapp)
+    assert win._run_target_path == MAIN_ENTRY, (
+        f"Expected _run_target_path={MAIN_ENTRY!r} after switching to B, "
+        f"got {win._run_target_path!r}"
+    )
+
+    # Switch back to A via stashed path -- run target must follow
+    win._on_file_tree_selected(LOOP_SCRIPT)
+    _pev(qapp)
+    assert win._run_target_path == LOOP_SCRIPT, (
+        f"Expected _run_target_path={LOOP_SCRIPT!r} after switching back to A, "
+        f"got {win._run_target_path!r}"
+    )
+
+
+def test_run_target_stays_fixed_in_script_mode(qapp, cleanup_both_sidecars):
+    """
+    D3.5b: When a script is provided via the constructor (explicit mode),
+    _run_target_path must NOT change when browsing via the file tree.
+    """
+    window = MainWindow(script_path=LOOP_SCRIPT)
+    window.resize(1200, 800)
+    window.show()
+    qapp.processEvents()
+
+    assert window._explicit_run_target is True, (
+        "_explicit_run_target must be True when script_path is passed to constructor"
+    )
+    assert window._run_target_path == LOOP_SCRIPT, (
+        f"Expected _run_target_path={LOOP_SCRIPT!r}, got {window._run_target_path!r}"
+    )
+
+    # Load a folder and navigate to a different file
+    window._load_folder(FOLDER_TEST_DIR)
+    qapp.processEvents()
+    window._on_file_tree_selected(MAIN_ENTRY)
+    qapp.processEvents()
+
+    assert window._run_target_path == LOOP_SCRIPT, (
+        f"_run_target_path must stay fixed at {LOOP_SCRIPT!r} in script mode, "
+        f"got {window._run_target_path!r}"
+    )
+
+    window.close()
+    qapp.processEvents()
+
+
+# ===========================================================================
+# D4 — Scalar watches cleared on file switch
+# ===========================================================================
+
 def test_watch_scalars_cleared_on_file_switch(win, qapp, cleanup_sidecar):
     """
     D3: The scalar watch sidebar must be empty after switching to a different
