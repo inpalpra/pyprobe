@@ -41,12 +41,14 @@ dependencies = [
 pyprobe = "pyprobe.__main__:main"
 
 [project.optional-dependencies]
-planning = [
-    "pyplan",
-]
 dev = [
     "pytest>=7.0.0",
     "pytest-qt>=4.0.0",
+]
+
+[dependency-groups]
+planning = [
+    "pyplan",
 ]
 
 [tool.setuptools.packages.find]

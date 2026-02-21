@@ -19,9 +19,6 @@ jobs:
           - os: macos-latest
             artifact: pyprobe-macos-arm64
             archive_ext: tar.gz
-          - os: macos-13
-            artifact: pyprobe-macos-x86_64
-            archive_ext: tar.gz
           - os: ubuntu-22.04
             artifact: pyprobe-linux-x86_64
             archive_ext: tar.gz
@@ -60,12 +57,12 @@ jobs:
       # ── Install project + PyInstaller ──
       - name: Install dependencies
         run: |
-          uv sync --no-dev
+          uv sync --no-dev --frozen
           uv pip install pyinstaller
 
       # ── Build ──
       - name: Build executable
-        run: pyinstaller pyprobe.spec
+        run: uv run pyinstaller pyprobe.spec
 
       # ── Smoke test ──
       - name: Smoke test (Linux)

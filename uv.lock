@@ -677,7 +677,6 @@ source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "pyplan" },
     { name = "pyqt6" },
     { name = "pyqtgraph" },
     { name = "pytest" },
@@ -693,11 +692,15 @@ dev = [
     { name = "pytest-qt" },
 ]
 
+[package.dev-dependencies]
+planning = [
+    { name = "pyplan" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "numpy", specifier = ">=1.24.0" },
-    { name = "pyplan", git = "https://github.com/inpalpra/pyplan.git?rev=main" },
     { name = "pyqt6", specifier = ">=6.4.0" },
     { name = "pyqtgraph", specifier = ">=0.13.0" },
     { name = "pytest", specifier = ">=9.0.2" },
@@ -709,6 +712,9 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.15.3" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+planning = [{ name = "pyplan", git = "https://github.com/inpalpra/pyplan.git?rev=main" }]
 
 [[package]]
 name = "pyqt6"
