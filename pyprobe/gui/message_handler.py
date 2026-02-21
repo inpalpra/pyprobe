@@ -95,7 +95,11 @@ class MessageHandler(QObject):
 
         # Check subprocess status - critical for debugging
         proc = self._script_runner._runner_process
-        subprocess_alive = proc is not None and proc.is_alive() if proc else False
+        import multiprocessing as mp
+        if isinstance(proc, mp.Process):
+            subprocess_alive = proc is not None and proc.is_alive() if proc else False
+        else:
+            subprocess_alive = proc.poll() is None if proc else False
         
         # Process available messages without blocking (timeout=0 is non-blocking)
         # Limit to 50 messages per frame to keep GUI responsive
@@ -130,7 +134,11 @@ class MessageHandler(QObject):
         # If subprocess died but we didn't get DATA_SCRIPT_END, that's a bug!
         # But only fire this once by checking is_running
         if not subprocess_alive and proc is not None and self._script_runner.is_running:
-            exit_code = proc.exitcode
+            import multiprocessing as mp
+            if isinstance(proc, mp.Process):
+                exit_code = proc.exitcode
+            else:
+                exit_code = proc.returncode
             if exit_code is not None:
                 if self._tracer:
                     self._tracer.trace_error(f"Subprocess exited (code={exit_code}) but no DATA_SCRIPT_END received!")
@@ -171,9 +179,14 @@ class MessageHandler(QObject):
             logger.debug("DATA_SCRIPT_END received, emitting script_ended signal")
             if self._tracer:
                 proc = self._script_runner._runner_process
+                import multiprocessing as mp
+                if isinstance(proc, mp.Process):
+                    is_alive = proc.is_alive() if proc else False
+                else:
+                    is_alive = proc.poll() is None if proc else False
                 self._tracer.trace_ipc_received(
                     "DATA_SCRIPT_END", 
-                    {"subprocess_alive": proc.is_alive() if proc else False}
+                    {"subprocess_alive": is_alive}
                 )
             self._end_received = True
 

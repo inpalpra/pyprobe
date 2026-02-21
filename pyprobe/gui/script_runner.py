@@ -46,6 +46,7 @@ class ScriptRunner(QObject):
         self._is_paused = False
         self._user_stopped = False
         self._loop_count = 0
+        self.use_legacy_ipc = True
         
         # Callbacks to get state from MainWindow
         self._get_active_anchors: Optional[Callable[[], List[ProbeAnchor]]] = None
@@ -95,20 +96,35 @@ class ScriptRunner(QObject):
         self._user_stopped = False
         self._loop_count = 0
         
-        # Create IPC channel
-        self._ipc = IPCChannel(is_gui_side=True)
-        
-        # Start runner subprocess
-        self._runner_process = mp.Process(
-            target=run_script_subprocess,
-            args=(
-                self._script_path,
-                self._ipc.command_queue,
-                self._ipc.data_queue,
-                []  # No legacy watches
+        # Create IPC channel and start runner subprocess
+        if self.use_legacy_ipc:
+            from ..ipc.channels import IPCChannel
+            self._ipc = IPCChannel(is_gui_side=True)
+            self._runner_process = mp.Process(
+                target=run_script_subprocess,
+                args=(
+                    self._script_path,
+                    self._ipc.command_queue,
+                    self._ipc.data_queue,
+                    []  # No legacy watches
+                )
             )
-        )
-        self._runner_process.start()
+            self._runner_process.start()
+        else:
+            from ..ipc.socket_channel import SocketIPCChannel
+            import subprocess
+            import sys
+            
+            self._ipc = SocketIPCChannel(is_gui_side=True)
+            port = self._ipc.port
+            
+            cmd = [
+                sys.executable,
+                "-m", "pyprobe_tracer",
+                "--socket", f"127.0.0.1:{port}",
+                self._script_path
+            ]
+            self._runner_process = subprocess.Popen(cmd)
         
         # Send probe commands for existing anchors
         if self._get_active_anchors:
@@ -147,9 +163,17 @@ class ScriptRunner(QObject):
                 self._tracer.trace_ipc_sent("CMD_STOP")
         
         if self._runner_process:
-            self._runner_process.join(timeout=2.0)
-            if self._runner_process.is_alive():
-                self._runner_process.terminate()
+            if isinstance(self._runner_process, mp.Process):
+                self._runner_process.join(timeout=2.0)
+                if self._runner_process.is_alive():
+                    self._runner_process.terminate()
+            else:
+                try:
+                    self._runner_process.wait(timeout=2.0)
+                except Exception:
+                    # e.g. subprocess.TimeoutExpired
+                    if self._runner_process.poll() is None:
+                        self._runner_process.terminate()
         
         self.cleanup()
     
@@ -205,17 +229,30 @@ class ScriptRunner(QObject):
         logger.debug(f"  starting new subprocess for {self._script_path}")
         
         # Start new subprocess with existing IPC queues
-        self._runner_process = mp.Process(
-            target=run_script_subprocess,
-            args=(
-                self._script_path,
-                self._ipc.command_queue,
-                self._ipc.data_queue,
-                []
+        if isinstance(self._runner_process, mp.Process) or getattr(self, 'use_legacy_ipc', False):
+            self._runner_process = mp.Process(
+                target=run_script_subprocess,
+                args=(
+                    self._script_path,
+                    self._ipc.command_queue,
+                    self._ipc.data_queue,
+                    []
+                )
             )
-        )
-        self._runner_process.start()
-        logger.debug(f"  new process pid={self._runner_process.pid}")
+            self._runner_process.start()
+            logger.debug(f"  new process pid={self._runner_process.pid}")
+        else:
+            import subprocess
+            import sys
+            port = self._ipc.port
+            cmd = [
+                sys.executable,
+                "-m", "pyprobe_tracer",
+                "--socket", f"127.0.0.1:{port}",
+                self._script_path
+            ]
+            self._runner_process = subprocess.Popen(cmd)
+            logger.debug(f"  new process pid={self._runner_process.pid}")
         
         self._loop_count += 1
         
@@ -253,14 +290,30 @@ class ScriptRunner(QObject):
         proc = self._runner_process
         if proc is not None:
             logger.debug(f"  waiting for process (pid={proc.pid})")
-            proc.join(timeout=0.5)
-            if proc.is_alive():
-                logger.debug("  process still alive, terminating")
-                proc.terminate()
+            
+            if isinstance(proc, mp.Process):
                 proc.join(timeout=0.5)
-            logger.debug(f"  process exit code: {proc.exitcode}")
+                if proc.is_alive():
+                    logger.debug("  process still alive, terminating")
+                    proc.terminate()
+                    proc.join(timeout=0.5)
+                exitcode = proc.exitcode
+            else:
+                try:
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    if proc.poll() is None:
+                        logger.debug("  process still alive, terminating")
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=0.5)
+                        except Exception:
+                            pass
+                exitcode = proc.returncode
+
+            logger.debug(f"  process exit code: {exitcode}")
             if self._tracer:
-                self._tracer.trace_reaction_subprocess_ended(proc.exitcode)
+                self._tracer.trace_reaction_subprocess_ended(exitcode)
         
         self._runner_process = None
         logger.debug(f"  IPC still valid: {self._ipc is not None}")
@@ -276,15 +329,34 @@ class ScriptRunner(QObject):
         # Terminate subprocess
         proc = self._runner_process
         if proc is not None:
-            proc.join(timeout=0.5)
-            if proc.is_alive():
-                proc.terminate()
+            if isinstance(proc, mp.Process):
                 proc.join(timeout=0.5)
                 if proc.is_alive():
-                    proc.kill()
-                    proc.join(timeout=0.1)
+                    proc.terminate()
+                    proc.join(timeout=0.5)
+                    if proc.is_alive():
+                        proc.kill()
+                        proc.join(timeout=0.1)
+                exitcode = proc.exitcode
+            else:
+                try:
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    if proc.poll() is None:
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=0.5)
+                        except Exception:
+                            if proc.poll() is None:
+                                proc.kill()
+                                try:
+                                    proc.wait(timeout=0.1)
+                                except Exception:
+                                    pass
+                exitcode = proc.returncode
+
             if self._tracer:
-                self._tracer.trace_reaction_subprocess_ended(proc.exitcode)
+                self._tracer.trace_reaction_subprocess_ended(exitcode)
         
         # Clean up IPC
         if self._ipc is not None:

@@ -3,11 +3,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/multi_assign.py",
       "line": 2,
-      "col": 8,
-      "symbol": "b",
+      "col": 12,
+      "symbol": "c",
       "func": "main",
       "is_assignment": true,
-      "color": "#2bee64",
+      "color": "#9d2bee",
       "lens": null
     },
     {
@@ -23,11 +23,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/multi_assign.py",
       "line": 2,
-      "col": 12,
-      "symbol": "c",
+      "col": 8,
+      "symbol": "b",
       "func": "main",
       "is_assignment": true,
-      "color": "#9d2bee",
+      "color": "#2bee64",
       "lens": null
     }
   ],
