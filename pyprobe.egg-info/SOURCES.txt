@@ -20,8 +20,10 @@ pyprobe/core/anchor_matcher.py
 pyprobe/core/capture_manager.py
 pyprobe/core/capture_record.py
 pyprobe/core/data_classifier.py
+pyprobe/core/probe_persistence.py
 pyprobe/core/runner.py
 pyprobe/core/sequence.py
+pyprobe/core/settings.py
 pyprobe/core/tracer.py
 pyprobe/gui/__init__.py
 pyprobe/gui/animations.py
@@ -36,6 +38,7 @@ pyprobe/gui/control_bar.py
 pyprobe/gui/debug_overlay.py
 pyprobe/gui/dock_bar.py
 pyprobe/gui/drag_helpers.py
+pyprobe/gui/file_tree.py
 pyprobe/gui/file_watcher.py
 pyprobe/gui/focus_manager.py
 pyprobe/gui/layout_manager.py
@@ -55,7 +58,13 @@ pyprobe/gui/scalar_watch_window.py
 pyprobe/gui/script_runner.py
 pyprobe/gui/watch_list.py
 pyprobe/gui/theme/__init__.py
+pyprobe/gui/theme/anthropic.py
+pyprobe/gui/theme/base.py
 pyprobe/gui/theme/cyberpunk.py
+pyprobe/gui/theme/instrument_panel.py
+pyprobe/gui/theme/monokai.py
+pyprobe/gui/theme/ocean.py
+pyprobe/gui/theme/theme_manager.py
 pyprobe/ipc/__init__.py
 pyprobe/ipc/channels.py
 pyprobe/ipc/messages.py
@@ -88,6 +97,7 @@ tests/test_color_manager.py
 tests/test_constellation_verify.py
 tests/test_dock_bar.py
 tests/test_e2e_capture_pipeline.py
+tests/test_e2e_folder_browsing.py
 tests/test_focus_manager.py
 tests/test_layout_manager.py
 tests/test_overlay_drag_drop_single_frame.py

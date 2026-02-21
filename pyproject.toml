@@ -7,7 +7,7 @@ name = "pyprobe"
 version = "0.1.0"
 description = "Variable probing based debugger for Python DSP debugging"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "PyProbe Contributors"}
@@ -35,6 +35,7 @@ dependencies = [
     "pytest-qt>=4.5.0",
     "pytest-xdist>=3.8.0",
     "pytest-forked>=1.6.0",
+    "pyplan",
 ]
 
 [project.scripts]
@@ -49,3 +50,6 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pyprobe*"]
+
+[tool.uv.sources]
+pyplan = { git = "https://github.com/inpalpra/pyplan.git", rev = "main" }

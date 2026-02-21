@@ -15,7 +15,7 @@ Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Topic :: Scientific/Engineering
 Classifier: Topic :: Software Development :: Debuggers
-Requires-Python: >=3.10
+Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: PyQt6>=6.4.0
 Requires-Dist: pyqtgraph>=0.13.0
@@ -26,6 +26,7 @@ Requires-Dist: scipy>=1.15.3
 Requires-Dist: pytest-qt>=4.5.0
 Requires-Dist: pytest-xdist>=3.8.0
 Requires-Dist: pytest-forked>=1.6.0
+Requires-Dist: pyplan
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-qt>=4.0.0; extra == "dev"
