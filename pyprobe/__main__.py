@@ -81,12 +81,12 @@ def main():
 
     # Initialize state tracer FIRST if requested
     if args.trace_states:
-        from .state_tracer import init_tracer
+        from pyprobe.state_tracer import init_tracer
         init_tracer(enabled=True)
         print("State tracing enabled. Log: /tmp/pyprobe_state_trace.log")
 
     # Setup logging before importing anything else
-    from .logging import setup_logging
+    from pyprobe.logging import setup_logging
     setup_logging(
         level=args.loglevel,
         log_file=args.logfile,
@@ -94,7 +94,7 @@ def main():
     )
 
     # Import here to avoid slow startup for --help
-    from .gui.app import run_app
+    from pyprobe.gui.app import run_app
 
     # Auto-detect file vs. folder
     script_path = args.script
