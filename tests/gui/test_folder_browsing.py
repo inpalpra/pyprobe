@@ -94,11 +94,11 @@ def cleanup_sidecar():
 
 def test_file_tree_hidden_on_startup(win, qapp):
     """
-    B1: File tree panel is invisible and occupies zero splitter width when no
-    folder has been loaded.
+    B1: File tree panel content is hidden and the splitter slot shows only the
+    collapsed edge strip (20px) when no folder has been loaded.
     """
     assert not win._file_tree.isVisible(), "Tree must be hidden at startup"
-    assert win._main_splitter.sizes()[SPLIT_TREE] == 0, "File-tree splitter slot must have zero width"
+    assert not win._tree_pane.is_expanded, "Tree pane must be collapsed at startup"
 
 
 def test_file_tree_hidden_when_opening_single_file(win, qapp):
@@ -482,10 +482,10 @@ def test_splitter_layout_contract(win, qapp):
     and every downstream index silently shifts.
     """
     sp = win._main_splitter
-    assert sp.widget(SPLIT_TREE) is win._file_tree
+    assert sp.widget(SPLIT_TREE) is win._tree_pane
     assert sp.widget(SPLIT_CODE) is not None          # code_container
     assert sp.widget(SPLIT_PROBES) is win._probe_container
-    assert sp.widget(SPLIT_WATCH) is win._scalar_watch_sidebar
+    assert sp.widget(SPLIT_WATCH) is win._watch_pane
     assert sp.count() == 4, (
         f"Expected exactly 4 splitter panes, got {sp.count()}"
     )
@@ -493,23 +493,25 @@ def test_splitter_layout_contract(win, qapp):
 
 def test_watch_toggle_affects_correct_pane(win, qapp):
     """
-    B12b: Pressing the Watch button must change the watch sidebar's splitter
-    slot — not the probe container's.
+    B12b: Toggling the watch pane must expand/collapse the watch sidebar's
+    collapsible pane — not the probe container.
     """
     win._load_script(REGRESSION_LOOP)
     _pev(qapp)
 
     sizes_before = win._main_splitter.sizes()
     probes_before = sizes_before[SPLIT_PROBES]
+    assert not win._watch_pane.is_expanded, "Watch pane starts collapsed"
 
     # Show the watch sidebar
     win._on_toggle_watch_window()
     _pev(qapp)
 
     sizes_after = win._main_splitter.sizes()
-    assert sizes_after[SPLIT_WATCH] > 0, (
-        "Watch sidebar must have non-zero width after toggle-on"
+    assert sizes_after[SPLIT_WATCH] > 20, (
+        "Watch sidebar must have more than strip width after toggle-on"
     )
+    assert win._watch_pane.is_expanded
     assert win._scalar_watch_sidebar.isVisible()
 
     # Hide it again
@@ -517,9 +519,7 @@ def test_watch_toggle_affects_correct_pane(win, qapp):
     _pev(qapp)
 
     sizes_hidden = win._main_splitter.sizes()
-    assert sizes_hidden[SPLIT_WATCH] == 0, (
-        "Watch sidebar must have zero width after toggle-off"
-    )
+    assert not win._watch_pane.is_expanded
     assert not win._scalar_watch_sidebar.isVisible()
     # Probe container should reclaim the space
     assert sizes_hidden[SPLIT_PROBES] >= probes_before, (

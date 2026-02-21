@@ -2,8 +2,8 @@
 """
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, 
-    QPushButton, QScrollArea, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QToolButton, QScrollArea, QFrame
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -20,12 +20,12 @@ class ScalarWatchSidebar(QWidget):
     
     # Signal when a scalar is removed from watch
     scalar_removed = pyqtSignal(object)  # ProbeAnchor
+    collapse_requested = pyqtSignal()
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         
-        self.setMinimumWidth(180)
-        self.setMaximumWidth(280)
+        self.setMinimumWidth(150)
         
         # Track scalars: anchor -> (card_widget, value_widget)
         self._scalars: Dict[ProbeAnchor, tuple] = {}
@@ -39,10 +39,27 @@ class ScalarWatchSidebar(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
         
-        # Header label
+        # Header row: collapse button + label
+        header_row = QWidget()
+        header_row.setObjectName("watchHeader")
+        h_layout = QHBoxLayout(header_row)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.setSpacing(0)
+
         header = QLabel("Watch")
         header.setObjectName("sidebarHeader")
-        layout.addWidget(header)
+        h_layout.addWidget(header)
+        h_layout.addStretch()
+
+        self._collapse_btn = QToolButton()
+        self._collapse_btn.setText("\u25b8")  # ▸
+        self._collapse_btn.setToolTip("Hide watch panel")
+        self._collapse_btn.setFixedSize(22, 22)
+        self._collapse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._collapse_btn.clicked.connect(self.collapse_requested.emit)
+        h_layout.addWidget(self._collapse_btn)
+
+        layout.addWidget(header_row)
         
         # Scroll area for scalars
         scroll = QScrollArea()
@@ -84,7 +101,18 @@ class ScalarWatchSidebar(QWidget):
                 text-transform: uppercase;
                 letter-spacing: 1px;
                 padding-bottom: 4px;
+            }
+            QWidget#watchHeader {
                 border-bottom: 1px solid #2a2a4a;
+            }
+            QToolButton {
+                color: #555555;
+                background: transparent;
+                border: none;
+                font-size: 11px;
+            }
+            QToolButton:hover {
+                color: #00ccff;
             }
             QLabel#placeholder {
                 color: #555555;

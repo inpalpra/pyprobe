@@ -6,7 +6,8 @@ Shows .py files in a directory tree. Single click selects a file.
 import os
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTreeView, QLabel, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QLabel, QHeaderView,
+    QToolButton,
 )
 from PyQt6.QtCore import (
     pyqtSignal, Qt, QDir, QModelIndex, QSortFilterProxyModel
@@ -41,9 +42,11 @@ class FileTreePanel(QWidget):
     """
 
     file_selected = pyqtSignal(str)
+    collapse_requested = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self.setMinimumWidth(150)
         self._current_file: Optional[str] = None
         self._root_path: Optional[str] = None
         self._setup_ui()
@@ -58,9 +61,26 @@ class FileTreePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Header label
+        # Header row: label + collapse button
+        header_row = QWidget()
+        header_row.setObjectName("fileTreeHeader")
+        h_layout = QHBoxLayout(header_row)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.setSpacing(0)
+
         self._header = QLabel("FILES")
-        layout.addWidget(self._header)
+        h_layout.addWidget(self._header)
+        h_layout.addStretch()
+
+        self._collapse_btn = QToolButton()
+        self._collapse_btn.setText("\u25c2")  # ◂
+        self._collapse_btn.setToolTip("Hide file explorer")
+        self._collapse_btn.setFixedSize(22, 22)
+        self._collapse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._collapse_btn.clicked.connect(self.collapse_requested.emit)
+        h_layout.addWidget(self._collapse_btn)
+
+        layout.addWidget(header_row)
 
         # File system model
         self._fs_model = QFileSystemModel()
@@ -90,8 +110,16 @@ class FileTreePanel(QWidget):
         c = theme.colors
         self._header.setStyleSheet(
             f"color: {c['accent_primary']}; background-color: {c['bg_darkest']}; "
-            f"padding: 6px 8px; font-weight: bold; font-size: 10px; "
+            f"padding: 6px 8px; font-weight: bold; font-size: 10px;"
+        )
+        self._header.parentWidget().setStyleSheet(
+            f"background-color: {c['bg_darkest']}; "
             f"border-bottom: 1px solid {c['border_default']};"
+        )
+        self._collapse_btn.setStyleSheet(
+            f"QToolButton {{ color: {c['text_muted']}; background: transparent; "
+            f"border: none; font-size: 11px; }}"
+            f"QToolButton:hover {{ color: {c['accent_primary']}; }}"
         )
         self._tree.setStyleSheet(f"""
             QTreeView {{

@@ -2,22 +2,12 @@
   "probes": [
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/monotonic.py",
-      "line": 4,
+      "line": 3,
       "col": 4,
-      "symbol": "c",
+      "symbol": "b",
       "func": "main",
       "is_assignment": true,
-      "color": "#9d2bee",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/monotonic.py",
-      "line": 5,
-      "col": 4,
-      "symbol": "d",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#eed52b",
+      "color": "#2bee64",
       "lens": null
     },
     {
@@ -32,12 +22,22 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/monotonic.py",
-      "line": 3,
+      "line": 5,
       "col": 4,
-      "symbol": "b",
+      "symbol": "d",
       "func": "main",
       "is_assignment": true,
-      "color": "#2bee64",
+      "color": "#eed52b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/monotonic.py",
+      "line": 4,
+      "col": 4,
+      "symbol": "c",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#9d2bee",
       "lens": null
     }
   ],

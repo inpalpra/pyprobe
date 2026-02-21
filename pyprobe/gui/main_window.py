@@ -45,6 +45,7 @@ from .probe_controller import ProbeController
 from .scalar_watch_window import ScalarWatchSidebar
 from .redraw_throttler import RedrawThrottler
 from .file_tree import FileTreePanel
+from .collapsible_pane import CollapsiblePane
 
 # === PERSISTENCE IMPORTS ===
 from ..core.probe_persistence import (
@@ -376,10 +377,13 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_vlayout.addWidget(splitter)
 
-        # === File tree panel (hidden until folder opened) ===
+        # === File tree panel (collapsed until folder opened) ===
         self._file_tree = FileTreePanel()
-        self._file_tree.setVisible(False)
-        splitter.addWidget(self._file_tree)
+        self._tree_pane = CollapsiblePane(
+            self._file_tree, side="left",
+            expand_tooltip="Show file explorer",
+        )
+        splitter.addWidget(self._tree_pane)
 
         # === M1: Code viewer with gutter (replaces watch list) ===
         code_container = QWidget()
@@ -399,17 +403,18 @@ class MainWindow(QMainWindow):
         self._probe_container = ProbePanelContainer()
         splitter.addWidget(self._probe_container)
 
-        # Scalar watch sidebar (right side, initially hidden)
+        # Scalar watch sidebar (collapsed until needed)
         self._scalar_watch_sidebar = ScalarWatchSidebar()
-        self._scalar_watch_sidebar.setVisible(False)
-        splitter.addWidget(self._scalar_watch_sidebar)
-        
+        self._watch_pane = CollapsiblePane(
+            self._scalar_watch_sidebar, side="right",
+            expand_tooltip="Show watch panel",
+        )
+        splitter.addWidget(self._watch_pane)
+
         # Store reference to splitter for resizing
         self._main_splitter = splitter
-        init_sizes = [0] * 4
-        init_sizes[SPLIT_CODE] = 400
-        init_sizes[SPLIT_PROBES] = 800
-        splitter.setSizes(init_sizes)  # Tree hidden, sidebar collapsed
+        splitter.setChildrenCollapsible(False)
+        self._recompute_splitter_sizes()
 
         # M2.5: Dock bar at bottom (hidden when empty)
         self._dock_bar = DockBar(self)
@@ -488,8 +493,9 @@ class MainWindow(QMainWindow):
         self._control_bar.open_folder_clicked.connect(self._on_open_folder)
         self._control_bar.action_clicked.connect(self._on_action_clicked)
         self._control_bar.stop_clicked.connect(self._on_stop_script)
-        self._control_bar.watch_clicked.connect(self._on_toggle_watch_window)
-        self._control_bar.files_clicked.connect(self._on_toggle_file_tree)
+        # Collapsible pane signals
+        self._tree_pane.toggled.connect(lambda _: self._recompute_splitter_sizes())
+        self._watch_pane.toggled.connect(lambda _: self._recompute_splitter_sizes())
 
         # File tree signals
         self._file_tree.file_selected.connect(self._on_file_tree_selected)
@@ -733,11 +739,7 @@ class MainWindow(QMainWindow):
         """Load a folder into the file tree panel."""
         self._folder_path = os.path.abspath(folder_path)
         self._file_tree.set_root(self._folder_path)
-        self._file_tree.setVisible(True)
-        # Resize splitter to show tree
-        sizes = self._main_splitter.sizes()
-        sizes[SPLIT_TREE] = 200
-        self._main_splitter.setSizes(sizes)
+        self._tree_pane.expand()
         self._status_bar.showMessage(f"Opened folder: {os.path.basename(folder_path)}")
 
     def _stash_current_file_visuals(self):
@@ -983,42 +985,78 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_toggle_watch_window(self):
         """Toggle the scalar watch sidebar visibility."""
-        if self._scalar_watch_sidebar.isVisible():
-            # Hide sidebar - collapse to 0 width
-            sizes = self._main_splitter.sizes()
-            self._saved_sidebar_width = sizes[SPLIT_WATCH] if sizes[SPLIT_WATCH] > 0 else 200
-            self._scalar_watch_sidebar.setVisible(False)
-            sizes[SPLIT_PROBES] += sizes[SPLIT_WATCH]
-            sizes[SPLIT_WATCH] = 0
-            self._main_splitter.setSizes(sizes)
-        else:
-            # Show sidebar - restore width
-            self._scalar_watch_sidebar.setVisible(True)
-            sizes = self._main_splitter.sizes()
-            sidebar_width = getattr(self, '_saved_sidebar_width', 200)
-            sizes[SPLIT_PROBES] = max(0, sizes[SPLIT_PROBES] - sidebar_width)
-            sizes[SPLIT_WATCH] = sidebar_width
-            self._main_splitter.setSizes(sizes)
+        self._watch_pane.toggle()
 
     @pyqtSlot()
     def _on_toggle_file_tree(self):
         """Toggle the file tree panel visibility."""
-        if self._file_tree.isVisible():
-            # Hide tree - collapse to 0 width
-            sizes = self._main_splitter.sizes()
-            self._saved_tree_width = sizes[SPLIT_TREE] if sizes[SPLIT_TREE] > 0 else 200
-            self._file_tree.setVisible(False)
-            sizes[SPLIT_CODE] += sizes[SPLIT_TREE]
-            sizes[SPLIT_TREE] = 0
-            self._main_splitter.setSizes(sizes)
+        self._tree_pane.toggle()
+
+    def _recompute_splitter_sizes(self) -> None:
+        """Distribute splitter space using weight-based proportional allocation.
+
+        Collapsed panes get 20px (edge strip only).  Remaining space is
+        distributed among expanded panes according to weights:
+            Explorer=1, Code=1.5, Probes=3, Watch=1
+        """
+        total = self._main_splitter.width() or 1200  # fallback before first show
+        weights = {
+            SPLIT_TREE: 1.0,
+            SPLIT_CODE: 1.5,
+            SPLIT_PROBES: 3.0,
+            SPLIT_WATCH: 1.0,
+        }
+
+        tree_expanded = self._tree_pane.is_expanded
+        watch_expanded = self._watch_pane.is_expanded
+
+        collapsed_px = 0
+        if not tree_expanded:
+            collapsed_px += 20
+        if not watch_expanded:
+            collapsed_px += 20
+
+        remaining = total - collapsed_px
+
+        # Sum weights of expanded panes
+        expanded_weight = 0.0
+        if tree_expanded:
+            expanded_weight += weights[SPLIT_TREE]
+        expanded_weight += weights[SPLIT_CODE]   # code always expanded
+        expanded_weight += weights[SPLIT_PROBES]  # probes always expanded
+        if watch_expanded:
+            expanded_weight += weights[SPLIT_WATCH]
+
+        def alloc(idx: int) -> int:
+            return int(remaining * weights[idx] / expanded_weight) if expanded_weight else 0
+
+        sizes = [0] * 4
+
+        # Tree pane
+        if tree_expanded:
+            raw = alloc(SPLIT_TREE)
+            sizes[SPLIT_TREE] = max(180, min(300, raw))
         else:
-            # Show tree - restore width
-            self._file_tree.setVisible(True)
-            sizes = self._main_splitter.sizes()
-            tree_width = getattr(self, '_saved_tree_width', 200)
-            sizes[SPLIT_CODE] = max(0, sizes[SPLIT_CODE] - tree_width)
-            sizes[SPLIT_TREE] = tree_width
-            self._main_splitter.setSizes(sizes)
+            sizes[SPLIT_TREE] = 20
+
+        # Code pane
+        sizes[SPLIT_CODE] = max(200, alloc(SPLIT_CODE))
+
+        # Probes pane (placeholder, adjusted below)
+        sizes[SPLIT_PROBES] = alloc(SPLIT_PROBES)
+
+        # Watch pane
+        if watch_expanded:
+            raw = alloc(SPLIT_WATCH)
+            sizes[SPLIT_WATCH] = max(180, min(280, raw))
+        else:
+            sizes[SPLIT_WATCH] = 20
+
+        # Push residual into probes so total matches
+        residual = total - (sizes[SPLIT_TREE] + sizes[SPLIT_CODE] + sizes[SPLIT_WATCH])
+        sizes[SPLIT_PROBES] = max(100, residual)
+
+        self._main_splitter.setSizes(sizes)
 
     # === M1: ANCHOR-BASED PROBE HANDLERS ===
 
@@ -1054,9 +1092,9 @@ class MainWindow(QMainWindow):
         # Add to watch sidebar
         self._scalar_watch_sidebar.add_scalar(anchor, color)
         
-        # Show sidebar if hidden
-        if not self._scalar_watch_sidebar.isVisible():
-            self._on_toggle_watch_window()
+        # Show sidebar if collapsed
+        if not self._watch_pane.is_expanded:
+            self._watch_pane.expand()
         
         # Highlight in code viewer
         self._code_viewer.set_probe_active(anchor, color)

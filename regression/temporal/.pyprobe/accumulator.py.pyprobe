@@ -3,21 +3,21 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/accumulator.py",
       "line": 4,
-      "col": 16,
-      "symbol": "total",
-      "func": "main",
-      "is_assignment": false,
-      "color": "#2bee64",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/accumulator.py",
-      "line": 4,
       "col": 8,
       "symbol": "total",
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/accumulator.py",
+      "line": 4,
+      "col": 16,
+      "symbol": "total",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#2bee64",
       "lens": null
     }
   ],
