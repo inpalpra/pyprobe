@@ -1,2 +1,5 @@
 **/__pycache__/
 **/.pyprobe/
+build/
+dist/
+*.spec.bak

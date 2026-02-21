@@ -1,0 +1,115 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ['v*']
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: pyprobe-macos-arm64
+            archive_ext: tar.gz
+          - os: macos-13
+            artifact: pyprobe-macos-x86_64
+            archive_ext: tar.gz
+          - os: ubuntu-22.04
+            artifact: pyprobe-linux-x86_64
+            archive_ext: tar.gz
+          - os: windows-latest
+            artifact: pyprobe-windows-x86_64
+            archive_ext: zip
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.artifact }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── Linux: install system Qt / display dependencies ──
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1-mesa-glx libglib2.0-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
+            libxcb-xkb1 libxkbcommon-x11-0 \
+            xvfb
+
+      # ── Install project + PyInstaller ──
+      - name: Install dependencies
+        run: |
+          uv sync --no-dev
+          uv pip install pyinstaller
+
+      # ── Build ──
+      - name: Build executable
+        run: pyinstaller pyprobe.spec
+
+      # ── Smoke test ──
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run --auto-servernum dist/pyprobe/pyprobe --help
+
+      - name: Smoke test (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: |
+          dist/pyprobe/pyprobe --help
+        shell: bash
+
+      # ── Archive ──
+      - name: Archive (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        run: tar -czf ${{ matrix.artifact }}.tar.gz -C dist pyprobe
+
+      - name: Archive (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: Compress-Archive -Path dist\pyprobe -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.${{ matrix.archive_ext }}
+          retention-days: 14
+
+  # ── Create GitHub Release and attach binaries ──
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**/*
