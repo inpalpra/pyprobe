@@ -13,12 +13,15 @@ from ...plots.draw_mode import DrawMode, apply_draw_mode
 
 MAX_DISPLAY_POINTS = 5000
 
-def downsample(data: np.ndarray) -> np.ndarray:
-    """Downsample large data for display."""
-    if len(data) <= MAX_DISPLAY_POINTS:
-        return data
+def downsample(data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> tuple:
+    """Downsample large data for display, returning (x_indices, y_values)."""
+    if n_points <= 0:
+        n_points = MAX_DISPLAY_POINTS
+
+    if len(data) <= n_points:
+        return np.arange(len(data)) + x_offset, data
     
-    n_chunks = MAX_DISPLAY_POINTS // 2
+    n_chunks = n_points // 2
     chunk_size = len(data) // n_chunks
     truncated = data[:n_chunks * chunk_size]
     reshaped = truncated.reshape(n_chunks, chunk_size)
@@ -26,13 +29,18 @@ def downsample(data: np.ndarray) -> np.ndarray:
     mins = reshaped.min(axis=1)
     maxs = reshaped.max(axis=1)
     
-    result = np.empty(n_chunks * 2, dtype=data.dtype)
-    result[0::2] = mins
-    result[1::2] = maxs
-    return result
+    chunk_starts = np.arange(n_chunks) * chunk_size
+    x = np.empty(n_chunks * 2, dtype=np.int64)
+    x[0::2] = chunk_starts + x_offset
+    x[1::2] = chunk_starts + (chunk_size - 1) + x_offset
+    
+    y = np.empty(n_chunks * 2, dtype=data.dtype)
+    y[0::2] = mins
+    y[1::2] = maxs
+    return x, y
 
 class ComplexWidget(QWidget):
-    """Base widget for complex time-domain plots."""
+    """Base widget for complex time-domain plots with zoom-responsive downsampling."""
     
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -40,6 +48,7 @@ class ComplexWidget(QWidget):
         self._color = color
         self._plot_widget = pg.PlotWidget()
         self._info_label = QLabel("")
+        self._raw_data: Optional[np.ndarray] = None  # Raw complex array
         
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
@@ -49,6 +58,13 @@ class ComplexWidget(QWidget):
         self._draw_modes: Dict[str, DrawMode] = {}
         # Series key -> (curve, color_hex) for apply_draw_mode
         self._series_curves: Dict[str, tuple] = {}
+        
+        # Zoom-responsive state
+        self._zoom_timer = QTimer()
+        self._zoom_timer.setSingleShot(True)
+        self._zoom_timer.setInterval(50)
+        self._zoom_timer.timeout.connect(self._rerender_for_zoom)
+        self._updating_curves = False
         
         self._setup_ui()
         self._configure_plot()
@@ -92,6 +108,10 @@ class ComplexWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+        # Zoom-responsive: connect sigRangeChanged
+        vb = plot_item.getViewBox()
+        vb.sigRangeChanged.connect(self._on_view_range_changed)
 
     def _apply_theme(self, theme) -> None:
         c = theme.colors
@@ -167,6 +187,52 @@ class ComplexWidget(QWidget):
             self._pin_indicator.update_layout(view_rect)
             self._pin_indicator.raise_()
 
+    # ── Zoom-responsive downsampling ──────────────────────
+
+    def _on_view_range_changed(self, vb, ranges):
+        """Handle view range changes — debounce and re-render."""
+        if self._updating_curves or self._raw_data is None:
+            return
+        self._zoom_timer.start()
+
+    def _rerender_for_zoom(self):
+        """Re-downsample or show raw data based on visible x-range.
+
+        Subclasses implement _render_slice(i_min, i_max) which produces
+        the derived arrays (real, imag, mag, phase, etc.) for the visible
+        slice, then calls setData on their curves.
+        """
+        if self._raw_data is None:
+            return
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        x_min, x_max = vb.viewRange()[0]
+        n = len(self._raw_data)
+        i_min = max(0, int(np.floor(x_min)))
+        i_max = min(n, int(np.ceil(x_max)) + 1)
+        if i_min >= i_max:
+            return
+        self._updating_curves = True
+        self._render_slice(i_min, i_max)
+        self._updating_curves = False
+
+    def _render_slice(self, i_min: int, i_max: int):
+        """Override in subclasses to re-render the visible slice."""
+        pass
+
+    # ── get_plot_data for testing ────────────────────────
+
+    def get_plot_data(self) -> list:
+        """Return data currently plotted, for test verification."""
+        result = []
+        for key, (curve, _color) in self._series_curves.items():
+            x_data, y_data = curve.getData()
+            if x_data is not None and y_data is not None:
+                result.append({'name': key, 'x': list(x_data), 'y': list(y_data)})
+            else:
+                result.append({'name': key, 'x': [], 'y': []})
+        return result
+
+
 class ComplexRIWidget(ComplexWidget):
     """Real & Imaginary components."""
     
@@ -180,12 +246,28 @@ class ComplexRIWidget(ComplexWidget):
 
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
+        self._raw_data = value
+
+        self._updating_curves = True
         real = value.real
         imag = value.imag
-        
-        self._real_curve.setData(downsample(real))
-        self._imag_curve.setData(downsample(imag))
+        x_r, y_r = downsample(real)
+        x_i, y_i = downsample(imag)
+        self._real_curve.setData(x_r, y_r)
+        self._imag_curve.setData(x_i, y_i)
+        self._updating_curves = False
         self.update_info(f"[{value.shape}]")
+
+    def _render_slice(self, i_min: int, i_max: int):
+        """Re-render real & imag for the visible slice."""
+        sliced = self._raw_data[i_min:i_max]
+        real = sliced.real
+        imag = sliced.imag
+        x_r, y_r = downsample(real, x_offset=i_min)
+        x_i, y_i = downsample(imag, x_offset=i_min)
+        self._real_curve.setData(x_r, y_r)
+        self._imag_curve.setData(x_i, y_i)
+
 
 class ComplexMAWidget(ComplexWidget):
     """Magnitude (Log) & Phase."""
@@ -196,11 +278,6 @@ class ComplexMAWidget(ComplexWidget):
         # Mag on left axis
         self._mag_curve = self._plot_widget.plot(pen=pg.mkPen('#ffff00', width=1.5), name="Log Mag (dB)")
         self._plot_widget.setLabel('left', 'Magnitude (dB)', color='#ffff00')
-        
-        # Phase on right axis approach using ViewBox?
-        # For simplicity in this iteration, keeping same axis but maybe specific widget handles it better.
-        # User requested: "MA option, needs either two Y scales... Alternate would be to toggle Y-scale"
-        # Let's implement dual scale using ViewBox.
         
         self._p1 = self._plot_widget.plotItem
         self._p2 = pg.ViewBox()
@@ -229,26 +306,33 @@ class ComplexMAWidget(ComplexWidget):
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         """Handle axis pin state - also control secondary Y axis for phase."""
         super()._on_pin_state_changed(axis, is_pinned)
-        
-        # When Y axis is locked/unlocked, also lock/unlock the secondary ViewBox (phase)
         if axis == 'y':
             self._p2.enableAutoRange(axis='y', enable=not is_pinned)
 
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
-        
-        # Mag (Log)
-        # Avoid log(0)
-        mag = np.abs(value)
-        mag_db = 20 * np.log10(mag + 1e-12)
-        
-        # Phase (Rad)
+        self._raw_data = value
+
+        self._updating_curves = True
+        mag_db = 20 * np.log10(np.abs(value) + 1e-12)
         phase = np.angle(value)
-        
-        self._mag_curve.setData(downsample(mag_db))
-        self._phase_curve.setData(downsample(phase))
-        
+        x_m, y_m = downsample(mag_db)
+        x_p, y_p = downsample(phase)
+        self._mag_curve.setData(x_m, y_m)
+        self._phase_curve.setData(x_p, y_p)
+        self._updating_curves = False
         self.update_info(f"[{value.shape}]")
+
+    def _render_slice(self, i_min: int, i_max: int):
+        """Re-render mag & phase for the visible slice."""
+        sliced = self._raw_data[i_min:i_max]
+        mag_db = 20 * np.log10(np.abs(sliced) + 1e-12)
+        phase = np.angle(sliced)
+        x_m, y_m = downsample(mag_db, x_offset=i_min)
+        x_p, y_p = downsample(phase, x_offset=i_min)
+        self._mag_curve.setData(x_m, y_m)
+        self._phase_curve.setData(x_p, y_p)
+
 
 class SingleCurveWidget(ComplexWidget):
     """Generic single curve complex view."""
@@ -259,10 +343,25 @@ class SingleCurveWidget(ComplexWidget):
         self._curve = self._plot_widget.plot(pen=pg.mkPen(color.name(), width=1.5), name=title)
         self._plot_widget.setLabel('left', title)
         self._register_series(title, self._curve, color.name())
+        self._raw_real_data: Optional[np.ndarray] = None  # Pre-computed real array
 
     def set_data(self, data: np.ndarray, info: str):
-        self._curve.setData(downsample(data))
+        self._raw_real_data = data
+        self._raw_data = data  # Base class zoom guard checks this
+        self._updating_curves = True
+        x, y = downsample(data)
+        self._curve.setData(x, y)
+        self._updating_curves = False
         self.update_info(info)
+
+    def _render_slice(self, i_min: int, i_max: int):
+        """Re-render for the visible slice using pre-computed real data."""
+        source = self._raw_real_data if self._raw_real_data is not None else self._raw_data
+        if source is None:
+            return
+        sliced = source[i_min:i_max]
+        x, y = downsample(sliced, x_offset=i_min)
+        self._curve.setData(x, y)
 
 # --- PLUGINS ---
 

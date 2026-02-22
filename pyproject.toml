@@ -47,6 +47,9 @@ dev = [
 ]
 
 [dependency-groups]
+dev = [
+    "pysoqpsk-tg",
+]
 planning = [
     "pyplan",
 ]
@@ -57,3 +60,4 @@ include = ["pyprobe*"]
 
 [tool.uv.sources]
 pyplan = { git = "https://github.com/inpalpra/pyplan.git", rev = "main" }
+pysoqpsk-tg = { path = "../pysoqpsk-tg" }

@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QRectF
+from PyQt6.QtCore import QRectF, QTimer
 
 from ...plots.pin_layout_mixin import PinLayoutMixin
 from ...plots.draw_mode import DrawMode, apply_draw_mode
@@ -120,6 +120,15 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         # M2.5: Setup axis controller and pin indicator
         plot_item = self._plot_widget.getPlotItem()
+        
+        # Zoom-responsive downsampling: re-render when view range changes
+        self._zoom_timer = QTimer()
+        self._zoom_timer.setSingleShot(True)
+        self._zoom_timer.setInterval(50)  # 50ms debounce
+        self._zoom_timer.timeout.connect(self._rerender_for_zoom)
+        self._updating_curves = False  # Guard against recursion
+        vb = plot_item.getViewBox()
+        vb.sigRangeChanged.connect(self._on_view_range_changed)
         self._axis_controller = AxisController(plot_item)
         self._axis_controller.pin_state_changed.connect(self._on_pin_state_changed)
         
@@ -301,16 +310,28 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             self._row_visible[row_index] = not self._row_visible[row_index]
             self._curves[row_index].setVisible(self._row_visible[row_index])
 
-    def downsample(self, data: np.ndarray) -> np.ndarray:
+    def downsample(self, data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> Tuple[np.ndarray, np.ndarray]:
         """
         Downsample data for display while preserving visual features.
         Uses min-max decimation to preserve peaks.
+        
+        Args:
+            data: The array to downsample.
+            n_points: Max display points (0 = use MAX_DISPLAY_POINTS).
+            x_offset: Offset added to x-indices (for sliced data).
+        
+        Returns:
+            (x_indices, y_values) tuple. x_indices map back to original
+            sample positions so the plot x-axis stays correct.
         """
-        if len(data) <= self.MAX_DISPLAY_POINTS:
-            return data
+        if n_points <= 0:
+            n_points = self.MAX_DISPLAY_POINTS
+        
+        if len(data) <= n_points:
+            return np.arange(len(data)) + x_offset, data
 
         # Number of chunks
-        n_chunks = self.MAX_DISPLAY_POINTS // 2
+        n_chunks = n_points // 2
         chunk_size = len(data) // n_chunks
 
         # Reshape and get min/max per chunk
@@ -321,12 +342,18 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         mins = reshaped.min(axis=1)
         maxs = reshaped.max(axis=1)
 
-        # Interleave min and max
-        result = np.empty(n_chunks * 2, dtype=data.dtype)
-        result[0::2] = mins
-        result[1::2] = maxs
+        # Build x-indices that map back to original sample positions
+        chunk_starts = np.arange(n_chunks) * chunk_size
+        x = np.empty(n_chunks * 2, dtype=np.int64)
+        x[0::2] = chunk_starts + x_offset
+        x[1::2] = chunk_starts + (chunk_size - 1) + x_offset
 
-        return result
+        # Interleave min and max y-values
+        y = np.empty(n_chunks * 2, dtype=data.dtype)
+        y[0::2] = mins
+        y[1::2] = maxs
+
+        return x, y
 
     def update_data(self, value: Any, dtype: str, shape: Optional[Tuple[int, ...]] = None, source_info: str = "") -> None:
         """Update the widget with new data."""
@@ -418,16 +445,19 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         apply_draw_mode(self._curves[0], mode, self._color.name())
 
         # Downsample if needed
-        display_data = self.downsample(self._data)
+        x_display, y_display = self.downsample(self._data)
 
         # Update plot - use time vector if available (Waveform objects)
+        self._updating_curves = True
         if self._t_vector is not None and len(self._t_vector) == len(self._data):
-            t_display = self.downsample(self._t_vector) if len(self._data) > self.MAX_DISPLAY_POINTS else self._t_vector
-            self._curves[0].setData(t_display, display_data)
+            # Map sample indices through time vector
+            t_display = self._t_vector[x_display]
+            self._curves[0].setData(t_display, y_display)
             self._plot_widget.setLabel('bottom', 'Time')
         else:
-            self._curves[0].setData(display_data)
+            self._curves[0].setData(x_display, y_display)
             self._plot_widget.setLabel('bottom', 'Sample Index')
+        self._updating_curves = False
 
         # Update info label
         shape_str = f"[{value.shape}]" if shape else ""
@@ -445,15 +475,17 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._ensure_curves(num_rows)
 
         # Update each row
+        self._updating_curves = True
         for row_idx in range(num_rows):
             row_data = value[row_idx, :]
-            display_data = self.downsample(row_data)
+            x_display, y_display = self.downsample(row_data)
             
             if self._t_vector is not None and len(self._t_vector) == len(row_data):
-                t_display = self.downsample(self._t_vector) if len(row_data) > self.MAX_DISPLAY_POINTS else self._t_vector
-                self._curves[row_idx].setData(t_display, display_data)
+                t_display = self._t_vector[x_display]
+                self._curves[row_idx].setData(t_display, y_display)
             else:
-                self._curves[row_idx].setData(display_data)
+                self._curves[row_idx].setData(x_display, y_display)
+        self._updating_curves = False
 
         # Set x-axis label
         if self._t_vector is not None:
@@ -483,6 +515,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         all_samples = []
 
         # Update each waveform with its own time vector
+        self._updating_curves = True
         for idx, wf in enumerate(waveforms):
             samples = np.asarray(wf['samples'])
             scalars = wf.get('scalars', [0.0, 1.0])
@@ -491,11 +524,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             # Compute time vector for this specific waveform
             t_vector = t0 + np.arange(len(samples)) * dt
             
-            display_data = self.downsample(samples)
-            t_display = self.downsample(t_vector) if len(samples) > self.MAX_DISPLAY_POINTS else t_vector
+            x_indices, y_display = self.downsample(samples)
+            # Map sample indices through time vector
+            t_display = t_vector[x_indices]
             
-            self._curves[idx].setData(t_display, display_data)
+            self._curves[idx].setData(t_display, y_display)
             all_samples.append(samples)
+        self._updating_curves = False
 
         self._plot_widget.setLabel('bottom', 'Time')
         self._info_label.setText(f"[{num_waveforms} waveforms] {source_info}")
@@ -515,11 +550,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._ensure_curves(num_arrays)
         all_data = []
 
+        self._updating_curves = True
         for idx, arr in enumerate(arrays):
             samples = np.asarray(arr)
-            display_data = self.downsample(samples)
-            self._curves[idx].setData(display_data)
+            x_display, y_display = self.downsample(samples)
+            self._curves[idx].setData(x_display, y_display)
             all_data.append(samples)
+        self._updating_curves = False
 
         self._plot_widget.setLabel('bottom', 'Sample Index')
         self._info_label.setText(f"[{num_arrays} arrays] {source_info}")
@@ -549,6 +586,70 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._stats_label.setText(
             f"{prefix_str}Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
         )
+
+    def _on_view_range_changed(self, vb, ranges):
+        """Handle view range changes — debounce and re-render."""
+        if self._updating_curves or self._data is None:
+            return
+        self._zoom_timer.start()
+
+    def _rerender_for_zoom(self):
+        """Re-downsample or show raw data based on visible x-range."""
+        if self._data is None:
+            return
+        
+        plot_item = self._plot_widget.getPlotItem()
+        vb = plot_item.getViewBox()
+        x_min, x_max = vb.viewRange()[0]
+        
+        # For 1D data
+        if self._data.ndim == 1:
+            n = len(self._data)
+            i_min = max(0, int(np.floor(x_min)))
+            i_max = min(n, int(np.ceil(x_max)) + 1)
+            if i_min >= i_max:
+                return
+            
+            visible_slice = self._data[i_min:i_max]
+            visible_count = len(visible_slice)
+            
+            self._updating_curves = True
+            if visible_count <= self.MAX_DISPLAY_POINTS:
+                # Full resolution for visible slice
+                x = np.arange(i_min, i_max)
+                y = visible_slice
+            else:
+                # Re-downsample the visible slice
+                x, y = self.downsample(visible_slice, x_offset=i_min)
+            
+            if self._t_vector is not None and len(self._t_vector) == len(self._data):
+                self._curves[0].setData(self._t_vector[x], y)
+            else:
+                self._curves[0].setData(x, y)
+            self._updating_curves = False
+        
+        elif self._data.ndim == 2:
+            # 2D: re-downsample each row for visible range
+            n_cols = self._data.shape[1]
+            i_min = max(0, int(np.floor(x_min)))
+            i_max = min(n_cols, int(np.ceil(x_max)) + 1)
+            if i_min >= i_max:
+                return
+            
+            self._updating_curves = True
+            for row_idx in range(min(self._data.shape[0], len(self._curves))):
+                row_slice = self._data[row_idx, i_min:i_max]
+                if len(row_slice) <= self.MAX_DISPLAY_POINTS:
+                    x = np.arange(i_min, i_max)
+                    y = row_slice
+                else:
+                    x, y = self.downsample(row_slice, x_offset=i_min)
+                
+                if self._t_vector is not None and len(self._t_vector) == n_cols:
+                    self._curves[row_idx].setData(self._t_vector[x], y)
+                else:
+                    self._curves[row_idx].setData(x, y)
+            self._updating_curves = False
 
     def set_draw_mode(self, curve_index: int, mode: DrawMode) -> None:
         """Set the draw mode for a curve by index."""
