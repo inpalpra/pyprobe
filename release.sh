@@ -66,6 +66,8 @@ if [[ ! "$NEW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
   exit 1
 fi
 
+PURE_VERSION="${NEW_TAG#v}"
+
 echo -e "${GREEN}New tag:${RESET}    ${BOLD}${NEW_TAG}${RESET}"
 echo ""
 
@@ -82,14 +84,25 @@ fi
 
 # ── Confirm ──
 echo -e "${BOLD}This will:${RESET}"
-echo "  1. Create git tag ${NEW_TAG}"
-echo "  2. Push to origin (triggers GitHub Actions release build)"
+echo "  1. Bump version to ${PURE_VERSION} in pyproject.toml"
+echo "  2. Create git commit for the bump"
+echo "  3. Create git tag ${NEW_TAG}"
+echo "  4. Push to origin (triggers GitHub Actions release build)"
 echo ""
 read -rp "$(echo -e "${YELLOW}Proceed? [y/N]:${RESET} ")" confirm
 if [[ "$confirm" != [yY] ]]; then
   echo "Aborted."
   exit 0
 fi
+
+# ── Bump Version in pyproject.toml ──
+# Works on both BSD (macOS) and GNU sed
+sed -i.bak -e "s/^version = \".*\"/version = \"${PURE_VERSION}\"/" pyproject.toml
+rm pyproject.toml.bak
+
+git add pyproject.toml
+git commit -m "Bump version to ${PURE_VERSION}"
+echo -e "${GREEN}✓ Bumped version in pyproject.toml${RESET}"
 
 # ── Tag and push ──
 git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
