@@ -10,7 +10,8 @@ from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
 from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
-
+from ...plots.editable_axis import EditableAxisItem
+from ...gui.axis_editor import AxisEditor
 
 class ConstellationWidget(QWidget):
     """Scatter plot widget for I/Q data."""
@@ -28,6 +29,7 @@ class ConstellationWidget(QWidget):
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
         self._pin_indicator: Optional[PinIndicator] = None
+        self._axis_editor: Optional[AxisEditor] = None
 
         self._setup_ui()
 
@@ -75,11 +77,13 @@ class ConstellationWidget(QWidget):
         self._plot_widget.setLabel('left', 'Q (Imag)')
         self._plot_widget.setLabel('bottom', 'I (Real)')
 
-        axis_pen = pg.mkPen(color=self._color.name(), width=1)
-        self._plot_widget.getAxis('left').setPen(axis_pen)
-        self._plot_widget.getAxis('bottom').setPen(axis_pen)
-        self._plot_widget.getAxis('left').setTextPen(axis_pen)
-        self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
+        # Setup editable axes
+        self._setup_editable_axes()
+        
+        # Axis editor (inline text editor)
+        self._axis_editor = AxisEditor(self._plot_widget)
+        self._axis_editor.value_committed.connect(self._on_axis_value_committed)
+        self._axis_editor.editing_cancelled.connect(self._on_axis_edit_cancelled)
 
         # Add cross-hair at origin
         self._origin_x = self._plot_widget.addLine(x=0, pen=pg.mkPen('#333333', width=1))
@@ -119,10 +123,18 @@ class ConstellationWidget(QWidget):
         self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
         self._plot_widget.setBackground(pc['bg'])
         self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        
+        # manually force grid
+        alpha_int = int(min(255, max(0, grid_alpha * 255)))
         axis_pen = pg.mkPen(color=pc['axis'], width=1)
-        for ax in ('left', 'bottom'):
-            self._plot_widget.getAxis(ax).setPen(axis_pen)
-            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
+        for ax_name in ('left', 'bottom'):
+            ax = self._plot_widget.getAxis(ax_name)
+            if ax is not None:
+                ax.setPen(axis_pen)
+                ax.setTextPen(axis_pen)
+                if hasattr(ax, 'setGrid'):
+                    ax.setGrid(alpha_int)
+        
         origin_color = QColor(pc['grid_major'])
         origin_color.setAlphaF(origin_alpha)
         grid_pen = pg.mkPen(color=origin_color, width=1)
@@ -135,6 +147,87 @@ class ConstellationWidget(QWidget):
             return data
         indices = np.random.choice(len(data), self.MAX_DISPLAY_POINTS, replace=False)
         return data[indices]
+
+    # === Editable Axes ===
+    
+    def _setup_editable_axes(self) -> None:
+        """Replace standard axes with editable ones that support double-click editing."""
+        plot_item = self._plot_widget.getPlotItem()
+
+        # Create editable axes
+        bottom_axis = EditableAxisItem('bottom')
+        left_axis = EditableAxisItem('left')
+
+        # Style them to match probe color
+        axis_pen = pg.mkPen(color=self._color.name(), width=1)
+        bottom_axis.setPen(axis_pen)
+        bottom_axis.setTextPen(axis_pen)
+        left_axis.setPen(axis_pen)
+        left_axis.setTextPen(axis_pen)
+
+        # Place axes (and their grids) above the plotted data
+        bottom_axis.setZValue(10)
+        left_axis.setZValue(10)
+
+        # Replace existing axes
+        plot_item.setAxisItems({'bottom': bottom_axis, 'left': left_axis})
+
+        # Explicitly set grid on current editable axes
+        bottom_axis.setGrid(153) # ~0.6 alpha
+        left_axis.setGrid(153)
+
+        # Connect edit signals
+        bottom_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('x', 'min', val))
+        bottom_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('x', 'max', val))
+        left_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y', 'min', val))
+        left_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y', 'max', val))
+
+    def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
+        """Start inline editing of an axis min/max value."""
+        if self._axis_editor is None:
+            return
+
+        # Store context for commit
+        self._axis_editor.setProperty('edit_axis', axis)
+        self._axis_editor.setProperty('edit_endpoint', endpoint)
+
+        # Position near the axis
+        if axis == 'x':
+            x = 40 if endpoint == 'min' else self._plot_widget.width() - 60
+            y = self._plot_widget.height() - 20
+        else:
+            x = 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
+
+        self._axis_editor.show_at(x, y, current_value)
+
+    def _on_axis_value_committed(self, value: float) -> None:
+        """Handle axis editor value committed."""
+        axis = self._axis_editor.property('edit_axis')
+        endpoint = self._axis_editor.property('edit_endpoint')
+        plot_item = self._plot_widget.getPlotItem()
+        view_box = plot_item.getViewBox()
+
+        if axis == 'x':
+            current_range = view_box.viewRange()[0]
+            if endpoint == 'min':
+                plot_item.setXRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setXRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('x', True)
+        elif axis == 'y':
+            current_range = view_box.viewRange()[1]
+            if endpoint == 'min':
+                plot_item.setYRange(value, current_range[1], padding=0)
+            else:
+                plot_item.setYRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('y', True)
+
+    def _on_axis_edit_cancelled(self) -> None:
+        """Handle axis editor cancelled. Nothing to do."""
+        pass
 
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the constellation with new complex data."""
