@@ -242,7 +242,7 @@ jobs:
             xvfb
 
       - name: Wait for PyPI index to update
-        run: sleep 30
+        run: sleep 90
 
       - name: Install from PyPI in clean venv
         run: |
