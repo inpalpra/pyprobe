@@ -640,6 +640,9 @@ class ProbePanel(QFrame):
                 self._toolbar.set_mode(InteractionMode.POINTER)
         elif key == Qt.Key.Key_D and event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             self._toggle_debug_overlay()
+        elif key == Qt.Key.Key_P:
+            # P for Park
+            self.park_requested.emit()
         else:
             super().keyPressEvent(event)
 

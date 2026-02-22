@@ -47,7 +47,9 @@ dev = [
 ]
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest-qt>=4.5.0",
+]
 planning = [
     "pyplan",
 ]

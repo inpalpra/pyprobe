@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "pyprobe-plots"
-version = "0.1.13"
+version = "0.1.14"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -693,6 +693,9 @@ dev = [
 ]
 
 [package.dev-dependencies]
+dev = [
+    { name = "pytest-qt" },
+]
 planning = [
     { name = "pyplan" },
 ]
@@ -714,7 +717,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = []
+dev = [{ name = "pytest-qt", specifier = ">=4.5.0" }]
 planning = [{ name = "pyplan", git = "https://github.com/inpalpra/pyplan.git?rev=main" }]
 
 [[package]]
