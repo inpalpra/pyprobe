@@ -31,9 +31,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-# ── Get latest tag ──
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-echo -e "${CYAN}Latest tag:${RESET} ${BOLD}${LATEST_TAG}${RESET}"
+# ── Get latest version from pyproject.toml ──
+CURRENT_VERSION=$(grep -E '^version = ' pyproject.toml | cut -d'"' -f2 | tr -d ' ')
+echo -e "${CYAN}Current version in pyproject.toml:${RESET} ${BOLD}${CURRENT_VERSION}${RESET}"
 
 # ── Determine new version ──
 auto_bump() {
@@ -56,7 +56,7 @@ for arg in "$@"; do
 done
 
 if [[ -z "$NEW_TAG" ]]; then
-  NEW_TAG=$(auto_bump "$LATEST_TAG")
+  NEW_TAG=$(auto_bump "$CURRENT_VERSION")
 fi
 
 # Validate format
@@ -72,8 +72,8 @@ echo -e "${GREEN}New tag:${RESET}    ${BOLD}${NEW_TAG}${RESET}"
 echo ""
 
 # ── Show commits since last release ──
-echo -e "${CYAN}Commits since ${LATEST_TAG}:${RESET}"
-git log --oneline "${LATEST_TAG}..HEAD" 2>/dev/null || git log --oneline -10
+echo -e "${CYAN}Commits since v${CURRENT_VERSION}:${RESET}"
+git log --oneline "v${CURRENT_VERSION}..HEAD" 2>/dev/null || git log --oneline -10
 echo ""
 
 # ── Dry run exit ──
