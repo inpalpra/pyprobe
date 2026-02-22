@@ -518,7 +518,19 @@ class ProbePanel(QFrame):
 
     def _on_toolbar_reset(self) -> None:
         """Handle reset from toolbar."""
-        if self._plot and hasattr(self._plot, 'axis_controller'):
+        # Restore original setRange if axis-constrained zoom had patched it
+        if self._plot and hasattr(self._plot, '_plot_widget'):
+            vb = self._plot._plot_widget.getPlotItem().getViewBox()
+            if hasattr(vb, '_original_setRange'):
+                vb.setRange = vb._original_setRange
+                del vb._original_setRange
+        # Reset toolbar mode to POINTER (clears zoom constraints)
+        if self._toolbar:
+            self._toolbar.set_mode(InteractionMode.POINTER)
+        # Prefer reset_view() which restores full curve data before auto-ranging
+        if self._plot and hasattr(self._plot, 'reset_view'):
+            self._plot.reset_view()
+        elif self._plot and hasattr(self._plot, 'axis_controller'):
             ac = self._plot.axis_controller
             if ac:
                 ac.reset()
@@ -618,8 +630,8 @@ class ProbePanel(QFrame):
             else:
                 logger.debug("  No axis_controller found!")
         elif key == Qt.Key.Key_R:
-            if self._plot and hasattr(self._plot, 'axis_controller') and self._plot.axis_controller:
-                self._plot.axis_controller.reset()
+            # Delegate to _on_toolbar_reset which handles setRange restore
+            self._on_toolbar_reset()
         elif key == Qt.Key.Key_M:
             # M for Maximize toggle
             self.maximize_requested.emit()

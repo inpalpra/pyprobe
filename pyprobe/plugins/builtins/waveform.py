@@ -651,6 +651,43 @@ class WaveformWidget(PinLayoutMixin, QWidget):
                     self._curves[row_idx].setData(x, y)
             self._updating_curves = False
 
+    def reset_view(self) -> None:
+        """Reset the view: restore full data to curves, unpin axes, snap to full range.
+        
+        _rerender_for_zoom replaces curve data with the visible-range-only slice.
+        A bare autoRange() would then fit only to that partial data, causing
+        incremental widening instead of a snap. This method restores the full
+        dataset before auto-ranging.
+        """
+        if self._data is None:
+            return
+        
+        # 1. Restore full dataset to curves
+        self._updating_curves = True
+        if self._data.ndim == 1:
+            x_display, y_display = self.downsample(self._data)
+            if self._t_vector is not None and len(self._t_vector) == len(self._data):
+                self._curves[0].setData(self._t_vector[x_display], y_display)
+            else:
+                self._curves[0].setData(x_display, y_display)
+        elif self._data.ndim == 2:
+            for row_idx in range(min(self._data.shape[0], len(self._curves))):
+                row_data = self._data[row_idx, :]
+                x_display, y_display = self.downsample(row_data)
+                if self._t_vector is not None and len(self._t_vector) == self._data.shape[1]:
+                    self._curves[row_idx].setData(self._t_vector[x_display], y_display)
+                else:
+                    self._curves[row_idx].setData(x_display, y_display)
+        self._updating_curves = False
+        
+        # 2. Unpin axes and snap to full range
+        if self._axis_controller:
+            self._axis_controller.set_pinned('x', False)
+            self._axis_controller.set_pinned('y', False)
+        
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        vb.autoRange(padding=0)
+
     def set_draw_mode(self, curve_index: int, mode: DrawMode) -> None:
         """Set the draw mode for a curve by index."""
         if curve_index < 0 or curve_index >= len(self._curves):

@@ -2,16 +2,6 @@
   "probes": [
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 76,
-      "col": 8,
-      "symbol": "received_symbols",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#9d2bee",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
       "col": 36,
       "symbol": "signal_q",
@@ -23,33 +13,34 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
-      "col": 26,
-      "symbol": "signal_i",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#2bee64",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
       "col": 8,
       "symbol": "received_symbols",
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
       "lens": null
-    }
-  ],
-  "watches": [
+    },
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 73,
-      "col": 12,
-      "symbol": "NUM_SYMBOLS",
+      "line": 76,
+      "col": 8,
+      "symbol": "received_symbols",
       "func": "main",
-      "is_assignment": false
+      "is_assignment": true,
+      "color": "#9d2bee",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
+      "col": 26,
+      "symbol": "signal_i",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
+      "lens": null
     }
   ],
+  "watches": [],
   "overlays": []
 }

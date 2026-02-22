@@ -237,6 +237,16 @@ class ConstellationWidget(QWidget):
             self._pin_indicator.update_layout(view_rect)
             self._pin_indicator.raise_()
 
+    def reset_view(self) -> None:
+        """Reset the view: unpin axes, re-lock aspect, snap to full range."""
+        if self._axis_controller:
+            self._axis_controller.set_pinned('x', False)
+            self._axis_controller.set_pinned('y', False)
+        # Re-lock aspect for proper I/Q display
+        self._plot_widget.setAspectLocked(True)
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        vb.autoRange(padding=0)
+
     def get_plot_data(self) -> dict:
         """
         Return the data currently plotted on the constellation.

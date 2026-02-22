@@ -219,6 +219,22 @@ class ComplexWidget(QWidget):
         """Override in subclasses to re-render the visible slice."""
         pass
 
+    def reset_view(self) -> None:
+        """Reset the view: restore full data to curves, unpin axes, snap to full range."""
+        if self._raw_data is None:
+            return
+        # Restore full dataset to curves via subclass _render_slice
+        n = len(self._raw_data)
+        self._updating_curves = True
+        self._render_slice(0, n)
+        self._updating_curves = False
+        # Unpin axes and snap to full range
+        if self._axis_controller:
+            self._axis_controller.set_pinned('x', False)
+            self._axis_controller.set_pinned('y', False)
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        vb.autoRange(padding=0)
+
     # ── get_plot_data for testing ────────────────────────
 
     def get_plot_data(self) -> list:
