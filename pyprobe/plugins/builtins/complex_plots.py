@@ -94,9 +94,14 @@ class ComplexWidget(QWidget):
 
     def _configure_plot(self):
         self._plot_widget.setBackground('#0d0d0d')
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        # Use a more visible default grid alpha (0.6) before theme override
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
         self._plot_widget.setLabel('bottom', 'Sample Index')
         self._plot_legend = self._plot_widget.addLegend(offset=(10, 10))
+        
+        # Place axes (and their grids) above the plotted data
+        self._plot_widget.getAxis('bottom').setZValue(10)
+        self._plot_widget.getAxis('left').setZValue(10)
         
         # Setup axis controller and pin indicator
         plot_item = self._plot_widget.getPlotItem()
@@ -302,6 +307,7 @@ class ComplexMAWidget(ComplexWidget):
         self._p1.getAxis('right').linkToView(self._p2)
         self._p2.setXLink(self._p1)
         self._p1.getAxis('right').setLabel('Phase (rad)', color='#00ff00')
+        self._p1.getAxis('right').setZValue(10)
         
         self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
         self._p2.addItem(self._phase_curve)

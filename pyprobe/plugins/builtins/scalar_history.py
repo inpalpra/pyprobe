@@ -69,7 +69,8 @@ class ScalarHistoryWidget(QWidget):
     def _configure_plot(self):
         """Configure plot."""
         self._plot_widget.setBackground('#0d0d0d')
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        # Use a more visible default grid alpha (0.6) before theme override
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setLabel('left', 'Value')
         self._plot_widget.setLabel('bottom', 'Sample')
@@ -79,6 +80,10 @@ class ScalarHistoryWidget(QWidget):
         self._plot_widget.getAxis('bottom').setPen(axis_pen)
         self._plot_widget.getAxis('left').setTextPen(axis_pen)
         self._plot_widget.getAxis('bottom').setTextPen(axis_pen)
+
+        # Place axes (and their grids) above the plotted data
+        self._plot_widget.getAxis('bottom').setZValue(10)
+        self._plot_widget.getAxis('left').setZValue(10)
 
         self._curve = self._plot_widget.plot(
             pen=pg.mkPen(color=self._color.name(), width=2),

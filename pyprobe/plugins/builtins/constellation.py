@@ -68,7 +68,8 @@ class ConstellationWidget(QWidget):
     def _configure_plot(self):
         """Configure the constellation plot appearance."""
         self._plot_widget.setBackground('#0d0d0d')
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        # Use a more visible default grid alpha (0.6) before theme override
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setAspectLocked(True)
         self._plot_widget.setLabel('left', 'Q (Imag)')

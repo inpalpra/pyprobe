@@ -98,7 +98,8 @@ class WaveformWidget(PinLayoutMixin, QWidget):
     def _configure_plot(self):
         """Configure plot appearance using probe color."""
         self._plot_widget.setBackground('#0d0d0d')
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        # Use a more visible default grid alpha (0.6) before theme override
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setLabel('left', 'Amplitude')
         self._plot_widget.setLabel('bottom', 'Sample Index')
@@ -173,8 +174,17 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         left_axis.setPen(axis_pen)
         left_axis.setTextPen(axis_pen)
 
+        # Place axes (and their grids) above the plotted data
+        bottom_axis.setZValue(10)
+        left_axis.setZValue(10)
+
         # Replace existing axes
         plot_item.setAxisItems({'bottom': bottom_axis, 'left': left_axis})
+
+        # Explicitly set grid on current editable axes to prevent PyqtGraph 
+        # UI state caching from ignoring the grid update.
+        bottom_axis.setGrid(153) # ~0.6 alpha
+        left_axis.setGrid(153)
 
         # Connect edit signals
         bottom_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('x', 'min', val))
@@ -237,10 +247,19 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
         self._plot_widget.setBackground(pc['bg'])
         self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        
+        # Manually force the grid alpha on the axes since we replaced them
+        # and cached UI state in PlotItem may drop the showGrid update
+        alpha_int = int(min(255, max(0, grid_alpha * 255)))
+        
         axis_pen = pg.mkPen(color=pc['axis'], width=1)
-        for ax in ('left', 'bottom'):
-            self._plot_widget.getAxis(ax).setPen(axis_pen)
-            self._plot_widget.getAxis(ax).setTextPen(axis_pen)
+        for ax_name in ('left', 'bottom'):
+            ax = self._plot_widget.getAxis(ax_name)
+            ax.setPen(axis_pen)
+            ax.setTextPen(axis_pen)
+            # hasattr guard in case axis handles grid differently
+            if hasattr(ax, 'setGrid'):
+                ax.setGrid(alpha_int)
 
     def _get_row_color(self, row_index: int) -> str:
         """Get deterministic color for row index (cycles through palette)."""
