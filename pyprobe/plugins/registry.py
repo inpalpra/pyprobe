@@ -65,12 +65,23 @@ class PluginRegistry:
         compatible = self.get_compatible_plugins(dtype, shape)
         return compatible[0] if compatible else None
     
-    def get_plugin_by_name(self, name: str) -> Optional[ProbePlugin]:
-        """Get a plugin by its name."""
-        for plugin in self._plugins:
-            if plugin.name == name:
-                return plugin
-        return None
+    def get_plugin_by_name(self, name: str, dtype: Optional[str] = None) -> Optional[ProbePlugin]:
+        """Get a plugin by its name. If multiple plugins share a name,
+        uses dtype to find the compatible one.
+        """
+        candidates = [p for p in self._plugins if p.name == name]
+        if not candidates:
+            return None
+        if len(candidates) == 1 or dtype is None:
+            return candidates[0]
+            
+        for p in candidates:
+            try:
+                if p.can_handle(dtype, None):
+                    return p
+            except Exception:
+                pass
+        return candidates[0]
     
     @property
     def all_plugins(self) -> List[ProbePlugin]:

@@ -251,7 +251,7 @@ class ProbePanel(QFrame):
         from PyQt6.QtCore import QTimer
         
         registry = PluginRegistry.instance()
-        plugin = registry.get_plugin_by_name(plugin_name)
+        plugin = registry.get_plugin_by_name(plugin_name, getattr(self, '_dtype', None))
         
         if not plugin:
             return

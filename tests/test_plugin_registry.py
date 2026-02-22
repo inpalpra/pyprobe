@@ -101,3 +101,15 @@ class TestPluginByName:
         """Nonexistent name returns None."""
         registry = PluginRegistry.instance()
         assert registry.get_plugin_by_name("FooBarPlugin") is None
+
+    def test_get_by_name_disambiguation(self):
+        """get_plugin_by_name disambiguates identical names using dtype."""
+        registry = PluginRegistry.instance()
+        from pyprobe.plugins.builtins.complex_plots import ComplexFftMagPlugin
+        from pyprobe.plugins.builtins.waveform import WaveformFftMagPlugin
+        
+        plugin_complex = registry.get_plugin_by_name("FFT Mag (dB)", DTYPE_ARRAY_COMPLEX)
+        plugin_real = registry.get_plugin_by_name("FFT Mag (dB)", DTYPE_ARRAY_1D)
+        
+        assert isinstance(plugin_complex, ComplexFftMagPlugin)
+        assert isinstance(plugin_real, WaveformFftMagPlugin)

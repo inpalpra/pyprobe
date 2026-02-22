@@ -108,7 +108,7 @@ class LensDropdown(QComboBox):
         Returns True if successful, False if plugin is incompatible.
         """
         registry = PluginRegistry.instance()
-        plugin = registry.get_plugin_by_name(plugin_name)
+        plugin = registry.get_plugin_by_name(plugin_name, self._current_dtype)
         
         if plugin and plugin in self._compatible_plugins:
             self.setCurrentText(plugin_name)
@@ -120,12 +120,12 @@ class LensDropdown(QComboBox):
     def current_plugin(self) -> Optional[ProbePlugin]:
         """Get the currently selected plugin."""
         name = self.currentText()
-        return PluginRegistry.instance().get_plugin_by_name(name)
+        return PluginRegistry.instance().get_plugin_by_name(name, self._current_dtype)
     
     def _on_selection_changed(self, index: int) -> None:
         """Handle user changing the lens selection."""
         plugin_name = self.currentText()
-        plugin = PluginRegistry.instance().get_plugin_by_name(plugin_name)
+        plugin = PluginRegistry.instance().get_plugin_by_name(plugin_name, self._current_dtype)
         
         # Only emit if it's a compatible plugin
         if plugin and plugin in self._compatible_plugins:

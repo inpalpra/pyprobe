@@ -765,6 +765,202 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         return result
 
 
+class WaveformFftMagWidget(WaveformWidget):
+    """FFT Magnitude (dB) with Kaiser Bessel window for 1D arrays."""
+    
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+        super().__init__(var_name, color, parent)
+        self._plot_widget.setLabel('bottom', 'Frequency')
+        # Left label is already 'Amplitude', we can specifically set to dB
+        self._plot_widget.setLabel('left', 'Magnitude (dB)')
+        self._info_label.setText("FFT Magnitude (dB)")
+        self.MAX_DISPLAY_POINTS = 1000000
+        self._first_data = True
+
+    def _on_view_range_changed(self, vb, ranges):
+        pass
+
+    def reset_view(self) -> None:
+        if self._axis_controller:
+            self._axis_controller.set_pinned('x', False)
+            self._axis_controller.set_pinned('y', False)
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        vb.autoRange(padding=0)
+
+    def update_data(self, value: Any, dtype: str, shape: Optional[Tuple[int, ...]] = None, source_info: str = "") -> None:
+        """Override update_data to intercept data and compute FFT."""
+        if value is None:
+            return
+
+        # Special interception for waveforms - we need to extract raw data, apply FFT
+        # and set t_vector to frequencies before passing to base methods
+        
+        # Determine dt if it's a waveform
+        dt = 1.0
+        is_waveform = False
+        
+        if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_REAL:
+            samples = np.asarray(value['samples'])
+            scalars = value.get('scalars', [0.0, 1.0])
+            dt = scalars[1]
+            value = samples
+            is_waveform = True
+        elif not isinstance(value, (dict, list, np.ndarray)):
+            # Direct python objects
+            from ...core.data_classifier import get_waveform_info
+            info = get_waveform_info(value)
+            if info:
+                samples = np.asarray(getattr(value, info['samples_attr']))
+                scalars = [float(getattr(value, attr)) for attr in info['scalar_attrs']]
+                dt = scalars[1]
+                value = samples
+                is_waveform = True
+
+        # Convert simple types to array
+        if not isinstance(value, np.ndarray) and not isinstance(value, dict):
+            try:
+                value = np.asarray(value)
+            except:
+                return
+                
+        if isinstance(value, np.ndarray):
+            if value.ndim == 0:
+                value = np.atleast_1d(value)
+            
+            # Helper to compute FFT
+            def compute_fft(data_arr, dt_val):
+                n = len(data_arr)
+                if n == 0:
+                    return data_arr, None
+                import scipy.signal
+                window = scipy.signal.windows.kaiser(n, beta=9)
+                windowed = data_arr * window
+                nfft = max(8192, 2**int(np.ceil(np.log2(n))))
+                fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
+                fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                
+                if is_waveform and dt_val > 0:
+                    freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dt_val))
+                else:
+                    freqs = np.arange(-nfft//2, nfft - nfft//2)
+                return fft_mag, freqs
+
+            if value.ndim == 1:
+                fft_mag, freqs = compute_fft(value, dt)
+                self._t_vector = freqs  # Setup for base class to use
+                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                super()._update_1d_data(fft_mag, dtype, shape, source_info + " (FFT)")
+                # Override the base updating t_vector label
+                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                
+            elif value.ndim == 2:
+                # Need to convert row by row
+                fft_mags = []
+                freqs = None
+                for i in range(value.shape[0]):
+                    mag, f = compute_fft(value[i], dt)
+                    fft_mags.append(mag)
+                    if i == 0:
+                        freqs = f
+                
+                self._t_vector = freqs
+                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                super()._update_2d_data(np.array(fft_mags), dtype, shape, source_info + " (FFT)")
+                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+            
+            if getattr(self, '_first_data', False):
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(50, self.reset_view)
+                self._first_data = False
+
+        elif isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COLLECTION:
+            # Modify the dictionary entries before passing to base
+            import scipy.signal
+            new_waveforms = []
+            for wf in value.get('waveforms', []):
+                samples = np.asarray(wf['samples'])
+                scalars = wf.get('scalars', [0.0, 1.0])
+                dt_val = scalars[1]
+                n = len(samples)
+                if n > 0:
+                    window = scipy.signal.windows.kaiser(n, beta=9)
+                    windowed = samples * window
+                    nfft = max(8192, 2**int(np.ceil(np.log2(n))))
+                    fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
+                    fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                    
+                    # We have to trick the base class into drawing frequencies.
+                    # Base class calculates t_vector = t0 + np.arange(len(samples)) * dt
+                    # So we need t0 and dt that reconstruct our frequency array.
+                    # np.fft.fftfreq produces frequencies separated by 1/(n*dt)
+                    # fftshift moves negative frequencies first, so min freq is approximately -1/(2*dt)
+                    new_dt = 1.0 / (nfft * dt_val) if dt_val > 0 else 1.0
+                    freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dt_val)) if dt_val > 0 else np.arange(-nfft//2, nfft - nfft//2)
+                    new_t0 = freqs[0]
+                    if dt_val <= 0:
+                        new_dt = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
+                    
+                    new_waveforms.append({'samples': fft_mag, 'scalars': [new_t0, new_dt]})
+            
+            new_value = {'__dtype__': DTYPE_WAVEFORM_COLLECTION, 'waveforms': new_waveforms}
+            super().update_data(new_value, dtype, shape, source_info + " (FFT)")
+            self._plot_widget.setLabel('bottom', 'Frequency (Hz)')
+            
+            if getattr(self, '_first_data', False):
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(50, self.reset_view)
+                self._first_data = False
+            
+        elif isinstance(value, dict) and value.get('__dtype__') == DTYPE_ARRAY_COLLECTION:
+            import scipy.signal
+            new_arrays = []
+            for arr in value.get('arrays', []):
+                samples = np.asarray(arr)
+                n = len(samples)
+                if n > 0:
+                    window = scipy.signal.windows.kaiser(n, beta=9)
+                    windowed = samples * window
+                    nfft = max(8192, 2**int(np.ceil(np.log2(n))))
+                    fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
+                    fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                    new_arrays.append(fft_mag)
+            
+            # For array collections without dt, X axis is just frequency bins
+            # However base array collection just draws indices.
+            # To fix X-axis for arrays, we might need a custom t_vector, but base array collection
+            # ignores t_vector entirely. We'll just let it draw indices 0..N-1 for now, 
+            # representing shifted bins.
+            new_value = {'__dtype__': DTYPE_ARRAY_COLLECTION, 'arrays': new_arrays}
+            super().update_data(new_value, dtype, shape, source_info + " (FFT)")
+            self._plot_widget.setLabel('bottom', 'FFT Bin')
+            
+            if getattr(self, '_first_data', False):
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(50, self.reset_view)
+                self._first_data = False
+            
+        else:
+            super().update_data(value, dtype, shape, source_info)
+
+class WaveformFftMagPlugin(ProbePlugin):
+    """Plugin for FFT Magnitude of 1D arrays and waveforms."""
+    
+    name = "FFT Mag (dB)"
+    icon = "activity"
+    priority = 90  # Just below Waveform
+    
+    def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
+        return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION)
+    
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
+        return WaveformFftMagWidget(var_name, color, parent)
+    
+    def update(self, widget: QWidget, value: Any, dtype: str,
+               shape: Optional[Tuple[int, ...]] = None,
+               source_info: str = "") -> None:
+        if isinstance(widget, WaveformFftMagWidget):
+            widget.update_data(value, dtype, shape, source_info)
+
 class WaveformPlugin(ProbePlugin):
     """Plugin for visualizing 1D arrays as waveforms."""
     

@@ -523,6 +523,72 @@ class ComplexMAPlugin(ProbePlugin):
         if isinstance(widget, ComplexMAWidget):
             widget.update_data(np.asanyarray(value))
 
+class ComplexFftMagWidget(SingleCurveWidget):
+    """FFT Magnitude (dB) with Kaiser Bessel window."""
+    
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+        super().__init__(var_name, color, "FFT Magnitude (dB)", parent)
+        self._plot_widget.setLabel('bottom', 'FFT Bin')
+        self._first_data = True
+
+    def set_data(self, data: np.ndarray, info: str):
+        self._raw_real_data = data
+        self._raw_data = data
+        self._updating_curves = True
+        
+        import sys
+        n = len(data)
+        print(f"DEBUG: ComplexFftMagWidget set_data called with {n} elements, shape {data.shape}, dtype {data.dtype}", file=sys.stderr)
+        
+        if n > 0:
+            import scipy.signal
+            window = scipy.signal.windows.kaiser(n, beta=9)
+            windowed = data * window
+            
+            nfft = max(8192, 2**int(np.ceil(np.log2(n))))
+            
+            fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
+            fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+            
+            freqs = np.arange(-nfft//2, nfft - nfft//2)
+            print(f"DEBUG: Plotting FFT Mag min={np.min(fft_mag):.2f}, max={np.max(fft_mag):.2f}, freqs min={freqs[0]}, max={freqs[-1]}", file=sys.stderr)
+            
+            self._curve.setData(freqs, fft_mag)
+            
+            if getattr(self, '_first_data', False):
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(50, self.reset_view)
+                self._first_data = False
+        
+        self._updating_curves = False
+        self.update_info(info)
+
+    def _on_view_range_changed(self, vb, ranges):
+        pass
+
+    def reset_view(self) -> None:
+        if self._axis_controller:
+            self._axis_controller.set_pinned('x', False)
+            self._axis_controller.set_pinned('y', False)
+        vb = self._plot_widget.getPlotItem().getViewBox()
+        vb.autoRange(padding=0)
+
+class ComplexFftMagPlugin(ProbePlugin):
+    name = "FFT Mag (dB)"
+    icon = "activity"
+    priority = 100
+    
+    def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
+        return dtype == DTYPE_ARRAY_COMPLEX
+    
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
+        return ComplexFftMagWidget(var_name, color, parent)
+    
+    def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
+        if isinstance(widget, ComplexFftMagWidget):
+            val = np.asanyarray(value)
+            widget.set_data(val, f"[{val.shape}]")
+
 class LogMagPlugin(ProbePlugin):
     name = "Log Mag (dB)"
     icon = "activity"
