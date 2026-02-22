@@ -96,19 +96,21 @@ class ComplexWidget(QWidget):
         layout.addWidget(self._plot_widget)
 
         # Footer spacer to make room for the hover toolbar (matching WaveformWidget's layout)
-        self._footer_spacer = QLabel(" ")
-        self._footer_spacer.setFont(QFont("JetBrains Mono", 9))
+        self._footer_spacer = QLabel("")
+        self._footer_spacer.setFixedHeight(24)
         layout.addWidget(self._footer_spacer)
 
     def _configure_plot(self):
         self._plot_widget.setBackground('#0d0d0d')
         # Use a more visible default grid alpha (0.6) before theme override
         self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
-        self._plot_widget.setLabel('bottom', 'Sample Index')
         self._plot_legend = self._plot_widget.addLegend(offset=(10, 10))
         
         # Setup editable axes
         self._setup_editable_axes()
+        
+        # Add bottom label after replacing axes
+        self._plot_widget.setLabel('bottom', 'Sample Index')
         
         # Axis editor (inline text editor)
         self._axis_editor = AxisEditor(self._plot_widget)

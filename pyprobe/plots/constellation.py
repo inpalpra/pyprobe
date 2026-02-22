@@ -78,6 +78,11 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
         layout.addWidget(self._stats_label)
 
+        # Footer spacer to make room for the hover toolbar
+        self._footer_spacer = QLabel("")
+        self._footer_spacer.setFixedHeight(24)
+        layout.addWidget(self._footer_spacer)
+
     def _configure_plot(self):
         """Configure the constellation plot appearance."""
         self._plot_widget.setBackground('#0d0d0d')
@@ -131,6 +136,11 @@ class ConstellationPlot(PinLayoutMixin, BasePlot):
         self._plot_widget.setBackground(pc['bg'])
         self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
         axis_pen = pg.mkPen(color=pc['axis'], width=1)
+        
+        label_style = {'color': c['text_secondary'], 'font-size': '10pt'}
+        self._plot_widget.setLabel('left', 'Q (Imag)', **label_style)
+        self._plot_widget.setLabel('bottom', 'I (Real)', **label_style)
+        
         for ax in ('left', 'bottom'):
             self._plot_widget.getAxis(ax).setPen(axis_pen)
             self._plot_widget.getAxis(ax).setTextPen(axis_pen)

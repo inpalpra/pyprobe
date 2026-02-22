@@ -66,6 +66,11 @@ class ConstellationWidget(QWidget):
         self._stats_label.setFont(QFont("JetBrains Mono", 9))
         self._stats_label.setStyleSheet(f"color: {self._color.name()};")
         layout.addWidget(self._stats_label)
+
+        # Footer spacer to make room for the hover toolbar
+        self._footer_spacer = QLabel("")
+        self._footer_spacer.setFixedHeight(24)
+        layout.addWidget(self._footer_spacer)
     
     def _configure_plot(self):
         """Configure the constellation plot appearance."""
@@ -74,11 +79,13 @@ class ConstellationWidget(QWidget):
         self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
         self._plot_widget.useOpenGL(False)
         self._plot_widget.setAspectLocked(True)
-        self._plot_widget.setLabel('left', 'Q (Imag)')
-        self._plot_widget.setLabel('bottom', 'I (Real)')
 
         # Setup editable axes
         self._setup_editable_axes()
+        
+        # Add labels AFTER replacing axes
+        self._plot_widget.setLabel('left', 'Q (Imag)')
+        self._plot_widget.setLabel('bottom', 'I (Real)')
         
         # Axis editor (inline text editor)
         self._axis_editor = AxisEditor(self._plot_widget)
@@ -123,6 +130,11 @@ class ConstellationWidget(QWidget):
         self._info_label.setStyleSheet(f"color: {c['text_secondary']};")
         self._plot_widget.setBackground(pc['bg'])
         self._plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        
+        # Color axis labels
+        label_style = {'color': c['text_secondary'], 'font-size': '10pt'}
+        self._plot_widget.setLabel('left', 'Q (Imag)', **label_style)
+        self._plot_widget.setLabel('bottom', 'I (Real)', **label_style)
         
         # manually force grid
         alpha_int = int(min(255, max(0, grid_alpha * 255)))
