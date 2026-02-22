@@ -44,9 +44,7 @@ probe(noisy_signal, title="Noisy Sine Wave")
 
 ## Screenshots
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/90bd59c3-8b73-461f-afce-73a411ce0f52" alt="PyProbe Interface showing multiple docked DSP plots" width="800"/>
-</p>
+![PyProbe Interface showing multiple docked DSP plots](https://github.com/user-attachments/assets/90bd59c3-8b73-461f-afce-73a411ce0f52)
 
 ## License
 
