@@ -56,6 +56,13 @@ class PinButton(QPushButton):
                 background-color: rgba(0, 255, 255, 100);
                 border: 2px solid {c['accent_primary']};
             }}
+            QToolTip {{
+                background-color: {c['bg_medium']};
+                color: {c['text_primary']};
+                border: 1px solid {c['accent_primary']};
+                padding: 4px 8px;
+                border-radius: 4px;
+            }}
         """)
     
     def _set_opacity(self, active: bool) -> None:
@@ -152,13 +159,8 @@ class PinIndicator(QWidget):
         y_y = view_rect.top() + 4
         self._y_btn.move(int(y_x), int(y_y))
         
-        # X lock: Inside plot area at bottom, to the left of toolbar
-        if self._toolbar_rect is not None:
-            # Dynamic: position just left of the actual toolbar
-            x_x = self._toolbar_rect.left() - self._x_btn.width() - 8
-        else:
-            # Fallback: right edge of view rect with small margin
-            x_x = view_rect.right() - self._x_btn.width() - 8
+        # X lock: extreme right of plot area, just above X axis
+        x_x = view_rect.right() - self._x_btn.width() - 4
         x_y = view_rect.bottom() - self._x_btn.height() - 4
         self._x_btn.move(int(x_x), int(x_y))
         

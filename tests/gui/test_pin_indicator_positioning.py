@@ -109,11 +109,8 @@ class TestPinButtonSignals:
 
 
 class TestPinIndicatorWithToolbarRect:
-    def test_set_toolbar_rect_used(self, indicator, qapp):
-        """set_toolbar_rect adjusts X button position if method exists."""
-        if not hasattr(indicator, 'set_toolbar_rect'):
-            pytest.skip("set_toolbar_rect not yet implemented (Phase 4)")
-
+    def test_x_button_at_right_edge(self, indicator, qapp):
+        """X button is always positioned near the right edge of the view rect."""
         from PyQt6.QtCore import QRect
         toolbar_rect = QRect(450, 350, 130, 40)
         indicator.set_toolbar_rect(toolbar_rect)
@@ -122,6 +119,8 @@ class TestPinIndicatorWithToolbarRect:
         indicator.update_layout(view_rect)
         qapp.processEvents()
 
-        # X button should be to the left of the toolbar
+        # X button should be near the right edge of view_rect, NOT
+        # relative to the toolbar
         x_pos = indicator._x_btn.pos()
-        assert x_pos.x() < toolbar_rect.left()
+        assert x_pos.x() >= view_rect.right() - indicator._x_btn.width() - 10
+
