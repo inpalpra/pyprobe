@@ -92,6 +92,11 @@ class ComplexWidget(QWidget):
         
         layout.addWidget(self._plot_widget)
 
+        # Footer spacer to make room for the hover toolbar (matching WaveformWidget's layout)
+        self._footer_spacer = QLabel(" ")
+        self._footer_spacer.setFont(QFont("JetBrains Mono", 9))
+        layout.addWidget(self._footer_spacer)
+
     def _configure_plot(self):
         self._plot_widget.setBackground('#0d0d0d')
         # Use a more visible default grid alpha (0.6) before theme override
