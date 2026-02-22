@@ -238,26 +238,38 @@ class ProbePanelContainer(QScrollArea):
             self._layout.addWidget(panels[0], 0, 0, 1, self._cols)
             self._next_row = 1
             self._next_col = 0
-            return
-
-        # Otherwise grid layout
-        # If odd number of panels, last one gets full width
-        last_idx = len(panels) - 1
-        for i, panel in enumerate(panels):
-            is_last = (i == last_idx)
-            is_odd_count = (len(panels) % 2 == 1)
-            
-            if is_last and is_odd_count:
-                # Last panel with odd count: span full width
-                self._layout.addWidget(panel, self._next_row, 0, 1, self._cols)
-                self._next_row += 1
-                self._next_col = 0
-            else:
-                self._layout.addWidget(panel, self._next_row, self._next_col)
-                self._next_col += 1
-                if self._next_col >= self._cols:
-                    self._next_col = 0
+        else:
+            # Otherwise grid layout
+            # If odd number of panels, last one gets full width
+            last_idx = len(panels) - 1
+            for i, panel in enumerate(panels):
+                is_last = (i == last_idx)
+                is_odd_count = (len(panels) % 2 == 1)
+                
+                if is_last and is_odd_count:
+                    # Last panel with odd count: span full width
+                    self._layout.addWidget(panel, self._next_row, 0, 1, self._cols)
                     self._next_row += 1
+                    self._next_col = 0
+                else:
+                    self._layout.addWidget(panel, self._next_row, self._next_col)
+                    self._next_col += 1
+                    if self._next_col >= self._cols:
+                        self._next_col = 0
+                        self._next_row += 1
+
+        # Calculate total number of rows used
+        total_rows = self._next_row
+        if self._next_col > 0:
+            total_rows += 1
+
+        # Set uniform row stretch for all used rows, reset for others
+        # to ensure aspect-locked plots don't steal vertical space.
+        for r in range(self._layout.rowCount()):
+            if r < total_rows:
+                self._layout.setRowStretch(r, 1)
+            else:
+                self._layout.setRowStretch(r, 0)
 
     def get_panel(self, var_name: str = None, anchor: ProbeAnchor = None) -> Optional[ProbePanel]:
         """Get the first panel by variable name or anchor (for backwards compatibility)."""

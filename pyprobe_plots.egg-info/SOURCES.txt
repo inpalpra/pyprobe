@@ -116,6 +116,7 @@ tests/test_focus_manager.py
 tests/test_layout_manager.py
 tests/test_overlay_drag_drop_single_frame.py
 tests/test_overlay_drag_drop_two_frames.py
+tests/test_packaging.py
 tests/test_plot_toolbar.py
 tests/test_plugin_registry.py
 tests/test_signal_overlay.py
