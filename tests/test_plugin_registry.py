@@ -94,22 +94,22 @@ class TestPluginByName:
     def test_get_by_name(self):
         """get_plugin_by_name returns correct plugin."""
         registry = PluginRegistry.instance()
-        plugin = registry.get_plugin_by_name("Waveform")
+        plugin = registry.get_plugin_by_name("Waveform", DTYPE_ARRAY_1D)
         assert isinstance(plugin, WaveformPlugin)
 
     def test_get_nonexistent_returns_none(self):
         """Nonexistent name returns None."""
         registry = PluginRegistry.instance()
-        assert registry.get_plugin_by_name("FooBarPlugin") is None
+        assert registry.get_plugin_by_name("FooBarPlugin", DTYPE_ARRAY_1D) is None
 
     def test_get_by_name_disambiguation(self):
         """get_plugin_by_name disambiguates identical names using dtype."""
         registry = PluginRegistry.instance()
-        from pyprobe.plugins.builtins.complex_plots import ComplexFftMagPlugin
-        from pyprobe.plugins.builtins.waveform import WaveformFftMagPlugin
+        from pyprobe.plugins.builtins.complex_plots import ComplexFftMagAnglePlugin
+        from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
         
-        plugin_complex = registry.get_plugin_by_name("FFT Mag (dB)", DTYPE_ARRAY_COMPLEX)
-        plugin_real = registry.get_plugin_by_name("FFT Mag (dB)", DTYPE_ARRAY_1D)
+        plugin_complex = registry.get_plugin_by_name("FFT Mag (dB) / Angle (deg)", DTYPE_ARRAY_COMPLEX)
+        plugin_real = registry.get_plugin_by_name("FFT Mag (dB) / Angle (deg)", DTYPE_ARRAY_1D)
         
-        assert isinstance(plugin_complex, ComplexFftMagPlugin)
-        assert isinstance(plugin_real, WaveformFftMagPlugin)
+        assert isinstance(plugin_complex, ComplexFftMagAnglePlugin)
+        assert isinstance(plugin_real, WaveformFftMagAnglePlugin)

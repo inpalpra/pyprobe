@@ -523,22 +523,55 @@ class ComplexMAPlugin(ProbePlugin):
         if isinstance(widget, ComplexMAWidget):
             widget.update_data(np.asanyarray(value))
 
-class ComplexFftMagWidget(SingleCurveWidget):
-    """FFT Magnitude (dB) with Kaiser Bessel window."""
+class ComplexFftMagAngleWidget(ComplexWidget):
+    """FFT Magnitude (dB) & Angle (deg) with Kaiser Bessel window."""
     
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
-        super().__init__(var_name, color, "FFT Magnitude (dB)", parent)
+        super().__init__(var_name, color, parent)
+        
+        self._mag_curve = self._plot_widget.plot(pen=pg.mkPen('#ffff00', width=1.5), name="FFT Mag (dB)")
+        self._plot_widget.setLabel('left', 'Magnitude (dB)', color='#ffff00')
         self._plot_widget.setLabel('bottom', 'FFT Bin')
+        
+        self._p1 = self._plot_widget.plotItem
+        self._p2 = pg.ViewBox()
+        self._p1.showAxis('right')
+        self._p1.scene().addItem(self._p2)
+        self._p1.getAxis('right').linkToView(self._p2)
+        self._p2.setXLink(self._p1)
+        self._p1.getAxis('right').setLabel('Angle (deg)', color='#00ff00')
+        self._p1.getAxis('right').setZValue(10)
+        
+        self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
+        self._p2.addItem(self._phase_curve)
+        
+        self._plot_legend.addItem(self._phase_curve, "Angle (deg)")
+        
+        self._register_series('FFT Mag (dB)', self._mag_curve, '#ffff00')
+        self._register_series('Angle (deg)', self._phase_curve, '#00ff7f')
+        
+        self._p1.vb.sigResized.connect(self._update_views)
         self._first_data = True
+        
+        self._fft_freqs = None
+        self._fft_mag = None
+        self._fft_phase = None
+
+    def _update_views(self):
+        self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
+        self._p2.linkedViewChanged(self._p1.vb, self._p2.XAxis)
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        super()._on_pin_state_changed(axis, is_pinned)
+        if axis == 'y':
+            self._p2.enableAutoRange(axis='y', enable=not is_pinned)
 
     def set_data(self, data: np.ndarray, info: str):
-        self._raw_real_data = data
         self._raw_data = data
         self._updating_curves = True
         
         import sys
         n = len(data)
-        print(f"DEBUG: ComplexFftMagWidget set_data called with {n} elements, shape {data.shape}, dtype {data.dtype}", file=sys.stderr)
         
         if n > 0:
             import scipy.signal
@@ -548,14 +581,17 @@ class ComplexFftMagWidget(SingleCurveWidget):
             nfft = max(8192, 2**int(np.ceil(np.log2(n))))
             
             fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
-            fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+            self._fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+            self._fft_phase = np.rad2deg(np.angle(fft_data))
             
-            freqs = np.arange(-nfft//2, nfft - nfft//2)
-            print(f"DEBUG: Plotting FFT Mag min={np.min(fft_mag):.2f}, max={np.max(fft_mag):.2f}, freqs min={freqs[0]}, max={freqs[-1]}", file=sys.stderr)
+            self._fft_freqs = np.arange(-nfft//2, nfft - nfft//2)
             
-            self._curve.setData(freqs, fft_mag)
+            x_m, y_m = downsample(self._fft_mag)
+            x_p, y_p = downsample(self._fft_phase)
+            self._mag_curve.setData(self._fft_freqs[x_m], y_m)
+            self._phase_curve.setData(self._fft_freqs[x_p], y_p)
             
-            if getattr(self, '_first_data', False):
+            if self._first_data:
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(50, self.reset_view)
                 self._first_data = False
@@ -563,18 +599,50 @@ class ComplexFftMagWidget(SingleCurveWidget):
         self._updating_curves = False
         self.update_info(info)
 
-    def _on_view_range_changed(self, vb, ranges):
-        pass
+    def _render_slice(self, i_min: int, i_max: int):
+        if self._fft_freqs is None or self._fft_mag is None:
+            return
+        
+        x_min, x_max = self._plot_widget.getPlotItem().getViewBox().viewRange()[0]
+        
+        import bisect
+        idx_min = bisect.bisect_left(self._fft_freqs, x_min)
+        idx_max = bisect.bisect_right(self._fft_freqs, x_max)
+        
+        idx_min = max(0, idx_min)
+        idx_max = min(len(self._fft_freqs), idx_max)
+        
+        if idx_min >= idx_max:
+            return
+
+        mag_slice = self._fft_mag[idx_min:idx_max]
+        phase_slice = self._fft_phase[idx_min:idx_max]
+        
+        x_m, y_m = downsample(mag_slice, x_offset=idx_min)
+        x_p, y_p = downsample(phase_slice, x_offset=idx_min)
+        
+        self._mag_curve.setData(self._fft_freqs[x_m], y_m)
+        self._phase_curve.setData(self._fft_freqs[x_p], y_p)
 
     def reset_view(self) -> None:
         if self._axis_controller:
             self._axis_controller.set_pinned('x', False)
             self._axis_controller.set_pinned('y', False)
+        
+        if self._fft_freqs is not None and self._fft_mag is not None:
+            self._updating_curves = True
+            x_m, y_m = downsample(self._fft_mag)
+            x_p, y_p = downsample(self._fft_phase)
+            self._mag_curve.setData(self._fft_freqs[x_m], y_m)
+            self._phase_curve.setData(self._fft_freqs[x_p], y_p)
+            self._updating_curves = False
+            
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+        self._p2.autoRange(padding=0)
 
-class ComplexFftMagPlugin(ProbePlugin):
-    name = "FFT Mag (dB)"
+class ComplexFftMagAnglePlugin(ProbePlugin):
+    name = "FFT Mag (dB) / Angle (deg)"
     icon = "activity"
     priority = 100
     
@@ -582,10 +650,10 @@ class ComplexFftMagPlugin(ProbePlugin):
         return dtype == DTYPE_ARRAY_COMPLEX
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ComplexFftMagWidget(var_name, color, parent)
+        return ComplexFftMagAngleWidget(var_name, color, parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
-        if isinstance(widget, ComplexFftMagWidget):
+        if isinstance(widget, ComplexFftMagAngleWidget):
             val = np.asanyarray(value)
             widget.set_data(val, f"[{val.shape}]")
 

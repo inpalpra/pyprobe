@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QRectF, QTimer
+from PyQt6.QtCore import QRectF, QTimer, Qt
 
 from ...plots.pin_layout_mixin import PinLayoutMixin
 from ...plots.draw_mode import DrawMode, apply_draw_mode
@@ -621,11 +621,19 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         vb = plot_item.getViewBox()
         x_min, x_max = vb.viewRange()[0]
         
+        def get_indices(n_length):
+            if self._t_vector is not None and len(self._t_vector) == n_length:
+                if self._t_vector[-1] > self._t_vector[0]:
+                    import bisect
+                    i_min = bisect.bisect_left(self._t_vector, x_min)
+                    i_max = bisect.bisect_right(self._t_vector, x_max)
+                    return max(0, i_min), min(n_length, i_max)
+            return max(0, int(np.floor(x_min))), min(n_length, int(np.ceil(x_max)) + 1)
+            
         # For 1D data
         if self._data.ndim == 1:
             n = len(self._data)
-            i_min = max(0, int(np.floor(x_min)))
-            i_max = min(n, int(np.ceil(x_max)) + 1)
+            i_min, i_max = get_indices(n)
             if i_min >= i_max:
                 return
             
@@ -650,8 +658,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         elif self._data.ndim == 2:
             # 2D: re-downsample each row for visible range
             n_cols = self._data.shape[1]
-            i_min = max(0, int(np.floor(x_min)))
-            i_max = min(n_cols, int(np.ceil(x_max)) + 1)
+            i_min, i_max = get_indices(n_cols)
             if i_min >= i_max:
                 return
             
@@ -765,37 +772,144 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         return result
 
 
-class WaveformFftMagWidget(WaveformWidget):
-    """FFT Magnitude (dB) with Kaiser Bessel window for 1D arrays."""
+class WaveformFftMagAngleWidget(WaveformWidget):
+    """FFT Magnitude (dB) & Angle (deg) with Kaiser Bessel window for 1D arrays."""
     
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
         super().__init__(var_name, color, parent)
         self._plot_widget.setLabel('bottom', 'Frequency')
-        # Left label is already 'Amplitude', we can specifically set to dB
         self._plot_widget.setLabel('left', 'Magnitude (dB)')
-        self._info_label.setText("FFT Magnitude (dB)")
+        self._info_label.setText("FFT Mag (dB) / Angle (deg)")
         self.MAX_DISPLAY_POINTS = 1000000
         self._first_data = True
+        
+        # Calculate a complementary color for the phase axis & curves
+        c = QColor(self._color)
+        h, s, v, a = c.getHsv()
+        c.setHsv((h + 180) % 360, max(150, s), v, a)
+        self._phase_color = c.name()
+        
+        self._p1 = self._plot_widget.plotItem
+        self._p2 = pg.ViewBox()
+        self._p1.showAxis('right')
+        self._p1.scene().addItem(self._p2)
+        self._p1.getAxis('right').linkToView(self._p2)
+        self._p2.setXLink(self._p1)
+        self._p1.getAxis('right').setLabel('Angle (deg)', color=self._phase_color)
+        self._p1.getAxis('right').setZValue(10)
+        
+        self._legend = self._plot_widget.addLegend(offset=(10, 10))
+        self._legend.addItem(self._curves[0], "FFT Mag (dB)")
+        self._phase_legend_added = False
+        
+        self._phase_curves = []
+        self._current_phase_data = None
+        self._p1.vb.sigResized.connect(self._update_views)
 
-    def _on_view_range_changed(self, vb, ranges):
-        pass
+    def _update_views(self):
+        self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
+        self._p2.linkedViewChanged(self._p1.vb, self._p2.XAxis)
+
+    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
+        super()._on_pin_state_changed(axis, is_pinned)
+        if axis == 'y':
+            self._p2.enableAutoRange(axis='y', enable=not is_pinned)
+
+    def _ensure_phase_curves(self, num_rows: int):
+        while len(self._phase_curves) < num_rows:
+            idx = len(self._phase_curves)
+            color = self._get_row_color(idx) if num_rows > 1 else self._phase_color
+            pen = pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine)
+            curve = pg.PlotDataItem(pen=pen, antialias=False)
+            self._p2.addItem(curve)
+            self._phase_curves.append(curve)
+            if not self._phase_legend_added:
+                self._legend.addItem(curve, "Angle (deg)")
+                self._phase_legend_added = True
+        while len(self._phase_curves) > num_rows:
+            curve = self._phase_curves.pop()
+            self._p2.removeItem(curve)
+
+    def _render_phase_curves_full(self):
+        if self._current_phase_data is None:
+            return
+        self._updating_curves = True
+        if self._current_phase_data.ndim == 1:
+            x_idx, y_disp = self.downsample(self._current_phase_data)
+            if self._t_vector is not None and len(self._t_vector) == len(self._current_phase_data):
+                self._phase_curves[0].setData(self._t_vector[x_idx], y_disp)
+            else:
+                self._phase_curves[0].setData(x_idx, y_disp)
+        elif self._current_phase_data.ndim == 2:
+            n_cols = self._current_phase_data.shape[1]
+            for row_idx in range(min(self._current_phase_data.shape[0], len(self._phase_curves))):
+                x_idx, y_disp = self.downsample(self._current_phase_data[row_idx])
+                if self._t_vector is not None and len(self._t_vector) == n_cols:
+                    self._phase_curves[row_idx].setData(self._t_vector[x_idx], y_disp)
+                else:
+                    self._phase_curves[row_idx].setData(x_idx, y_disp)
+        self._updating_curves = False
+
+    def _rerender_for_zoom(self):
+        super()._rerender_for_zoom()
+        if self._current_phase_data is None:
+            return
+            
+        plot_item = self._plot_widget.getPlotItem()
+        vb = plot_item.getViewBox()
+        x_min, x_max = vb.viewRange()[0]
+        
+        def get_indices(n_length):
+            if self._t_vector is not None and len(self._t_vector) == n_length:
+                if self._t_vector[-1] > self._t_vector[0]:
+                    import bisect
+                    i_min = bisect.bisect_left(self._t_vector, x_min)
+                    i_max = bisect.bisect_right(self._t_vector, x_max)
+                    return max(0, i_min), min(n_length, i_max)
+            return max(0, int(np.floor(x_min))), min(n_length, int(np.ceil(x_max)) + 1)
+        
+        self._updating_curves = True
+        if self._current_phase_data.ndim == 1:
+            n = len(self._current_phase_data)
+            i_min, i_max = get_indices(n)
+            if i_min < i_max:
+                slice_data = self._current_phase_data[i_min:i_max]
+                if len(slice_data) <= self.MAX_DISPLAY_POINTS:
+                    x, y = np.arange(i_min, i_max), slice_data
+                else:
+                    x, y = self.downsample(slice_data, x_offset=i_min)
+                
+                if self._t_vector is not None and len(self._t_vector) == n:
+                    self._phase_curves[0].setData(self._t_vector[x], y)
+                else:
+                    self._phase_curves[0].setData(x, y)
+                    
+        elif self._current_phase_data.ndim == 2:
+            n_cols = self._current_phase_data.shape[1]
+            i_min, i_max = get_indices(n_cols)
+            if i_min < i_max:
+                for row_idx in range(min(self._current_phase_data.shape[0], len(self._phase_curves))):
+                    row_slice = self._current_phase_data[row_idx, i_min:i_max]
+                    if len(row_slice) <= self.MAX_DISPLAY_POINTS:
+                        x, y = np.arange(i_min, i_max), row_slice
+                    else:
+                        x, y = self.downsample(row_slice, x_offset=i_min)
+                        
+                    if self._t_vector is not None and len(self._t_vector) == n_cols:
+                        self._phase_curves[row_idx].setData(self._t_vector[x], y)
+                    else:
+                        self._phase_curves[row_idx].setData(x, y)
+        self._updating_curves = False
 
     def reset_view(self) -> None:
-        if self._axis_controller:
-            self._axis_controller.set_pinned('x', False)
-            self._axis_controller.set_pinned('y', False)
-        vb = self._plot_widget.getPlotItem().getViewBox()
-        vb.autoRange(padding=0)
+        super().reset_view()
+        self._render_phase_curves_full()
+        self._p2.autoRange(padding=0)
 
     def update_data(self, value: Any, dtype: str, shape: Optional[Tuple[int, ...]] = None, source_info: str = "") -> None:
-        """Override update_data to intercept data and compute FFT."""
         if value is None:
             return
 
-        # Special interception for waveforms - we need to extract raw data, apply FFT
-        # and set t_vector to frequencies before passing to base methods
-        
-        # Determine dt if it's a waveform
         dt = 1.0
         is_waveform = False
         
@@ -806,7 +920,6 @@ class WaveformFftMagWidget(WaveformWidget):
             value = samples
             is_waveform = True
         elif not isinstance(value, (dict, list, np.ndarray)):
-            # Direct python objects
             from ...core.data_classifier import get_waveform_info
             info = get_waveform_info(value)
             if info:
@@ -816,7 +929,6 @@ class WaveformFftMagWidget(WaveformWidget):
                 value = samples
                 is_waveform = True
 
-        # Convert simple types to array
         if not isinstance(value, np.ndarray) and not isinstance(value, dict):
             try:
                 value = np.asarray(value)
@@ -827,46 +939,50 @@ class WaveformFftMagWidget(WaveformWidget):
             if value.ndim == 0:
                 value = np.atleast_1d(value)
             
-            # Helper to compute FFT
             def compute_fft(data_arr, dt_val):
                 n = len(data_arr)
                 if n == 0:
-                    return data_arr, None
+                    return data_arr, None, None
                 import scipy.signal
                 window = scipy.signal.windows.kaiser(n, beta=9)
                 windowed = data_arr * window
                 nfft = max(8192, 2**int(np.ceil(np.log2(n))))
                 fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
                 fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                fft_phase = np.rad2deg(np.angle(fft_data))
                 
                 if is_waveform and dt_val > 0:
                     freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dt_val))
                 else:
                     freqs = np.arange(-nfft//2, nfft - nfft//2)
-                return fft_mag, freqs
+                return fft_mag, fft_phase, freqs
 
             if value.ndim == 1:
-                fft_mag, freqs = compute_fft(value, dt)
-                self._t_vector = freqs  # Setup for base class to use
-                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                fft_mag, fft_phase, freqs = compute_fft(value, dt)
+                self._t_vector = freqs
+                self._current_phase_data = fft_phase
+                self._ensure_phase_curves(1)
                 super()._update_1d_data(fft_mag, dtype, shape, source_info + " (FFT)")
-                # Override the base updating t_vector label
                 self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                self._render_phase_curves_full()
                 
             elif value.ndim == 2:
-                # Need to convert row by row
                 fft_mags = []
+                fft_phases = []
                 freqs = None
                 for i in range(value.shape[0]):
-                    mag, f = compute_fft(value[i], dt)
+                    mag, phase, f = compute_fft(value[i], dt)
                     fft_mags.append(mag)
+                    fft_phases.append(phase)
                     if i == 0:
                         freqs = f
                 
                 self._t_vector = freqs
-                self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                self._current_phase_data = np.array(fft_phases)
+                self._ensure_phase_curves(value.shape[0])
                 super()._update_2d_data(np.array(fft_mags), dtype, shape, source_info + " (FFT)")
                 self._plot_widget.setLabel('bottom', 'Frequency (Hz)' if is_waveform else 'FFT Bin')
+                self._render_phase_curves_full()
             
             if getattr(self, '_first_data', False):
                 from PyQt6.QtCore import QTimer
@@ -874,9 +990,9 @@ class WaveformFftMagWidget(WaveformWidget):
                 self._first_data = False
 
         elif isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COLLECTION:
-            # Modify the dictionary entries before passing to base
             import scipy.signal
             new_waveforms = []
+            phase_waveforms = []
             for wf in value.get('waveforms', []):
                 samples = np.asarray(wf['samples'])
                 scalars = wf.get('scalars', [0.0, 1.0])
@@ -888,12 +1004,8 @@ class WaveformFftMagWidget(WaveformWidget):
                     nfft = max(8192, 2**int(np.ceil(np.log2(n))))
                     fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
                     fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                    fft_phase = np.rad2deg(np.angle(fft_data))
                     
-                    # We have to trick the base class into drawing frequencies.
-                    # Base class calculates t_vector = t0 + np.arange(len(samples)) * dt
-                    # So we need t0 and dt that reconstruct our frequency array.
-                    # np.fft.fftfreq produces frequencies separated by 1/(n*dt)
-                    # fftshift moves negative frequencies first, so min freq is approximately -1/(2*dt)
                     new_dt = 1.0 / (nfft * dt_val) if dt_val > 0 else 1.0
                     freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dt_val)) if dt_val > 0 else np.arange(-nfft//2, nfft - nfft//2)
                     new_t0 = freqs[0]
@@ -901,10 +1013,19 @@ class WaveformFftMagWidget(WaveformWidget):
                         new_dt = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
                     
                     new_waveforms.append({'samples': fft_mag, 'scalars': [new_t0, new_dt]})
+                    phase_waveforms.append({'samples': fft_phase, 'freqs': freqs})
             
             new_value = {'__dtype__': DTYPE_WAVEFORM_COLLECTION, 'waveforms': new_waveforms}
             super().update_data(new_value, dtype, shape, source_info + " (FFT)")
             self._plot_widget.setLabel('bottom', 'Frequency (Hz)')
+            
+            self._current_phase_data = None
+            self._ensure_phase_curves(len(phase_waveforms))
+            self._updating_curves = True
+            for idx, wf in enumerate(phase_waveforms):
+                x_idx, y_display = self.downsample(wf['samples'])
+                self._phase_curves[idx].setData(wf['freqs'][x_idx], y_display)
+            self._updating_curves = False
             
             if getattr(self, '_first_data', False):
                 from PyQt6.QtCore import QTimer
@@ -914,6 +1035,7 @@ class WaveformFftMagWidget(WaveformWidget):
         elif isinstance(value, dict) and value.get('__dtype__') == DTYPE_ARRAY_COLLECTION:
             import scipy.signal
             new_arrays = []
+            phase_arrays = []
             for arr in value.get('arrays', []):
                 samples = np.asarray(arr)
                 n = len(samples)
@@ -923,29 +1045,33 @@ class WaveformFftMagWidget(WaveformWidget):
                     nfft = max(8192, 2**int(np.ceil(np.log2(n))))
                     fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
                     fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
+                    fft_phase = np.rad2deg(np.angle(fft_data))
                     new_arrays.append(fft_mag)
+                    phase_arrays.append(fft_phase)
             
-            # For array collections without dt, X axis is just frequency bins
-            # However base array collection just draws indices.
-            # To fix X-axis for arrays, we might need a custom t_vector, but base array collection
-            # ignores t_vector entirely. We'll just let it draw indices 0..N-1 for now, 
-            # representing shifted bins.
             new_value = {'__dtype__': DTYPE_ARRAY_COLLECTION, 'arrays': new_arrays}
             super().update_data(new_value, dtype, shape, source_info + " (FFT)")
             self._plot_widget.setLabel('bottom', 'FFT Bin')
+            
+            self._current_phase_data = None
+            self._ensure_phase_curves(len(phase_arrays))
+            self._updating_curves = True
+            for idx, arr in enumerate(phase_arrays):
+                x_display, y_display = self.downsample(arr)
+                self._phase_curves[idx].setData(x_display, y_display)
+            self._updating_curves = False
             
             if getattr(self, '_first_data', False):
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(50, self.reset_view)
                 self._first_data = False
-            
         else:
             super().update_data(value, dtype, shape, source_info)
 
-class WaveformFftMagPlugin(ProbePlugin):
+class WaveformFftMagAnglePlugin(ProbePlugin):
     """Plugin for FFT Magnitude of 1D arrays and waveforms."""
     
-    name = "FFT Mag (dB)"
+    name = "FFT Mag (dB) / Angle (deg)"
     icon = "activity"
     priority = 90  # Just below Waveform
     
@@ -953,12 +1079,12 @@ class WaveformFftMagPlugin(ProbePlugin):
         return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return WaveformFftMagWidget(var_name, color, parent)
+        return WaveformFftMagAngleWidget(var_name, color, parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str,
                shape: Optional[Tuple[int, ...]] = None,
                source_info: str = "") -> None:
-        if isinstance(widget, WaveformFftMagWidget):
+        if isinstance(widget, WaveformFftMagAngleWidget):
             widget.update_data(value, dtype, shape, source_info)
 
 class WaveformPlugin(ProbePlugin):
