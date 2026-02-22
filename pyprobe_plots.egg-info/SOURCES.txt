@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 pyprobe/__init__.py
 pyprobe/__main__.py
@@ -53,6 +54,15 @@ pyprobe/gui/redraw_throttler.py
 pyprobe/gui/scalar_watch_window.py
 pyprobe/gui/script_runner.py
 pyprobe/gui/watch_list.py
+pyprobe/gui/icons/__init__.py
+pyprobe/gui/icons/icon_lock_x.svg
+pyprobe/gui/icons/icon_lock_y.svg
+pyprobe/gui/icons/icon_pan.svg
+pyprobe/gui/icons/icon_pointer.svg
+pyprobe/gui/icons/icon_reset.svg
+pyprobe/gui/icons/icon_zoom.svg
+pyprobe/gui/icons/icon_zoom_x.svg
+pyprobe/gui/icons/icon_zoom_y.svg
 pyprobe/gui/theme/__init__.py
 pyprobe/gui/theme/anthropic.py
 pyprobe/gui/theme/base.py

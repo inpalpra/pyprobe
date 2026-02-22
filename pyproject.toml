@@ -52,6 +52,9 @@ planning = [
     "pyplan",
 ]
 
+[tool.setuptools.package-data]
+"pyprobe.gui" = ["icons/*.svg"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pyprobe*"]
