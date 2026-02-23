@@ -7,7 +7,7 @@ M1: Source-anchored probing with code viewer.
 from typing import Dict, List, Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QSplitter,
-    QStatusBar, QFileDialog, QMessageBox
+    QStatusBar, QFileDialog, QMessageBox, QLabel
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QColor, QAction, QActionGroup
@@ -434,6 +434,11 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self._status_bar)
         self._status_bar.showMessage("Ready - Open a Python script to begin")
 
+        # Right-aligned coordinate label for hover display
+        self._coord_label = QLabel("")
+        self._coord_label.setStyleSheet("color: #aaaaaa; font-family: 'JetBrains Mono'; font-size: 11px; padding-right: 8px;")
+        self._status_bar.addPermanentWidget(self._coord_label)
+
         self._setup_theme_menu()
 
     def _setup_theme_menu(self) -> None:
@@ -629,7 +634,16 @@ class MainWindow(QMainWindow):
 
     def _setup_probe_controller(self):
         """Connect ProbeController signals to slots."""
-        self._probe_controller.status_message.connect(self._status_bar.showMessage)
+        self._probe_controller.status_message.connect(self._on_probe_status_message)
+
+    def _on_probe_status_message(self, msg: str):
+        """Route coordinate messages to right-side label, others to status bar."""
+        if msg.startswith("X:"):
+            self._coord_label.setText(msg)
+        elif msg == "":
+            self._coord_label.setText("")
+        else:
+            self._status_bar.showMessage(msg)
 
     @pyqtSlot(dict)
     def _on_probe_value(self, payload: dict):

@@ -130,6 +130,9 @@ class ProbeController(QObject):
             self._probe_panels[anchor] = []
         self._probe_panels[anchor].append(panel)
         
+        # Connect hover coordinate signal
+        panel.status_message_requested.connect(self.status_message.emit)
+        
         # Connect lens changed signal
         if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
             from functools import partial

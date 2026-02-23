@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QRectF, QTimer
+from PyQt6.QtCore import QRectF, QTimer, pyqtSignal
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
@@ -15,6 +15,8 @@ from ...gui.axis_editor import AxisEditor
 
 class ConstellationWidget(QWidget):
     """Scatter plot widget for I/Q data."""
+
+    status_message_requested = pyqtSignal(str)
     
     MAX_DISPLAY_POINTS = 10000
     HISTORY_LENGTH = 5  # Number of frames to show with fading
@@ -121,6 +123,9 @@ class ConstellationWidget(QWidget):
         self._pin_indicator.y_pin_clicked.connect(lambda: self._axis_controller.toggle_pin('y'))
         self._pin_indicator.raise_()
         self._pin_indicator.show()
+
+        # Mouse hover coordinate display
+        self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
 
     def _apply_theme(self, theme) -> None:
         c = theme.colors
@@ -352,6 +357,22 @@ class ConstellationWidget(QWidget):
         self._plot_widget.setAspectLocked(True)
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+
+    # ── Mouse hover coordinate helpers ─────────────────────
+
+    def _on_mouse_moved(self, pos):
+        """Format hover coordinates and emit status_message_requested."""
+        from .complex_plots import format_coord
+        vb = self._plot_widget.plotItem.vb
+        mouse_point = vb.mapSceneToView(pos)
+        x_str = format_coord(mouse_point.x())
+        y_str = format_coord(mouse_point.y())
+        self.status_message_requested.emit(f"X: {x_str},  Y: {y_str}")
+
+    def leaveEvent(self, event):
+        """Clear status bar when mouse leaves the plot widget."""
+        super().leaveEvent(event)
+        self.status_message_requested.emit("")
 
     def get_plot_data(self) -> dict:
         """

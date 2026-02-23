@@ -32,9 +32,9 @@ class ProbePanel(QFrame):
     state indicator, identity label, and animation support.
     """
 
-    # M2.5: Signals
     maximize_requested = pyqtSignal()
     park_requested = pyqtSignal()
+    status_message_requested = pyqtSignal(str)
     overlay_requested = pyqtSignal(object, object)  # (self/panel, ProbeAnchor)
     overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
 
@@ -142,6 +142,10 @@ class ProbePanel(QFrame):
             self._plot = create_plot(self._anchor.symbol, self._dtype, self)
 
         self._layout.addWidget(self._plot)
+
+        # Connect plot widget's hover coordinate signal if present
+        if hasattr(self._plot, 'status_message_requested'):
+            self._plot.status_message_requested.connect(self.status_message_requested)
 
         # Set minimum size
         self.setMinimumSize(300, 250)
@@ -269,6 +273,10 @@ class ProbePanel(QFrame):
         # Insert into layout (index 1, after header)
         self._layout.insertWidget(1, self._plot)
         self._plot.show()  # Ensure new widget is visible
+
+        # Connect plot widget's hover coordinate signal if present
+        if hasattr(self._plot, 'status_message_requested'):
+            self._plot.status_message_requested.connect(self.status_message_requested)
         
         # Re-apply current toolbar mode to new plot widget
         if self._toolbar:

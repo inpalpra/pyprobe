@@ -3,7 +3,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import Qt, QRectF, QTimer
+from PyQt6.QtCore import Qt, QRectF, QTimer, pyqtSignal, QPointF
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
@@ -41,8 +41,41 @@ def downsample(data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> tuple:
     y[1::2] = maxs
     return x, y
 
+# ── SI-prefix formatter (shared by ComplexWidget and WaveformWidget) ──
+_SI_PREFIXES = [
+    (1e15,  'P'),
+    (1e12,  'T'),
+    (1e9,   'G'),
+    (1e6,   'M'),
+    (1e3,   'k'),
+    (1e0,   ''),
+    (1e-3,  'm'),
+    (1e-6,  'µ'),
+    (1e-9,  'n'),
+    (1e-12, 'p'),
+    (1e-15, 'f'),
+]
+
+def format_coord(val: float) -> str:
+    """Format a value using SI prefixes with 6 decimal places.
+
+    Falls back to scientific notation for |val| > 1e15 or < 1e-15.
+    """
+    if val == 0:
+        return '0.000000'
+    av = abs(val)
+    if av >= 1e15 or av < 1e-15:
+        return f'{val:.6e}'
+    for threshold, prefix in _SI_PREFIXES:
+        if av >= threshold:
+            return f'{val / threshold:.6f}{prefix}'
+    return f'{val:.6e}'
+
+
 class ComplexWidget(QWidget):
     """Base widget for complex time-domain plots with zoom-responsive downsampling."""
+
+    status_message_requested = pyqtSignal(str)
     
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -131,6 +164,9 @@ class ComplexWidget(QWidget):
         # Zoom-responsive: connect sigRangeChanged
         vb = plot_item.getViewBox()
         vb.sigRangeChanged.connect(self._on_view_range_changed)
+
+        # Mouse hover coordinate display
+        self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
 
     def _apply_theme(self, theme) -> None:
         c = theme.colors
@@ -345,6 +381,36 @@ class ComplexWidget(QWidget):
             self._axis_controller.set_pinned('y', False)
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+
+    # ── Mouse hover coordinate helpers ─────────────────────
+
+    def _get_active_viewbox(self):
+        """Return the viewbox to use for coordinate mapping.
+
+        For dual-axis subclasses (ComplexMAWidget, ComplexFftMagAngleWidget),
+        prefer the primary (magnitude) ViewBox. Fall back to the secondary
+        (phase) ViewBox only when all magnitude curves are hidden.
+        """
+        primary_vb = self._plot_widget.plotItem.vb
+        # Check if we have a secondary viewbox (_p2)
+        if hasattr(self, '_p2'):
+            # Check if mag curve is visible
+            if hasattr(self, '_mag_curve') and not self._mag_curve.isVisible():
+                return self._p2
+        return primary_vb
+
+    def _on_mouse_moved(self, pos):
+        """Format hover coordinates and emit status_message_requested."""
+        vb = self._get_active_viewbox()
+        mouse_point = vb.mapSceneToView(pos)
+        x_str = format_coord(mouse_point.x())
+        y_str = format_coord(mouse_point.y())
+        self.status_message_requested.emit(f"X: {x_str},  Y: {y_str}")
+
+    def leaveEvent(self, event):
+        """Clear status bar when mouse leaves the plot widget."""
+        super().leaveEvent(event)
+        self.status_message_requested.emit("")
 
     # ── get_plot_data for testing ────────────────────────
 

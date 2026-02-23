@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QRectF, QTimer, Qt
+from PyQt6.QtCore import QRectF, QTimer, Qt, pyqtSignal
 
 from ...plots.pin_layout_mixin import PinLayoutMixin
 from ...plots.draw_mode import DrawMode, apply_draw_mode
@@ -37,6 +37,8 @@ ROW_COLORS = [
 
 class WaveformWidget(PinLayoutMixin, QWidget):
     """The actual plot widget created by WaveformPlugin."""
+
+    status_message_requested = pyqtSignal(str)
     
     MAX_DISPLAY_POINTS = 5000
     
@@ -142,6 +144,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         # M2.5: Setup editable axes
         self._setup_editable_axes()
         
+        # Mouse hover coordinate display
+        self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
+
         # M2.5: Axis editor (inline text editor)
         self._axis_editor = AxisEditor(self._plot_widget)
         self._axis_editor.value_committed.connect(self._on_axis_value_committed)
@@ -713,6 +718,36 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+
+    # ── Mouse hover coordinate helpers ─────────────────────
+
+    def _get_active_viewbox(self):
+        """Return the viewbox to use for coordinate mapping.
+
+        For dual-axis subclasses, prefer the primary (magnitude) ViewBox.
+        Fall back to secondary if magnitude curves are all hidden.
+        """
+        primary_vb = self._plot_widget.plotItem.vb
+        if hasattr(self, '_p2'):
+            # Check if primary curves are all hidden
+            all_hidden = all(not c.isVisible() for c in self._curves)
+            if all_hidden:
+                return self._p2
+        return primary_vb
+
+    def _on_mouse_moved(self, pos):
+        """Format hover coordinates and emit status_message_requested."""
+        from .complex_plots import format_coord
+        vb = self._get_active_viewbox()
+        mouse_point = vb.mapSceneToView(pos)
+        x_str = format_coord(mouse_point.x())
+        y_str = format_coord(mouse_point.y())
+        self.status_message_requested.emit(f"X: {x_str},  Y: {y_str}")
+
+    def leaveEvent(self, event):
+        """Clear status bar when mouse leaves the plot widget."""
+        super().leaveEvent(event)
+        self.status_message_requested.emit("")
 
     def set_draw_mode(self, curve_index: int, mode: DrawMode) -> None:
         """Set the draw mode for a curve by index."""
