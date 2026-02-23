@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import QRectF, QTimer, Qt, pyqtSignal
 
 from ..base import ProbePlugin
 from ...core.data_classifier import DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX
@@ -12,6 +12,8 @@ from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
 from ...plots.editable_axis import EditableAxisItem
 from ...gui.axis_editor import AxisEditor
+from ...plots.marker_model import MarkerStore
+from ...plots.marker_items import MarkerOverlay, MarkerGlyph, snap_to_nearest
 
 class ConstellationWidget(QWidget):
     """Scatter plot widget for I/Q data."""
@@ -126,6 +128,15 @@ class ConstellationWidget(QWidget):
 
         # Mouse hover coordinate display
         self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
+        
+        # M3: Marker System
+        self._marker_store = MarkerStore(self)
+        self._marker_overlay = MarkerOverlay(self._plot_widget)
+        self._marker_store.markers_changed.connect(self._refresh_markers)
+        self._marker_overlay.marker_removed_requested.connect(self._marker_store.remove_marker)
+        self._marker_glyphs = {}
+        
+        self._plot_widget.scene().sigMouseClicked.connect(self._on_mouse_clicked)
 
     def _apply_theme(self, theme) -> None:
         c = theme.colors
@@ -299,11 +310,12 @@ class ConstellationWidget(QWidget):
         # via enableAutoRange(). Calling autoRange() every frame would override
         # any pinned axis settings.
             
-        shape_str = f"[{value.shape}]" if shape else ""
-        self._info_label.setText(f"{shape_str} {source_info}")
-        self._update_stats()
+            
+        self._info_label.setText(source_info)
+        self._update_stats(shape=shape if shape else value.shape)
+        self._refresh_markers()
 
-    def _update_stats(self):
+    def _update_stats(self, shape: Optional[tuple] = None):
         """Update constellation statistics."""
         if self._data is None or len(self._data) == 0:
             return
@@ -311,7 +323,8 @@ class ConstellationWidget(QWidget):
         power = np.mean(np.abs(self._data) ** 2)
         power_db = 10 * np.log10(power) if power > 0 else -np.inf
         
-        self._stats_label.setText(f"Power: {power_db:.2f} dB | Symbols: {len(self._data)}")
+        prefix = f"Shape: {shape} | " if shape else ""
+        self._stats_label.setText(f"{prefix}Power: {power_db:.2f} dB | Symbols: {len(self._data)}")
 
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         """Handle axis pin state change from AxisController."""
@@ -338,6 +351,8 @@ class ConstellationWidget(QWidget):
         """Reposition pin indicator on resize."""
         super().resizeEvent(event)
         self._update_pin_layout()
+        if hasattr(self, '_marker_overlay'):
+            self._marker_overlay._reposition()
 
     def _update_pin_layout(self) -> None:
         """Update the position of pin indicators relative to plot area."""
@@ -369,6 +384,7 @@ class ConstellationWidget(QWidget):
         self._plot_widget.setAspectLocked(True)
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+        self._refresh_markers()
 
     # ── Mouse hover coordinate helpers ─────────────────────
 
@@ -385,6 +401,49 @@ class ConstellationWidget(QWidget):
         """Clear status bar when mouse leaves the plot widget."""
         super().leaveEvent(event)
         self.status_message_requested.emit("")
+
+    def _on_mouse_clicked(self, ev):
+        if ev.modifiers() == Qt.KeyboardModifier.AltModifier and ev.button() == Qt.MouseButton.LeftButton:
+            ev.accept()
+            curve_dict = {f"history_{i}": scatter for i, scatter in enumerate(self._scatter_items)}
+            trace_key, x, y = snap_to_nearest(self._plot_widget, curve_dict, ev.scenePos())
+            if trace_key is not None:
+                self._marker_store.add_marker(trace_key, x, y)
+                
+    def _refresh_markers(self):
+        plot_item = self._plot_widget.getPlotItem()
+        for glyph in self._marker_glyphs.values():
+            plot_item.removeItem(glyph)
+        self._marker_glyphs.clear()
+        
+        # Mapping trace keys back to scatter items
+        curve_dict = {f"history_{i}": scatter for i, scatter in enumerate(self._scatter_items)}
+        
+        # Block signals to avoid infinite recursion (we're called from markers_changed)
+        self._marker_store.blockSignals(True)
+        for m in self._marker_store.get_markers():
+            if m.trace_key in curve_dict:
+                curve = curve_dict[m.trace_key]
+                x_data, y_data = curve.getData()
+                if x_data is not None and len(x_data) > 0:
+                    # Use Euclidean distance for scatter (I/Q) data
+                    dist = (x_data - m.x)**2 + (y_data - m.y)**2
+                    idx = np.argmin(dist)
+                    new_x, new_y = float(x_data[idx]), float(y_data[idx])
+                    updates = {}
+                    if new_x != m.x:
+                        updates['x'] = new_x
+                    if new_y != m.y:
+                        updates['y'] = new_y
+                    if updates:
+                        self._marker_store.update_marker(m.id, **updates)
+            
+            glyph = MarkerGlyph(m)
+            plot_item.addItem(glyph)
+            self._marker_glyphs[m.id] = glyph
+        self._marker_store.blockSignals(False)
+            
+        self._marker_overlay.update_markers(self._marker_store)
 
     def get_plot_data(self) -> dict:
         """

@@ -14,6 +14,8 @@ from ...plots.pin_indicator import PinIndicator
 from ...plots.draw_mode import DrawMode, apply_draw_mode
 from ...plots.editable_axis import EditableAxisItem
 from ...gui.axis_editor import AxisEditor
+from ...plots.marker_model import MarkerStore
+from ...plots.marker_items import MarkerOverlay, MarkerGlyph, snap_to_nearest
 
 MAX_DISPLAY_POINTS = 5000
 
@@ -179,6 +181,15 @@ class ComplexWidget(QWidget):
 
         # Mouse hover coordinate display
         self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
+        
+        # M3: Marker System
+        self._marker_store = MarkerStore(self)
+        self._marker_overlay = MarkerOverlay(self._plot_widget)
+        self._marker_store.markers_changed.connect(self._refresh_markers)
+        self._marker_overlay.marker_removed_requested.connect(self._marker_store.remove_marker)
+        self._marker_glyphs = {}
+        
+        self._plot_widget.scene().sigMouseClicked.connect(self._on_mouse_clicked)
 
     def _apply_theme(self, theme) -> None:
         c = theme.colors
@@ -381,6 +392,8 @@ class ComplexWidget(QWidget):
         """Reposition pin indicator on resize."""
         super().resizeEvent(event)
         self._update_pin_layout()
+        if hasattr(self, '_marker_overlay'):
+            self._marker_overlay._reposition()
 
     def _update_pin_layout(self) -> None:
         """Update the position of pin indicators relative to plot area."""
@@ -411,13 +424,12 @@ class ComplexWidget(QWidget):
             return
         self._zoom_timer.start()
 
+    def _render_slice(self, i_min: int, i_max: int):
+        """Override in subclasses to re-render the visible slice."""
+        pass
+        
     def _rerender_for_zoom(self):
-        """Re-downsample or show raw data based on visible x-range.
-
-        Subclasses implement _render_slice(i_min, i_max) which produces
-        the derived arrays (real, imag, mag, phase, etc.) for the visible
-        slice, then calls setData on their curves.
-        """
+        """Re-downsample or show raw data based on visible x-range."""
         if self._raw_data is None:
             return
         vb = self._plot_widget.getPlotItem().getViewBox()
@@ -437,10 +449,7 @@ class ComplexWidget(QWidget):
         self._updating_curves = True
         self._render_slice(i_min, i_max)
         self._updating_curves = False
-
-    def _render_slice(self, i_min: int, i_max: int):
-        """Override in subclasses to re-render the visible slice."""
-        pass
+        self._refresh_markers()
 
     def _get_x_for_indices(self, indices: np.ndarray) -> np.ndarray:
         """Map sample indices to x-axis values using _t_vector if available."""
@@ -463,6 +472,7 @@ class ComplexWidget(QWidget):
             self._axis_controller.set_pinned('y', False)
         vb = self._plot_widget.getPlotItem().getViewBox()
         vb.autoRange(padding=0)
+        self._refresh_markers()
 
     # ── Mouse hover coordinate helpers ─────────────────────
 
@@ -493,6 +503,75 @@ class ComplexWidget(QWidget):
         """Clear status bar when mouse leaves the plot widget."""
         super().leaveEvent(event)
         self.status_message_requested.emit("")
+
+    def _on_mouse_clicked(self, ev):
+        if ev.modifiers() == Qt.KeyboardModifier.AltModifier and ev.button() == Qt.MouseButton.LeftButton:
+            ev.accept()
+            curve_dict = {key: curve for key, (curve, _) in self._series_curves.items()}
+            # Build per-curve ViewBox mapping for secondary-axis curves
+            curve_viewboxes = None
+            if hasattr(self, '_secondary_keys') and hasattr(self, '_p2'):
+                curve_viewboxes = {k: self._p2 for k in self._secondary_keys if k in curve_dict}
+            trace_key, x, y = snap_to_nearest(self._plot_widget, curve_dict, ev.scenePos(),
+                                              curve_viewboxes=curve_viewboxes)
+            if trace_key is not None:
+                # Get the series color for the marker
+                _, color_hex = self._series_curves.get(trace_key, (None, '#ffffff'))
+                self._marker_store.add_marker(trace_key, x, y, color=color_hex)
+                
+    def _refresh_markers(self):
+        plot_item = self._plot_widget.getPlotItem()
+        # Remove glyphs from whichever ViewBox they were added to
+        for m_id, glyph in self._marker_glyphs.items():
+            owner = getattr(glyph, '_owner_vb', None)
+            if owner is not None:
+                owner.removeItem(glyph)
+            else:
+                plot_item.removeItem(glyph)
+        self._marker_glyphs.clear()
+
+        secondary_keys = getattr(self, '_secondary_keys', set())
+        has_p2 = hasattr(self, '_p2')
+
+        # Block signals to avoid infinite recursion (we're called from markers_changed)
+        self._marker_store.blockSignals(True)
+        for m in self._marker_store.get_markers():
+            if m.trace_key in self._series_curves:
+                curve, _ = self._series_curves[m.trace_key]
+                x_data, y_data = curve.getData()
+                if x_data is not None and len(x_data) > 0:
+                    idx = np.argmin(np.abs(x_data - m.x))
+                    new_y = float(y_data[idx])
+                    if new_y != m.y:
+                        self._marker_store.update_marker(m.id, y=new_y)
+
+            glyph = MarkerGlyph(m)
+            glyph.signaler.marker_moved.connect(self._on_marker_dragged)
+            # Add glyph to the correct ViewBox
+            if has_p2 and m.trace_key in secondary_keys:
+                self._p2.addItem(glyph)
+                glyph._owner_vb = self._p2
+            else:
+                plot_item.addItem(glyph)
+                glyph._owner_vb = None
+            self._marker_glyphs[m.id] = glyph
+        self._marker_store.blockSignals(False)
+
+        self._marker_overlay.update_markers(self._marker_store)
+
+    def _on_marker_dragged(self, marker_id: str, new_x: float, new_y: float):
+        """Handle marker drag — snap to nearest series curve point at the dragged x."""
+        m = self._marker_store.get_marker(marker_id)
+        if m is None:
+            return
+        if m.trace_key in self._series_curves:
+            curve, _ = self._series_curves[m.trace_key]
+            x_data, y_data = curve.getData()
+            if x_data is not None and len(x_data) > 0:
+                idx = np.argmin(np.abs(x_data - new_x))
+                new_x = float(x_data[idx])
+                new_y = float(y_data[idx])
+        self._marker_store.update_marker(marker_id, x=new_x, y=new_y)
 
     # ── get_plot_data for testing ────────────────────────
 
@@ -534,7 +613,8 @@ class ComplexRIWidget(ComplexWidget):
 
         if self._t_vector is not None:
             self._plot_widget.setLabel('bottom', 'Time')
-        self.update_info(f"[{value.shape}]")
+        self.update_info(f"{value.shape}")
+        self._refresh_markers()
 
     def _render_slice(self, i_min: int, i_max: int):
         """Re-render real & imag for the visible slice."""
@@ -574,10 +654,13 @@ class ComplexMAWidget(ComplexWidget):
         
         self._register_series('Log Mag', self._mag_curve, '#ffff00')
         self._register_series('Phase', self._phase_curve, '#00ff7f')
-        
+
+        # Keys whose curves live in the secondary ViewBox (_p2)
+        self._secondary_keys: set = {'Phase'}
+
         # Replace right axis with editable one
         self._setup_editable_secondary_axis('#00ff00', 'Phase (rad)')
-        
+
         # Handle view resize
         self._p1.vb.sigResized.connect(self._update_views)
 
@@ -615,7 +698,8 @@ class ComplexMAWidget(ComplexWidget):
 
         if self._t_vector is not None:
             self._plot_widget.setLabel('bottom', 'Time')
-        self.update_info(f"[{value.shape}]")
+        self.update_info(f"{value.shape}")
+        self._refresh_markers()
 
     def _render_slice(self, i_min: int, i_max: int):
         """Re-render mag & phase for the visible slice."""
@@ -650,6 +734,7 @@ class SingleCurveWidget(ComplexWidget):
         if self._t_vector is not None:
             self._plot_widget.setLabel('bottom', 'Time')
         self.update_info(info)
+        self._refresh_markers()
 
     def _render_slice(self, i_min: int, i_max: int):
         """Re-render for the visible slice using pre-computed real data."""
@@ -751,10 +836,13 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         
         self._register_series('FFT Mag (dB)', self._mag_curve, '#ffff00')
         self._register_series('Angle (deg)', self._phase_curve, '#00ff7f')
-        
+
+        # Keys whose curves live in the secondary ViewBox (_p2)
+        self._secondary_keys: set = {'Angle (deg)'}
+
         # Replace right axis with editable one
         self._setup_editable_secondary_axis('#00ff00', 'Angle (deg)')
-        
+
         self._p1.vb.sigResized.connect(self._update_views)
         self._first_data = True
         

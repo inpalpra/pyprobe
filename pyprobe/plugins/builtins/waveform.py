@@ -19,6 +19,8 @@ from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
 from ...plots.editable_axis import EditableAxisItem
 from ...gui.axis_editor import AxisEditor
+from ...plots.marker_model import MarkerStore
+from ...plots.marker_items import MarkerOverlay, MarkerGlyph, snap_to_nearest
 
 # Default color palette (overridden at runtime by theme.row_colors)
 ROW_COLORS = [
@@ -151,6 +153,16 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._axis_editor = AxisEditor(self._plot_widget)
         self._axis_editor.value_committed.connect(self._on_axis_value_committed)
         self._axis_editor.editing_cancelled.connect(self._on_axis_edit_cancelled)
+        
+        # M3: Marker System
+        self._marker_store = MarkerStore(self)
+        self._marker_overlay = MarkerOverlay(self._plot_widget)
+        self._marker_store.markers_changed.connect(self._refresh_markers)
+        self._marker_overlay.marker_removed_requested.connect(self._marker_store.remove_marker)
+        self._marker_glyphs = {}
+        
+        self._plot_widget.scene().sigMouseClicked.connect(self._on_mouse_clicked)
+
     
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         """Handle axis pin state change from AxisController."""
@@ -511,11 +523,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._updating_curves = False
 
         # Update info label
-        shape_str = f"[{value.shape}]" if shape else ""
-        self._info_label.setText(f"{shape_str} {source_info}")
+        self._info_label.setText(source_info)
 
         # Update stats
-        self._update_stats()
+        self._update_stats_from_data(self._data, shape=shape if shape else value.shape)
+
+        self._refresh_markers()
+
 
     def _update_2d_data(self, value: np.ndarray, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with 2D data (each row is a time series)."""
@@ -545,11 +559,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             self._plot_widget.setLabel('bottom', 'Sample Index')
 
         # Update info label
-        shape_str = f"[{value.shape[0]}×{value.shape[1]}]"
-        self._info_label.setText(f"{shape_str} {source_info}")
+        self._info_label.setText(source_info)
 
         # Update stats (aggregate across all rows)
-        self._update_stats_2d()
+        self._update_stats_from_data(self._data, prefix=f"{value.shape[0]} rows", shape=shape if shape else value.shape)
+
+        self._refresh_markers()
+
 
     def _update_waveform_collection_data(self, value: dict, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with waveform collection."""
@@ -584,11 +600,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._updating_curves = False
 
         self._plot_widget.setLabel('bottom', 'Time')
-        self._info_label.setText(f"[{num_waveforms} waveforms] {source_info}")
+        self._info_label.setText(source_info)
 
         if all_samples:
             all_data = np.concatenate(all_samples)
-            self._update_stats_from_data(all_data, f"{num_waveforms} wfms")
+            self._update_stats_from_data(all_data, f"{num_waveforms} wfms", shape=(num_waveforms, len(all_samples[0])) if all_samples else None)
+        
+        self._refresh_markers()
 
     def _update_array_collection_data(self, value: dict, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with array collection."""
@@ -610,11 +628,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self._updating_curves = False
 
         self._plot_widget.setLabel('bottom', 'Sample Index')
-        self._info_label.setText(f"[{num_arrays} arrays] {source_info}")
+        self._info_label.setText(source_info)
 
         if all_data:
             concatenated = np.concatenate(all_data)
-            self._update_stats_from_data(concatenated, f"{num_arrays} arrays")
+            self._update_stats_from_data(concatenated, f"{num_arrays} arrays", shape=(num_arrays, len(all_data[0])) if all_data else None)
+            
+        self._refresh_markers()
 
     def _update_stats(self):
         """Update statistics display for 1D data."""
@@ -628,12 +648,18 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             return
         self._update_stats_from_data(self._data, f"{self._data.shape[0]} rows")
 
-    def _update_stats_from_data(self, data: np.ndarray, prefix: str = ""):
+    def _update_stats_from_data(self, data: np.ndarray, prefix: str = "", shape: Optional[tuple] = None):
         min_val = np.min(data)
         max_val = np.max(data)
         mean_val = np.mean(data)
         
-        prefix_str = f"{prefix} | " if prefix else ""
+        prefix_parts = []
+        if shape is not None:
+            prefix_parts.append(f"Shape: {shape}")
+        if prefix:
+            prefix_parts.append(prefix)
+            
+        prefix_str = " | ".join(prefix_parts) + " | " if prefix_parts else ""
         self._stats_label.setText(
             f"{prefix_str}Min: {min_val:.4g} | Max: {max_val:.4g} | Mean: {mean_val:.4g}"
         )
@@ -775,6 +801,62 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         """Clear status bar when mouse leaves the plot widget."""
         super().leaveEvent(event)
         self.status_message_requested.emit("")
+
+    def _on_mouse_clicked(self, ev):
+        if ev.modifiers() == Qt.KeyboardModifier.AltModifier and ev.button() == Qt.MouseButton.LeftButton:
+            ev.accept()
+            curve_dict = {i: c for i, c in enumerate(self._curves)}
+            trace_key, x, y = snap_to_nearest(self._plot_widget, curve_dict, ev.scenePos())
+            if trace_key is not None:
+                self._marker_store.add_marker(trace_key, x, y)
+                
+    def _refresh_markers(self):
+        plot_item = self._plot_widget.getPlotItem()
+        for glyph in self._marker_glyphs.values():
+            plot_item.removeItem(glyph)
+        self._marker_glyphs.clear()
+        
+        # Block signals to avoid infinite recursion (we're called from markers_changed)
+        self._marker_store.blockSignals(True)
+        for m in self._marker_store.get_markers():
+            # If the curve shifted due to new data, re-evaluate Y
+            if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
+                curve = self._curves[m.trace_key]
+                x_data, y_data = curve.getData()
+                if x_data is not None and len(x_data) > 0:
+                    idx = np.argmin(np.abs(x_data - m.x))
+                    new_y = float(y_data[idx])
+                    if new_y != m.y:
+                        self._marker_store.update_marker(m.id, y=new_y)
+            
+            glyph = MarkerGlyph(m)
+            glyph.signaler.marker_moved.connect(self._on_marker_dragged)
+            plot_item.addItem(glyph)
+            self._marker_glyphs[m.id] = glyph
+        self._marker_store.blockSignals(False)
+            
+        self._marker_overlay.update_markers(self._marker_store)
+
+    def _on_marker_dragged(self, marker_id: str, new_x: float, new_y: float):
+        """Handle marker drag — snap to nearest curve point at the dragged x."""
+        m = self._marker_store.get_marker(marker_id)
+        if m is None:
+            return
+        # Snap to curve at the new x
+        if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
+            curve = self._curves[m.trace_key]
+            x_data, y_data = curve.getData()
+            if x_data is not None and len(x_data) > 0:
+                idx = np.argmin(np.abs(x_data - new_x))
+                new_x = float(x_data[idx])
+                new_y = float(y_data[idx])
+        self._marker_store.update_marker(marker_id, x=new_x, y=new_y)
+        
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        if hasattr(self, '_marker_overlay'):
+            self._marker_overlay._reposition()
+
 
     def set_draw_mode(self, curve_index: int, mode: DrawMode) -> None:
         """Set the draw mode for a curve by index."""

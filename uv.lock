@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "pyprobe-plots"
-version = "0.1.19"
+version = "0.1.20"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -920,7 +920,7 @@ wheels = [
 [[package]]
 name = "rfutil"
 version = "0.1.0"
-source = { git = "https://github.com/inpalpra/rfutil#c0015f8eb0e36409f93cb1d1c80425a9224d42df" }
+source = { git = "https://github.com/inpalpra/rfutil#4b8486db8ba953cce4477431f15a324fc97dd73a" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },

@@ -1,0 +1,61 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- /Users/ppal/repos/pyprobe/.venv/bin/python
+cachedir: .pytest_cache
+PyQt6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.0
+rootdir: /Users/ppal/repos/pyprobe
+configfile: pyproject.toml
+plugins: xdist-3.8.0, qt-4.5.0, forked-1.6.0
+collecting ... collected 1 item
+
+tests/gui/test_markers_gui.py::test_markers_gui_waveform FAILED
+tests/gui/test_markers_gui.py::test_markers_gui_waveform ERROR
+
+==================================== ERRORS ====================================
+________________ ERROR at teardown of test_markers_gui_waveform ________________
+TEARDOWN ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "/Users/ppal/repos/pyprobe/pyprobe/plugins/builtins/waveform.py", line 824, in _refresh_markers
+    glyph = MarkerGlyph(m)
+            ^^^^^^^^^^^^^^
+  File "/Users/ppal/repos/pyprobe/pyprobe/plots/marker_items.py", line 28, in __init__
+    self.addToGroup(self.scatter)
+    ^^^^^^^^^^^^^^^
+AttributeError: 'MarkerGlyph' object has no attribute 'addToGroup'
+________________________________________________________________________________
+
+=================================== FAILURES ===================================
+__________________________ test_markers_gui_waveform ___________________________
+
+qtbot = <pytestqt.qtbot.QtBot object at 0x1073e0440>
+
+    def test_markers_gui_waveform(qtbot):
+        widget = WaveformWidget("Test", QColor("#ffffff"))
+        qtbot.addWidget(widget)
+    
+        # Needs to be shown for layout and scene to work properly
+        widget.show()
+        qtbot.waitForWindowShown(widget)
+    
+        # Feed data
+        widget.update_data(list(range(100)), "float")
+    
+        # Add marker programmatically
+        store = widget._marker_store
+        m0 = store.add_marker(0, 10.0, 10.0)
+    
+        # Force process events just in case
+>       qtbot.waitUntil(lambda: len(widget._marker_glyphs) == 1)
+E       pytestqt.exceptions.TimeoutError: waitUntil timed out in 5000 milliseconds
+
+tests/gui/test_markers_gui.py:23: TimeoutError
+=============================== warnings summary ===============================
+tests/gui/test_markers_gui.py::test_markers_gui_waveform
+  /Users/ppal/repos/pyprobe/.venv/lib/python3.12/site-packages/pytestqt/qtbot.py:304: DeprecationWarning: waitForWindowShown is deprecated, as the underlying Qt method was obsoleted in Qt 5.0 and removed in Qt 6.0. Its name is imprecise and the pytest-qt wrapper does not raise qtbot.TimeoutError if the window wasn't shown. Please use the qtbot.waitExposed context manager instead.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/gui/test_markers_gui.py::test_markers_gui_waveform - pytestqt.ex...
+ERROR tests/gui/test_markers_gui.py::test_markers_gui_waveform - Failed: TEAR...
+==================== 1 failed, 1 warning, 1 error in 5.40s =====================

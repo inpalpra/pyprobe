@@ -261,7 +261,11 @@ class ProbePanel(QFrame):
         
         if not plugin:
             return
-        
+            
+        # Dispose old marker store so the unified manager drops its markers
+        if self._plot and hasattr(self._plot, '_marker_store'):
+            self._plot._marker_store.dispose()
+
         # Remove old plot widget
         if self._plot:
             self._plot.hide()  # Hide immediately to prevent visual overlap
@@ -387,6 +391,38 @@ class ProbePanel(QFrame):
         else:
             change_color_action = menu.addAction("Change Color…")
             change_color_action.triggered.connect(self._change_probe_color)
+            
+        # M4: Markers submenu
+        if self._plot and hasattr(self._plot, '_marker_store'):
+            menu.addSeparator()
+            marker_menu = menu.addMenu("Markers")
+            
+            add_action = marker_menu.addAction("Add Marker at Center")
+            add_action.triggered.connect(self._add_marker_at_center)
+            
+            marker_menu.addSeparator()
+            
+            manager_action = marker_menu.addAction("Marker Manager…")
+            manager_action.triggered.connect(self._show_marker_manager)
+            
+            marker_menu.addSeparator()
+            
+            clear_action = marker_menu.addAction("Clear All Markers")
+            clear_action.triggered.connect(self._clear_all_markers)
+            
+            from .theme.theme_manager import ThemeManager
+            c = ThemeManager.instance().current.colors
+            marker_menu.setStyleSheet(f"""
+                QMenu {{
+                    background-color: {c['bg_medium']};
+                    color: {c['accent_primary']};
+                    border: 1px solid {c['accent_primary']};
+                }}
+                QMenu::item:selected {{
+                    background-color: {c['accent_primary']};
+                    color: {c['bg_medium']};
+                }}
+            """)
         
         # M2.5: Remove Overlays submenu (if any overlays exist)
         if hasattr(self, '_overlay_anchors') and self._overlay_anchors:
@@ -448,6 +484,40 @@ class ProbePanel(QFrame):
                 }}
             """)
             self.color_changed.emit(self._anchor, new_color)
+
+    def _add_marker_at_center(self):
+        if not self._plot or not hasattr(self._plot, '_marker_store'):
+            return
+            
+        store = self._plot._marker_store
+        
+        # Determine trace key
+        trace_key = 0
+        if hasattr(self._plot, 'series_keys') and len(self._plot.series_keys) > 0:
+            trace_key = self._plot.series_keys[0]
+        elif hasattr(self._plot, '_curves') and len(self._plot._curves) > 0:
+            trace_key = 0
+            
+        # Get center
+        x_center = 0.0
+        y_center = 0.0
+        if hasattr(self._plot, '_plot_widget'):
+            vb = self._plot._plot_widget.getPlotItem().getViewBox()
+            xr, yr = vb.viewRange()
+            x_center = sum(xr) / 2
+            y_center = sum(yr) / 2
+            
+        store.add_marker(trace_key, x_center, y_center)
+        
+    def _show_marker_manager(self):
+        if not self._plot or not hasattr(self._plot, '_marker_store'):
+            return
+        from .marker_manager import MarkerManager
+        MarkerManager.show_instance(self.window())
+
+    def _clear_all_markers(self):
+        if self._plot and hasattr(self._plot, '_marker_store'):
+            self._plot._marker_store.clear_markers()
 
     def show_throttle_indicator(self, active: bool):
         """Show or hide the throttle icon."""
