@@ -67,3 +67,35 @@ class EditableAxisItem(pg.AxisItem):
                 return
         
         event.ignore()
+
+    def _temporarily_enable_axis_interaction(self, event, handler) -> None:
+        """
+        Execute an event handler while temporarily forcing the ViewBox to accept
+        interactions for this axis, regardless of the plot's current interaction mode.
+        """
+        view_box = self.linkedView()
+        if view_box is None:
+            handler(event)
+            return
+
+        # Determine which axis index this EditableAxisItem controls (0 for X, 1 for Y)
+        axis_idx = 1 if self.orientation in ['left', 'right'] else 0
+
+        # Back up the current mouseEnabled state
+        original_state = list(view_box.state['mouseEnabled'])
+
+        try:
+            # Force enable interaction for this axis
+            view_box.state['mouseEnabled'][axis_idx] = True
+            handler(event)
+        finally:
+            # Restore the original state silently (avoiding pyqtgraph signal overhead)
+            view_box.state['mouseEnabled'] = original_state
+
+    def mouseDragEvent(self, event, **kwargs):
+        """Allow dragging the axis to pan, even if the plot area is in POINTER mode."""
+        self._temporarily_enable_axis_interaction(event, lambda e: super(EditableAxisItem, self).mouseDragEvent(e, **kwargs))
+
+    def wheelEvent(self, event, **kwargs):
+        """Allow scrolling the axis to zoom, even if the plot area is in POINTER mode."""
+        self._temporarily_enable_axis_interaction(event, lambda e: super(EditableAxisItem, self).wheelEvent(e, **kwargs))
