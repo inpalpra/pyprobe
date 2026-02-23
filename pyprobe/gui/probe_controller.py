@@ -145,6 +145,9 @@ class ProbeController(QObject):
             if stored_lens:
                 panel._lens_dropdown.set_lens(stored_lens)
         
+        # Connect color changed signal
+        panel.color_changed.connect(self._on_probe_color_changed)
+        
         # Send to runner if running
         ipc = self._get_ipc()
         if ipc and self._get_is_running():
@@ -155,6 +158,11 @@ class ProbeController(QObject):
         self.probe_added.emit(anchor, panel)
         
         return panel
+    
+    def _on_probe_color_changed(self, anchor: ProbeAnchor, color: QColor) -> None:
+        """Handle color change from a probe panel — update code viewer and gutter."""
+        self._code_viewer.update_probe_color(anchor, color)
+        self._gutter.set_probed_line(anchor.line, color)
     
     def remove_probe(self, anchor: ProbeAnchor, on_animation_done: Callable = None):
         """

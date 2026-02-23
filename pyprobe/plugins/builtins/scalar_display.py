@@ -60,6 +60,10 @@ class ScalarDisplayWidget(QWidget):
         else:
             self._value_label.setStyleSheet(f"color: {c['text_muted']};")
 
+    def set_color(self, color: QColor) -> None:
+        """Update the probe color (name label)."""
+        self._color = color
+        self._name_label.setStyleSheet(f"color: {color.name()};")
 
     def update_data(self, value: Any, dtype: str, shape: Optional[tuple] = None, source_info: str = "") -> None:
         """Update the display with new scalar value."""

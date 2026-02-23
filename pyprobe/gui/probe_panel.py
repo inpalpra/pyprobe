@@ -4,7 +4,8 @@ Container widget for probe panels with flow layout.
 
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
-    QWidget, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QMenu
+    QWidget, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QMenu,
+    QColorDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -35,6 +36,7 @@ class ProbePanel(QFrame):
     maximize_requested = pyqtSignal()
     park_requested = pyqtSignal()
     status_message_requested = pyqtSignal(str)
+    color_changed = pyqtSignal(object, object)  # (ProbeAnchor, QColor)
     overlay_requested = pyqtSignal(object, object)  # (self/panel, ProbeAnchor)
     overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
 
@@ -370,6 +372,22 @@ class ProbePanel(QFrame):
         park_action = menu.addAction("Park to Bar")
         park_action.triggered.connect(lambda: self.park_requested.emit())
         
+        # Change Color action
+        menu.addSeparator()
+        has_series = (self._plot and hasattr(self._plot, 'series_keys')
+                      and hasattr(self._plot, 'set_series_color'))
+        if has_series and len(self._plot.series_keys) > 1:
+            color_menu = menu.addMenu("Change Color…")
+            keys = self._plot.series_keys
+            for idx, key in enumerate(keys):
+                action = color_menu.addAction(str(key))
+                action.triggered.connect(
+                    lambda checked, k=key, i=idx: self._change_series_color(k, i)
+                )
+        else:
+            change_color_action = menu.addAction("Change Color…")
+            change_color_action.triggered.connect(self._change_probe_color)
+        
         # M2.5: Remove Overlays submenu (if any overlays exist)
         if hasattr(self, '_overlay_anchors') and self._overlay_anchors:
             menu.addSeparator()
@@ -386,6 +404,50 @@ class ProbePanel(QFrame):
     def set_state(self, state: ProbeState):
         """Update the state indicator."""
         self._state_indicator.set_state(state)
+
+    def _change_probe_color(self) -> None:
+        """Open color dialog and update the probe's primary color."""
+        new_color = QColorDialog.getColor(self._color, self, "Select Plot Color")
+        if not new_color.isValid():
+            return
+        self._color = new_color
+        hex_color = new_color.name()
+        self._identity_label.setStyleSheet(f"""
+            QLabel {{
+                color: {hex_color};
+                font-size: 11px;
+                font-weight: bold;
+            }}
+        """)
+        if self._plot and hasattr(self._plot, 'set_color'):
+            self._plot.set_color(new_color)
+        self.color_changed.emit(self._anchor, new_color)
+
+    def _change_series_color(self, series_key, series_index: int) -> None:
+        """Open color dialog and update a specific series' color."""
+        # Get current color from series if possible
+        initial = self._color
+        if self._plot and hasattr(self._plot, '_series_curves'):
+            if series_key in self._plot._series_curves:
+                _, hex_c = self._plot._series_curves[series_key]
+                initial = QColor(hex_c)
+        new_color = QColorDialog.getColor(initial, self, f"Select Color for {series_key}")
+        if not new_color.isValid():
+            return
+        if self._plot and hasattr(self._plot, 'set_series_color'):
+            self._plot.set_series_color(series_key, new_color)
+        # If this is the first/primary series, also update panel identity and emit signal
+        if series_index == 0:
+            self._color = new_color
+            hex_color = new_color.name()
+            self._identity_label.setStyleSheet(f"""
+                QLabel {{
+                    color: {hex_color};
+                    font-size: 11px;
+                    font-weight: bold;
+                }}
+            """)
+            self.color_changed.emit(self._anchor, new_color)
 
     def show_throttle_indicator(self, active: bool):
         """Show or hide the throttle icon."""

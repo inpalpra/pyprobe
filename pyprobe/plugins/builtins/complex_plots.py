@@ -115,10 +115,10 @@ class ComplexWidget(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         
         header = QHBoxLayout()
-        name_label = QLabel(self._var_name)
-        name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
-        name_label.setStyleSheet(f"color: {self._color.name()};")
-        header.addWidget(name_label)
+        self._name_label = QLabel(self._var_name)
+        self._name_label.setFont(QFont("JetBrains Mono", 11, QFont.Weight.Bold))
+        self._name_label.setStyleSheet(f"color: {self._color.name()};")
+        header.addWidget(self._name_label)
         header.addStretch()
         
         self._info_label.setFont(QFont("JetBrains Mono", 9))
@@ -275,6 +275,30 @@ class ComplexWidget(QWidget):
         """Register a named series for draw mode control."""
         self._draw_modes[key] = DrawMode.LINE
         self._series_curves[key] = (curve, color_hex)
+
+    def set_color(self, color: QColor) -> None:
+        """Update the primary probe color (name label + axis pens)."""
+        self._color = color
+        hex_color = color.name()
+        self._name_label.setStyleSheet(f"color: {hex_color};")
+        axis_pen = pg.mkPen(color=hex_color, width=1)
+        for ax_name in ('left', 'bottom'):
+            ax = self._plot_widget.getAxis(ax_name)
+            if ax is not None:
+                ax.setPen(axis_pen)
+                ax.setTextPen(axis_pen)
+
+    def set_series_color(self, series_key: str, color: QColor) -> None:
+        """Change the color of a specific registered series."""
+        if series_key not in self._series_curves:
+            return
+        hex_color = color.name()
+        curve, _old_hex = self._series_curves[series_key]
+        curve.setPen(pg.mkPen(hex_color, width=1.5))
+        self._series_curves[series_key] = (curve, hex_color)
+        # Re-apply draw mode with new color
+        mode = self._draw_modes.get(series_key, DrawMode.LINE)
+        apply_draw_mode(curve, mode, hex_color)
 
     def set_draw_mode(self, series_key: str, mode: DrawMode) -> None:
         """Set the draw mode for a named series."""
@@ -503,6 +527,15 @@ class ComplexMAWidget(ComplexWidget):
         if axis == 'y':
             self._p2.enableAutoRange(axis='y', enable=not is_pinned)
 
+    def set_series_color(self, series_key: str, color: QColor) -> None:
+        """Override to also update axis label colors for dual-axis layout."""
+        super().set_series_color(series_key, color)
+        hex_color = color.name()
+        if series_key == 'Log Mag':
+            self._plot_widget.setLabel('left', 'Magnitude (dB)', color=hex_color)
+        elif series_key == 'Phase':
+            self._p1.getAxis('right').setLabel('Phase (rad)', color=hex_color)
+
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
         self._raw_data = value
@@ -631,6 +664,15 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         super()._on_pin_state_changed(axis, is_pinned)
         if axis == 'y':
             self._p2.enableAutoRange(axis='y', enable=not is_pinned)
+
+    def set_series_color(self, series_key: str, color: QColor) -> None:
+        """Override to also update axis label colors for dual-axis layout."""
+        super().set_series_color(series_key, color)
+        hex_color = color.name()
+        if series_key == 'FFT Mag (dB)':
+            self._plot_widget.setLabel('left', 'Magnitude (dB)', color=hex_color)
+        elif series_key == 'Angle (deg)':
+            self._p1.getAxis('right').setLabel('Angle (deg)', color=hex_color)
 
     def set_data(self, data: np.ndarray, info: str):
         self._raw_data = data

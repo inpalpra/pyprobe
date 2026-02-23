@@ -271,6 +271,33 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         palette = self._row_colors
         return palette[row_index % len(palette)]
 
+    def set_color(self, color: QColor) -> None:
+        """Update the primary probe color (name label, stats, axes, primary curve)."""
+        self._color = color
+        hex_color = color.name()
+        self._name_label.setStyleSheet(f"color: {hex_color};")
+        self._stats_label.setStyleSheet(f"color: {hex_color};")
+        axis_pen = pg.mkPen(color=hex_color, width=1)
+        for ax_name in ('left', 'bottom'):
+            ax = self._plot_widget.getAxis(ax_name)
+            if ax is not None:
+                ax.setPen(axis_pen)
+                ax.setTextPen(axis_pen)
+        # Update primary curve if single-curve mode
+        if len(self._curves) == 1:
+            self._curves[0].setPen(pg.mkPen(hex_color, width=1.5))
+            mode = self._draw_modes.get(0, DrawMode.LINE)
+            apply_draw_mode(self._curves[0], mode, hex_color)
+
+    def set_series_color(self, series_key: int, color: QColor) -> None:
+        """Change the color of a curve by index."""
+        if series_key < 0 or series_key >= len(self._curves):
+            return
+        hex_color = color.name()
+        self._curves[series_key].setPen(pg.mkPen(hex_color, width=1.5))
+        mode = self._draw_modes.get(series_key, DrawMode.LINE)
+        apply_draw_mode(self._curves[series_key], mode, hex_color)
+
     def _ensure_curves(self, num_rows: int):
         """Ensure we have the right number of curve objects."""
         current_count = len(self._curves)

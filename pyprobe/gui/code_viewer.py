@@ -181,6 +181,13 @@ class CodeViewer(QPlainTextEdit):
         self._invalid_probes.discard(anchor)
         self.viewport().update()
 
+    def update_probe_color(self, anchor: ProbeAnchor, color: QColor) -> None:
+        """Update the highlight color of an already-active probe without changing ref count."""
+        if anchor in self._active_probes:
+            _, ref_count = self._active_probes[anchor]
+            self._active_probes[anchor] = (color, ref_count)
+            self.viewport().update()
+
     def set_probe_invalid(self, anchor: ProbeAnchor) -> None:
         """Mark a probe as invalid (e.g., line changed).
 

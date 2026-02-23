@@ -165,6 +165,18 @@ class ConstellationWidget(QWidget):
         indices = np.random.choice(len(data), self.MAX_DISPLAY_POINTS, replace=False)
         return data[indices]
 
+    def set_color(self, color: QColor) -> None:
+        """Update the probe color (name label, stats, scatter brushes)."""
+        self._color = color
+        hex_color = color.name()
+        self._name_label.setStyleSheet(f"color: {hex_color};")
+        self._stats_label.setStyleSheet(f"color: {hex_color};")
+        # Recompute scatter brushes with new color
+        r, g, b, _ = color.getRgb()
+        alphas = np.linspace(0.1, 1.0, self.HISTORY_LENGTH)
+        for i, (scatter, alpha) in enumerate(zip(self._scatter_items, alphas)):
+            scatter.setBrush(pg.mkBrush(r, g, b, int(alpha * 255)))
+
     # === Editable Axes ===
     
     def _setup_editable_axes(self) -> None:

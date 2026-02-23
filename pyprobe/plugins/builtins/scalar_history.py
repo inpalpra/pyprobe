@@ -127,6 +127,20 @@ class ScalarHistoryWidget(QWidget):
                 if hasattr(ax, 'setGrid'):
                     ax.setGrid(alpha_int)
 
+    def set_color(self, color: QColor) -> None:
+        """Update the probe color (name label, stats, curve, axes)."""
+        self._color = color
+        hex_color = color.name()
+        self._name_label.setStyleSheet(f"color: {hex_color};")
+        self._stats_label.setStyleSheet(f"color: {hex_color};")
+        self._curve.setPen(pg.mkPen(hex_color, width=2))
+        axis_pen = pg.mkPen(color=hex_color, width=1)
+        for ax_name in ('left', 'bottom'):
+            ax = self._plot_widget.getAxis(ax_name)
+            if ax is not None:
+                ax.setPen(axis_pen)
+                ax.setTextPen(axis_pen)
+
     # === Editable Axes ===
     
     def _setup_editable_axes(self) -> None:
