@@ -4,9 +4,10 @@ import numpy as np
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QColor
 
-from pyprobe.plugins.builtins.waveform import WaveformPlugin
+from pyprobe.plugins.builtins.waveform import WaveformPlugin, WaveformFftMagAnglePlugin
 from pyprobe.plugins.builtins.complex_plots import (
-    ComplexRIPlugin, ComplexMAPlugin, LogMagPlugin, LinearMagPlugin, PhaseRadPlugin, PhaseDegPlugin
+    ComplexRIPlugin, ComplexMAPlugin, ComplexFftMagAnglePlugin,
+    LogMagPlugin, LinearMagPlugin, PhaseRadPlugin, PhaseDegPlugin
 )
 from pyprobe.plugins.builtins.constellation import ConstellationPlugin
 from pyprobe.plugins.builtins.scalar_history import ScalarHistoryPlugin
@@ -168,3 +169,91 @@ def test_editable_axis_interaction(qtbot, qapp, probe_color, plugin_class):
         plot_item.getViewBox().enableAutoRange()
         plot_item.getViewBox().autoRange(padding=0)
         qapp.processEvents()
+
+
+@pytest.mark.parametrize("plugin_class", [
+    ComplexMAPlugin,
+    ComplexFftMagAnglePlugin,
+    WaveformFftMagAnglePlugin,
+])
+def test_editable_secondary_axis_interaction(qtbot, qapp, probe_color, plugin_class):
+    """
+    Test that double clicking on the right (secondary) y-axis spawns the AxisEditor
+    with 'y2' context and correctly updates the secondary ViewBox range.
+    """
+    data = np.exp(1j * np.linspace(0, 2 * np.pi, 100))
+
+    plugin = plugin_class()
+    widget = plugin.create_widget("test_var", probe_color)
+    widget.resize(600, 400)
+    widget.show()
+    qtbot.addWidget(widget)
+    qtbot.waitUntil(widget.isVisible, timeout=1000)
+
+    # Feed data to initialise the plot
+    if plugin_class == ComplexMAPlugin:
+        widget.update_data(data)
+    elif plugin_class == ComplexFftMagAnglePlugin:
+        widget.set_data(data, "[100]")
+    elif plugin_class == WaveformFftMagAnglePlugin:
+        widget.update_data(np.abs(data), dtype=DTYPE_ARRAY_1D)
+    qapp.processEvents()
+
+    # The right axis should now be an EditableAxisItem
+    plot_item = widget._plot_widget.getPlotItem()
+    right_axis = plot_item.getAxis('right')
+
+    from pyprobe.plots.editable_axis import EditableAxisItem
+    assert isinstance(right_axis, EditableAxisItem), (
+        f"Right axis is {type(right_axis).__name__}, expected EditableAxisItem"
+    )
+
+    # Test both min and max endpoints on the secondary axis
+    for endpoint, signal_name in [('min', 'edit_min_requested'), ('max', 'edit_max_requested')]:
+        signal = getattr(right_axis, signal_name)
+        signal.emit(0.0)
+        qapp.processEvents()
+
+        axis_editor = widget._axis_editor
+        assert axis_editor is not None
+        qtbot.waitUntil(axis_editor.isVisible, timeout=1000)
+
+        # Should be tagged as 'y2'
+        assert axis_editor.property('edit_axis') == 'y2'
+        assert axis_editor.property('edit_endpoint') == endpoint
+
+        # Determine a valid test value
+        p2 = widget._p2
+        cur_min, cur_max = p2.viewRange()[1]
+        test_val = cur_min - 5.0 if endpoint == 'min' else cur_max + 5.0
+
+        axis_editor.setText(str(test_val))
+        axis_editor._commit()
+
+        qtbot.waitUntil(lambda: not axis_editor.isVisible(), timeout=1000)
+
+        # Verify secondary ViewBox range updated
+        def verify_p2():
+            p2_range = p2.viewRange()[1]
+            rendered_val = p2_range[0] if endpoint == 'min' else p2_range[1]
+            assert np.isclose(rendered_val, test_val), (
+                f"Expected secondary y {endpoint} to be {test_val} but was {rendered_val}"
+            )
+
+        qtbot.waitUntil(verify_p2, timeout=1000)
+
+        # Y should be pinned
+        controller = widget._axis_controller if hasattr(widget, '_axis_controller') else None
+        if controller:
+            assert controller.y_pinned, "Y axis should be pinned after secondary axis edit"
+
+        # Unpin for next iteration
+        if controller:
+            controller.set_pinned('x', False)
+            controller.set_pinned('y', False)
+        p2.enableAutoRange(axis='y')
+        p2.autoRange(padding=0)
+        plot_item.getViewBox().enableAutoRange()
+        plot_item.getViewBox().autoRange(padding=0)
+        qapp.processEvents()
+

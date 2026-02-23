@@ -236,6 +236,27 @@ class ComplexWidget(QWidget):
         left_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y', 'min', val))
         left_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y', 'max', val))
 
+    def _setup_editable_secondary_axis(self, secondary_color: str, label: str = '') -> None:
+        """Replace the right axis with an EditableAxisItem for double-click editing.
+
+        Must be called *after* `_p1`, `_p2`, and `showAxis('right')` are set up.
+        """
+        right_axis = EditableAxisItem('right')
+        axis_pen = pg.mkPen(color=secondary_color, width=1)
+        right_axis.setPen(axis_pen)
+        right_axis.setTextPen(axis_pen)
+        right_axis.setZValue(10)
+
+        # Replace the existing right axis and re-link to secondary ViewBox
+        self._p1.setAxisItems({'right': right_axis})
+        right_axis.linkToView(self._p2)
+        if label:
+            right_axis.setLabel(label, color=secondary_color)
+
+        # Wire signals — use 'y2' to distinguish from primary 'y'
+        right_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y2', 'min', val))
+        right_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y2', 'max', val))
+
     def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
         """Start inline editing of an axis min/max value."""
         if self._axis_editor is None:
@@ -249,6 +270,10 @@ class ComplexWidget(QWidget):
         if axis == 'x':
             x = 40 if endpoint == 'min' else self._plot_widget.width() - 60
             y = self._plot_widget.height() - 20
+        elif axis == 'y2':
+            # Right side of the plot
+            x = self._plot_widget.width() - 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
         else:
             x = 20
             y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
@@ -276,6 +301,14 @@ class ComplexWidget(QWidget):
                 plot_item.setYRange(value, current_range[1], padding=0)
             else:
                 plot_item.setYRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('y', True)
+        elif axis == 'y2' and hasattr(self, '_p2'):
+            current_range = self._p2.viewRange()[1]
+            if endpoint == 'min':
+                self._p2.setYRange(value, current_range[1], padding=0)
+            else:
+                self._p2.setYRange(current_range[0], value, padding=0)
             if self._axis_controller:
                 self._axis_controller.set_pinned('y', True)
 
@@ -542,6 +575,9 @@ class ComplexMAWidget(ComplexWidget):
         self._register_series('Log Mag', self._mag_curve, '#ffff00')
         self._register_series('Phase', self._phase_curve, '#00ff7f')
         
+        # Replace right axis with editable one
+        self._setup_editable_secondary_axis('#00ff00', 'Phase (rad)')
+        
         # Handle view resize
         self._p1.vb.sigResized.connect(self._update_views)
 
@@ -715,6 +751,9 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         
         self._register_series('FFT Mag (dB)', self._mag_curve, '#ffff00')
         self._register_series('Angle (deg)', self._phase_curve, '#00ff7f')
+        
+        # Replace right axis with editable one
+        self._setup_editable_secondary_axis('#00ff00', 'Angle (deg)')
         
         self._p1.vb.sigResized.connect(self._update_views)
         self._first_data = True

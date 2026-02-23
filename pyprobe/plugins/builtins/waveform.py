@@ -860,6 +860,9 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         self._p1.getAxis('right').setLabel('Angle (deg)', color=self._phase_color)
         self._p1.getAxis('right').setZValue(10)
         
+        # Replace right axis with editable one for double-click editing
+        self._setup_editable_secondary_axis(self._phase_color, 'Angle (deg)')
+        
         self._legend = self._plot_widget.addLegend(offset=(10, 10))
         self._legend.addItem(self._curves[0], "FFT Mag (dB)")
         self._phase_legend_added = False
@@ -876,6 +879,59 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         super()._on_pin_state_changed(axis, is_pinned)
         if axis == 'y':
             self._p2.enableAutoRange(axis='y', enable=not is_pinned)
+
+    def _setup_editable_secondary_axis(self, secondary_color: str, label: str = '') -> None:
+        """Replace the right axis with an EditableAxisItem for double-click editing."""
+        from ...plots.editable_axis import EditableAxisItem
+        right_axis = EditableAxisItem('right')
+        axis_pen = pg.mkPen(color=secondary_color, width=1)
+        right_axis.setPen(axis_pen)
+        right_axis.setTextPen(axis_pen)
+        right_axis.setZValue(10)
+
+        self._p1.setAxisItems({'right': right_axis})
+        right_axis.linkToView(self._p2)
+        if label:
+            right_axis.setLabel(label, color=secondary_color)
+
+        right_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y2', 'min', val))
+        right_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y2', 'max', val))
+
+    def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
+        """Start inline editing — extends parent to also handle 'y2' (secondary axis)."""
+        if self._axis_editor is None:
+            return
+
+        self._axis_editor.setProperty('edit_axis', axis)
+        self._axis_editor.setProperty('edit_endpoint', endpoint)
+
+        if axis == 'x':
+            x = 40 if endpoint == 'min' else self._plot_widget.width() - 60
+            y = self._plot_widget.height() - 20
+        elif axis == 'y2':
+            x = self._plot_widget.width() - 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
+        else:
+            x = 20
+            y = self._plot_widget.height() - 40 if endpoint == 'min' else 20
+
+        self._axis_editor.show_at(x, y, current_value)
+
+    def _on_axis_value_committed(self, value: float) -> None:
+        """Handle axis editor value — extends parent to also handle 'y2'."""
+        axis = self._axis_editor.property('edit_axis')
+        endpoint = self._axis_editor.property('edit_endpoint')
+
+        if axis == 'y2' and hasattr(self, '_p2'):
+            current_range = self._p2.viewRange()[1]
+            if endpoint == 'min':
+                self._p2.setYRange(value, current_range[1], padding=0)
+            else:
+                self._p2.setYRange(current_range[0], value, padding=0)
+            if self._axis_controller:
+                self._axis_controller.set_pinned('y', True)
+        else:
+            super()._on_axis_value_committed(value)
 
     def _ensure_phase_curves(self, num_rows: int):
         while len(self._phase_curves) < num_rows:
