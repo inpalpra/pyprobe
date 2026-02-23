@@ -45,6 +45,9 @@ dev = [
     "pytest>=7.0.0",
     "pytest-qt>=4.0.0",
 ]
+rfutil = [
+    "rfutil",
+]
 
 [dependency-groups]
 dev = [
@@ -63,3 +66,4 @@ include = ["pyprobe*"]
 
 [tool.uv.sources]
 pyplan = { git = "https://github.com/inpalpra/pyplan.git", rev = "main" }
+rfutil = { git = "https://github.com/inpalpra/rfutil" }

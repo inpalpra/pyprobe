@@ -16,7 +16,8 @@ from .scalar_history_chart import ScalarHistoryChart
 from ..core.data_classifier import (
     DTYPE_SCALAR, DTYPE_ARRAY_1D, DTYPE_ARRAY_COMPLEX,
     DTYPE_ARRAY_2D, DTYPE_ARRAY_COLLECTION,
-    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_UNKNOWN
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COMPLEX,
+    DTYPE_WAVEFORM_COLLECTION, DTYPE_UNKNOWN
 )
 
 
@@ -39,6 +40,8 @@ def create_plot(
         return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_WAVEFORM_REAL:
         return WaveformWidget(var_name, default_color, parent)
+    elif dtype == DTYPE_WAVEFORM_COMPLEX:
+        return ConstellationPlot(var_name, parent)
     elif dtype == DTYPE_WAVEFORM_COLLECTION:
         return WaveformWidget(var_name, default_color, parent)
     elif dtype == DTYPE_ARRAY_COLLECTION:
@@ -62,6 +65,7 @@ def get_plot_type_name(dtype: str) -> str:
         DTYPE_ARRAY_2D: "2D Array",
         DTYPE_ARRAY_COLLECTION: "Array Collection",
         DTYPE_WAVEFORM_REAL: "Waveform",
+        DTYPE_WAVEFORM_COMPLEX: "Complex Waveform",
         DTYPE_WAVEFORM_COLLECTION: "Waveform Collection",
         DTYPE_UNKNOWN: "Unknown",
     }

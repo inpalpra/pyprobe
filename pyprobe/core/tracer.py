@@ -13,7 +13,8 @@ import numpy as np
 from .data_classifier import (
     classify_data, get_waveform_info, get_waveform_collection_info,
     get_array_collection_info,
-    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COMPLEX,
+    DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION
 )
 from .anchor import ProbeAnchor
 from .anchor_matcher import AnchorMatcher
@@ -162,8 +163,12 @@ class VariableTracer:
             samples = np.asarray(getattr(value, samples_attr)).copy()
             scalars = [float(getattr(value, attr)) for attr in scalar_attrs]
             
+            # Use complex tag if the samples are complex
+            is_complex = waveform_info.get('is_complex', False)
+            dtype_tag = DTYPE_WAVEFORM_COMPLEX if is_complex else DTYPE_WAVEFORM_REAL
+            
             return {
-                '__dtype__': DTYPE_WAVEFORM_REAL,
+                '__dtype__': dtype_tag,
                 'samples': samples,
                 'scalars': scalars,
             }

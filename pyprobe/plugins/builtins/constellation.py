@@ -7,7 +7,7 @@ from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import QRectF, QTimer, pyqtSignal
 
 from ..base import ProbePlugin
-from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
+from ...core.data_classifier import DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX
 from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
 from ...plots.editable_axis import EditableAxisItem
@@ -419,8 +419,7 @@ class ConstellationPlugin(ProbePlugin):
     priority = 100  # High priority for complex arrays
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        # TODO: Handle Waveform objects that are complex
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return ConstellationWidget(var_name, color, parent)
@@ -429,4 +428,13 @@ class ConstellationPlugin(ProbePlugin):
                shape: Optional[Tuple[int, ...]] = None,
                source_info: str = "") -> None:
         if isinstance(widget, ConstellationWidget):
+            # Extract complex samples from waveform if needed
+            if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COMPLEX:
+                value = np.asarray(value['samples'])
+            elif dtype == DTYPE_WAVEFORM_COMPLEX:
+                # Direct waveform object — extract samples array
+                from ...core.data_classifier import get_waveform_info
+                waveform_info = get_waveform_info(value)
+                if waveform_info is not None:
+                    value = np.asarray(getattr(value, waveform_info['samples_attr']))
             widget.update_data(value, dtype, shape, source_info)

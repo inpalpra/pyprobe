@@ -12,6 +12,7 @@ DTYPE_ARRAY_COMPLEX = 'array_complex'
 DTYPE_ARRAY_2D = 'array_2d'
 DTYPE_ARRAY_COLLECTION = 'array_collection'
 DTYPE_WAVEFORM_REAL = 'waveform_real'
+DTYPE_WAVEFORM_COMPLEX = 'waveform_complex'
 DTYPE_WAVEFORM_COLLECTION = 'waveform_collection'
 DTYPE_UNKNOWN = 'unknown'
 
@@ -34,6 +35,19 @@ def _is_1d_real_array(value: Any) -> bool:
         try:
             arr = np.asarray(value)
             return arr.ndim == 1 and not np.issubdtype(arr.dtype, np.complexfloating)
+        except (ValueError, TypeError):
+            return False
+    return False
+
+
+def _is_1d_complex_array(value: Any) -> bool:
+    """Check if value is a 1D array of complex numbers."""
+    if isinstance(value, np.ndarray):
+        return value.ndim == 1 and np.issubdtype(value.dtype, np.complexfloating)
+    if isinstance(value, (list, tuple)):
+        try:
+            arr = np.asarray(value)
+            return arr.ndim == 1 and np.issubdtype(arr.dtype, np.complexfloating)
         except (ValueError, TypeError):
             return False
     return False
@@ -62,14 +76,15 @@ def _classify_as_waveform(value: Any) -> Optional[Dict[str, Any]]:
     
     A waveform object has:
     - At least 2 scalar real numbers (e.g., t0, dt)
-    - Exactly 1 1D real array (samples)
+    - Exactly 1 1D array (real or complex) as samples
     
     We check public attributes and identify the first matching set.
     Properties returning arrays (like computed time vectors) are allowed
     but only one "primary" samples array is expected.
     
     Returns:
-        Dict with {'samples_attr': str, 'scalar_attrs': [str, str]} if waveform,
+        Dict with {'samples_attr': str, 'scalar_attrs': [str, str],
+                    'is_complex': bool} if waveform,
         None otherwise.
     """
     # Skip primitive types and numpy arrays
@@ -87,37 +102,42 @@ def _classify_as_waveform(value: Any) -> Optional[Dict[str, Any]]:
         return None
     
     scalar_attrs: List[str] = []
-    array_attrs: List[str] = []
+    real_array_attrs: List[str] = []
+    complex_array_attrs: List[str] = []
     
     for name, val in attrs.items():
         if _is_scalar_real(val):
             scalar_attrs.append(name)
         elif _is_1d_real_array(val):
-            array_attrs.append(name)
+            real_array_attrs.append(name)
+        elif _is_1d_complex_array(val):
+            complex_array_attrs.append(name)
         # Ignore other attribute types (methods, computed properties returning other types)
     
-    # Need at least 2 scalars and exactly 1 array for waveform classification
-    # If there are multiple arrays (e.g., x and computed t), prefer the one
-    # that looks like samples (not 't' or 'time' which are typically computed)
-    if len(scalar_attrs) >= 2 and len(array_attrs) >= 1:
+    # Combine real and complex arrays for waveform detection
+    all_array_attrs = real_array_attrs + complex_array_attrs
+    
+    # Need at least 2 scalars and at least 1 array for waveform classification
+    if len(scalar_attrs) >= 2 and len(all_array_attrs) >= 1:
         # Prefer array attr that's NOT named 't', 'time', 'times' (computed time vector)
         samples_attr = None
         time_like_names = {'t', 'time', 'times', 'time_vector'}
         
-        for arr_name in array_attrs:
+        for arr_name in all_array_attrs:
             if arr_name.lower() not in time_like_names:
                 samples_attr = arr_name
                 break
         
         # If all arrays are time-like, just pick the first one
         if samples_attr is None:
-            samples_attr = array_attrs[0]
+            samples_attr = all_array_attrs[0]
+        
+        # Determine if the samples array is complex
+        is_complex = samples_attr in complex_array_attrs
         
         # Identify t0 (start time) and dt (interval) by attribute name patterns
-        # t0 patterns: t0, start, offset, begin
-        # dt patterns: dt, delta, step, interval, period
-        t0_patterns = {'t0', 'start', 'offset', 'begin', 'tstart'}
-        dt_patterns = {'dt', 'delta', 'step', 'interval', 'period', 'tstep'}
+        t0_patterns = {'t0', 'x0', 'start', 'offset', 'begin', 'tstart'}
+        dt_patterns = {'dt', 'dx', 'delta', 'step', 'interval', 'period', 'tstep'}
         
         t0_attr = None
         dt_attr = None
@@ -144,6 +164,7 @@ def _classify_as_waveform(value: Any) -> Optional[Dict[str, Any]]:
         return {
             'samples_attr': samples_attr,
             'scalar_attrs': [t0_attr, dt_attr],  # Always [t0, dt] order
+            'is_complex': is_complex,
         }
     
     return None
@@ -178,6 +199,12 @@ def classify_data(value: Any) -> Tuple[str, Optional[tuple]]:
         if samples is not None:
             return DTYPE_WAVEFORM_REAL, samples.shape
         return DTYPE_WAVEFORM_REAL, None
+    # Serialized complex waveform from IPC
+    if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COMPLEX:
+        samples = value.get('samples')
+        if samples is not None:
+            return DTYPE_WAVEFORM_COMPLEX, samples.shape
+        return DTYPE_WAVEFORM_COMPLEX, None
 
     # Check for waveform collection (list/tuple of waveform objects)
     collection_info = _classify_as_waveform_collection(value)
@@ -189,6 +216,8 @@ def classify_data(value: Any) -> Tuple[str, Optional[tuple]]:
     if waveform_info is not None:
         samples = getattr(value, waveform_info['samples_attr'])
         arr = np.asarray(samples)
+        if waveform_info.get('is_complex', False):
+            return DTYPE_WAVEFORM_COMPLEX, arr.shape
         return DTYPE_WAVEFORM_REAL, arr.shape
 
     # Handle numpy arrays

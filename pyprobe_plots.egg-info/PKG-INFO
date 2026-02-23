@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: pyprobe-plots
-Version: 0.1.15
+Version: 0.1.19
 Summary: Variable probing based debugger for Python DSP debugging
 Author: PyProbe Contributors
 License: MIT
@@ -29,6 +29,8 @@ Requires-Dist: pytest-forked>=1.6.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-qt>=4.0.0; extra == "dev"
+Provides-Extra: rfutil
+Requires-Dist: rfutil; extra == "rfutil"
 
 # PyProbe Plots
 

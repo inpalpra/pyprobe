@@ -6,7 +6,9 @@ from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, QRectF, QTimer, pyqtSignal, QPointF
 
 from ..base import ProbePlugin
-from ...core.data_classifier import DTYPE_ARRAY_COMPLEX
+from ...core.data_classifier import (
+    DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX, get_waveform_info
+)
 from ...plots.axis_controller import AxisController
 from ...plots.pin_indicator import PinIndicator
 from ...plots.draw_mode import DrawMode, apply_draw_mode
@@ -16,29 +18,38 @@ from ...gui.axis_editor import AxisEditor
 MAX_DISPLAY_POINTS = 5000
 
 def downsample(data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> tuple:
-    """Downsample large data for display, returning (x_indices, y_values)."""
+    """Downsample large data for display, returning (x_indices, y_values).
+    
+    Uses min-max decimation: the array is split into chunks and each chunk
+    contributes its (argmin, min) and (argmax, max) pair, preserving the
+    visual envelope.  Chunk boundaries are computed with linspace so the
+    full array [0, N) is always covered — no tail samples are dropped.
+    """
     if n_points <= 0:
         n_points = MAX_DISPLAY_POINTS
 
-    if len(data) <= n_points:
-        return np.arange(len(data)) + x_offset, data
+    n = len(data)
+    if n <= n_points:
+        return np.arange(n) + x_offset, data
     
     n_chunks = n_points // 2
-    chunk_size = len(data) // n_chunks
-    truncated = data[:n_chunks * chunk_size]
-    reshaped = truncated.reshape(n_chunks, chunk_size)
+    # Boundaries always span [0, n] — no remainder
+    edges = np.linspace(0, n, n_chunks + 1, dtype=int)
     
-    mins = reshaped.min(axis=1)
-    maxs = reshaped.max(axis=1)
-    
-    chunk_starts = np.arange(n_chunks) * chunk_size
     x = np.empty(n_chunks * 2, dtype=np.int64)
-    x[0::2] = chunk_starts + x_offset
-    x[1::2] = chunk_starts + (chunk_size - 1) + x_offset
-    
     y = np.empty(n_chunks * 2, dtype=data.dtype)
-    y[0::2] = mins
-    y[1::2] = maxs
+    
+    for i in range(n_chunks):
+        chunk = data[edges[i]:edges[i + 1]]
+        amin = int(np.argmin(chunk))
+        amax = int(np.argmax(chunk))
+        # Always emit (lower_index, upper_index) order so the line is monotonic in x
+        lo, hi = sorted([amin, amax])
+        x[2 * i]     = edges[i] + lo + x_offset
+        x[2 * i + 1] = edges[i] + hi + x_offset
+        y[2 * i]     = chunk[lo]
+        y[2 * i + 1] = chunk[hi]
+    
     return x, y
 
 # ── SI-prefix formatter (shared by ComplexWidget and WaveformWidget) ──
@@ -84,6 +95,7 @@ class ComplexWidget(QWidget):
         self._plot_widget = pg.PlotWidget()
         self._info_label = QLabel("")
         self._raw_data: Optional[np.ndarray] = None  # Raw complex array
+        self._t_vector: Optional[np.ndarray] = None  # X-axis from waveform metadata
         
         # Axis pinning
         self._axis_controller: Optional[AxisController] = None
@@ -378,8 +390,15 @@ class ComplexWidget(QWidget):
         vb = self._plot_widget.getPlotItem().getViewBox()
         x_min, x_max = vb.viewRange()[0]
         n = len(self._raw_data)
-        i_min = max(0, int(np.floor(x_min)))
-        i_max = min(n, int(np.ceil(x_max)) + 1)
+        
+        # Map x-range to sample indices using t_vector if available
+        if self._t_vector is not None and len(self._t_vector) == n:
+            import bisect
+            i_min = max(0, bisect.bisect_left(self._t_vector, x_min))
+            i_max = min(n, bisect.bisect_right(self._t_vector, x_max))
+        else:
+            i_min = max(0, int(np.floor(x_min)))
+            i_max = min(n, int(np.ceil(x_max)) + 1)
         if i_min >= i_max:
             return
         self._updating_curves = True
@@ -389,6 +408,12 @@ class ComplexWidget(QWidget):
     def _render_slice(self, i_min: int, i_max: int):
         """Override in subclasses to re-render the visible slice."""
         pass
+
+    def _get_x_for_indices(self, indices: np.ndarray) -> np.ndarray:
+        """Map sample indices to x-axis values using _t_vector if available."""
+        if self._t_vector is not None and len(self._t_vector) > 0:
+            return self._t_vector[indices]
+        return indices.astype(float)
 
     def reset_view(self) -> None:
         """Reset the view: restore full data to curves, unpin axes, snap to full range."""
@@ -470,9 +495,12 @@ class ComplexRIWidget(ComplexWidget):
         imag = value.imag
         x_r, y_r = downsample(real)
         x_i, y_i = downsample(imag)
-        self._real_curve.setData(x_r, y_r)
-        self._imag_curve.setData(x_i, y_i)
+        self._real_curve.setData(self._get_x_for_indices(x_r), y_r)
+        self._imag_curve.setData(self._get_x_for_indices(x_i), y_i)
         self._updating_curves = False
+
+        if self._t_vector is not None:
+            self._plot_widget.setLabel('bottom', 'Time')
         self.update_info(f"[{value.shape}]")
 
     def _render_slice(self, i_min: int, i_max: int):
@@ -482,8 +510,8 @@ class ComplexRIWidget(ComplexWidget):
         imag = sliced.imag
         x_r, y_r = downsample(real, x_offset=i_min)
         x_i, y_i = downsample(imag, x_offset=i_min)
-        self._real_curve.setData(x_r, y_r)
-        self._imag_curve.setData(x_i, y_i)
+        self._real_curve.setData(self._get_x_for_indices(x_r), y_r)
+        self._imag_curve.setData(self._get_x_for_indices(x_i), y_i)
 
 
 class ComplexMAWidget(ComplexWidget):
@@ -545,9 +573,12 @@ class ComplexMAWidget(ComplexWidget):
         phase = np.angle(value)
         x_m, y_m = downsample(mag_db)
         x_p, y_p = downsample(phase)
-        self._mag_curve.setData(x_m, y_m)
-        self._phase_curve.setData(x_p, y_p)
+        self._mag_curve.setData(self._get_x_for_indices(x_m), y_m)
+        self._phase_curve.setData(self._get_x_for_indices(x_p), y_p)
         self._updating_curves = False
+
+        if self._t_vector is not None:
+            self._plot_widget.setLabel('bottom', 'Time')
         self.update_info(f"[{value.shape}]")
 
     def _render_slice(self, i_min: int, i_max: int):
@@ -557,8 +588,8 @@ class ComplexMAWidget(ComplexWidget):
         phase = np.angle(sliced)
         x_m, y_m = downsample(mag_db, x_offset=i_min)
         x_p, y_p = downsample(phase, x_offset=i_min)
-        self._mag_curve.setData(x_m, y_m)
-        self._phase_curve.setData(x_p, y_p)
+        self._mag_curve.setData(self._get_x_for_indices(x_m), y_m)
+        self._phase_curve.setData(self._get_x_for_indices(x_p), y_p)
 
 
 class SingleCurveWidget(ComplexWidget):
@@ -577,8 +608,11 @@ class SingleCurveWidget(ComplexWidget):
         self._raw_data = data  # Base class zoom guard checks this
         self._updating_curves = True
         x, y = downsample(data)
-        self._curve.setData(x, y)
+        self._curve.setData(self._get_x_for_indices(x), y)
         self._updating_curves = False
+
+        if self._t_vector is not None:
+            self._plot_widget.setLabel('bottom', 'Time')
         self.update_info(info)
 
     def _render_slice(self, i_min: int, i_max: int):
@@ -588,9 +622,38 @@ class SingleCurveWidget(ComplexWidget):
             return
         sliced = source[i_min:i_max]
         x, y = downsample(sliced, x_offset=i_min)
-        self._curve.setData(x, y)
+        self._curve.setData(self._get_x_for_indices(x), y)
 
 # --- PLUGINS ---
+
+def _extract_complex_waveform(value: Any, dtype: str):
+    """Extract (samples, t_vector) from a waveform dict or raw complex array.
+    
+    Returns:
+        (complex_samples, t_vector_or_None)
+    """
+    # Serialized waveform from IPC
+    if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COMPLEX:
+        samples = np.asarray(value['samples'])
+        scalars = value.get('scalars', [0.0, 1.0])
+        x0, dx = scalars[0], scalars[1]
+        t_vector = x0 + np.arange(len(samples)) * dx
+        return samples, t_vector
+    
+    # Direct waveform object (not serialized)
+    if dtype == DTYPE_WAVEFORM_COMPLEX:
+        waveform_info = get_waveform_info(value)
+        if waveform_info is not None:
+            samples = np.asarray(getattr(value, waveform_info['samples_attr']))
+            scalar_attrs = waveform_info['scalar_attrs']
+            x0 = float(getattr(value, scalar_attrs[0]))
+            dx = float(getattr(value, scalar_attrs[1]))
+            t_vector = x0 + np.arange(len(samples)) * dx
+            return samples, t_vector
+    
+    # Plain complex array — no t_vector
+    return np.asanyarray(value), None
+
 
 class ComplexRIPlugin(ProbePlugin):
     name = "Real & Imag"
@@ -598,14 +661,16 @@ class ComplexRIPlugin(ProbePlugin):
     priority = 90
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return ComplexRIWidget(var_name, color, parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, ComplexRIWidget):
-            widget.update_data(np.asanyarray(value))
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            widget.update_data(samples)
 
 class ComplexMAPlugin(ProbePlugin):
     name = "Mag & Phase"
@@ -613,14 +678,16 @@ class ComplexMAPlugin(ProbePlugin):
     priority = 85
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return ComplexMAWidget(var_name, color, parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, ComplexMAWidget):
-            widget.update_data(np.asanyarray(value))
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            widget.update_data(samples)
 
 class ComplexFftMagAngleWidget(ComplexWidget):
     """FFT Magnitude (dB) & Angle (deg) with Kaiser Bessel window."""
@@ -674,11 +741,10 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         elif series_key == 'Angle (deg)':
             self._p1.getAxis('right').setLabel('Angle (deg)', color=hex_color)
 
-    def set_data(self, data: np.ndarray, info: str):
+    def set_data(self, data: np.ndarray, info: str, dx: float = None):
         self._raw_data = data
         self._updating_curves = True
         
-        import sys
         n = len(data)
         
         if n > 0:
@@ -692,7 +758,13 @@ class ComplexFftMagAngleWidget(ComplexWidget):
             self._fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
             self._fft_phase = np.rad2deg(np.angle(fft_data))
             
-            self._fft_freqs = np.arange(-nfft//2, nfft - nfft//2)
+            # Physical frequency axis when dx available, else bin indices
+            if dx is not None and dx > 0:
+                self._fft_freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dx))
+                self._plot_widget.setLabel('bottom', 'Frequency (Hz)')
+            else:
+                self._fft_freqs = np.arange(-nfft//2, nfft - nfft//2, dtype=float)
+                self._plot_widget.setLabel('bottom', 'FFT Bin')
             
             x_m, y_m = downsample(self._fft_mag)
             x_p, y_p = downsample(self._fft_phase)
@@ -744,10 +816,18 @@ class ComplexFftMagAngleWidget(ComplexWidget):
             self._mag_curve.setData(self._fft_freqs[x_m], y_m)
             self._phase_curve.setData(self._fft_freqs[x_p], y_p)
             self._updating_curves = False
-            
+        
         vb = self._plot_widget.getPlotItem().getViewBox()
+        # autoRange y only — the x-range from downsampled data is truncated
+        # by min-max decimation, so we set x explicitly to the true freq bounds
+        vb.enableAutoRange(axis='y')
+        self._p2.enableAutoRange(axis='y')
         vb.autoRange(padding=0)
         self._p2.autoRange(padding=0)
+        if self._fft_freqs is not None and len(self._fft_freqs) > 0:
+            self._plot_widget.getPlotItem().setXRange(
+                float(self._fft_freqs[0]), float(self._fft_freqs[-1]), padding=0
+            )
 
 class ComplexFftMagAnglePlugin(ProbePlugin):
     name = "FFT Mag (dB) / Angle (deg)"
@@ -755,15 +835,19 @@ class ComplexFftMagAnglePlugin(ProbePlugin):
     priority = 100
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return ComplexFftMagAngleWidget(var_name, color, parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, ComplexFftMagAngleWidget):
-            val = np.asanyarray(value)
-            widget.set_data(val, f"[{val.shape}]")
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            # Pass dx for Fs computation if t_vector available
+            dx = None
+            if t_vector is not None and len(t_vector) >= 2:
+                dx = t_vector[1] - t_vector[0]
+            widget.set_data(samples, f"[{samples.shape}]", dx=dx)
 
 class LogMagPlugin(ProbePlugin):
     name = "Log Mag (dB)"
@@ -771,16 +855,17 @@ class LogMagPlugin(ProbePlugin):
     priority = 80
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return SingleCurveWidget(var_name, color, "Magnitude (dB)", parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
-            val = np.asanyarray(value)
-            mag_db = 20 * np.log10(np.abs(val) + 1e-12)
-            widget.set_data(mag_db, f"[{val.shape}]")
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            mag_db = 20 * np.log10(np.abs(samples) + 1e-12)
+            widget.set_data(mag_db, f"[{samples.shape}]")
 
 class LinearMagPlugin(ProbePlugin):
     name = "Linear Mag"
@@ -788,15 +873,16 @@ class LinearMagPlugin(ProbePlugin):
     priority = 75
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return SingleCurveWidget(var_name, color, "Magnitude", parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
-            val = np.asanyarray(value)
-            widget.set_data(np.abs(val), f"[{val.shape}]")
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            widget.set_data(np.abs(samples), f"[{samples.shape}]")
 
 class PhaseRadPlugin(ProbePlugin):
     name = "Phase (rad)"
@@ -804,15 +890,16 @@ class PhaseRadPlugin(ProbePlugin):
     priority = 70
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return SingleCurveWidget(var_name, color, "Phase (rad)", parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
-            val = np.asanyarray(value)
-            widget.set_data(np.angle(val), f"[{val.shape}]")
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            widget.set_data(np.angle(samples), f"[{samples.shape}]")
 
 class PhaseDegPlugin(ProbePlugin):
     name = "Phase (deg)"
@@ -820,13 +907,14 @@ class PhaseDegPlugin(ProbePlugin):
     priority = 65
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype == DTYPE_ARRAY_COMPLEX
+        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
     def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
         return SingleCurveWidget(var_name, color, "Phase (deg)", parent)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
-            val = np.asanyarray(value)
-            deg = np.rad2deg(np.angle(val))
-            widget.set_data(deg, f"[{val.shape}]")
+            samples, t_vector = _extract_complex_waveform(value, dtype)
+            widget._t_vector = t_vector
+            deg = np.rad2deg(np.angle(samples))
+            widget.set_data(deg, f"[{samples.shape}]")
