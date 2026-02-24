@@ -1,7 +1,7 @@
 # Implementation Plan: Enhance the marker manager table UX.
 
 ## Phase 1: UX Redesign and Core Implementation
-- [ ] Task: Review current Marker Manager UI code and design the new table layout structure
+- [x] Task: Review current Marker Manager UI code and design the new table layout structure [07837b9]
 - [ ] Task: Write Tests: Verify the initialization and data binding of the new PyQt6 table layout
 - [ ] Task: Implement Feature: Build the new Marker Manager table view components
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: UX Redesign and Core Implementation' (Protocol in workflow.md)
