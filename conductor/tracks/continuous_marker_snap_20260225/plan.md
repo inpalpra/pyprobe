@@ -17,7 +17,7 @@
 - [x] Task: Implement (Green Phase): Enhance the snapping logic to calculate the exact fractional position between points (smooth interpolation) instead of rigidly jumping to the nearest integer index. [8be1ea9]
 - [x] Task: Conductor - User Manual Verification 'Implement Smooth Interpolation' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts.* [e9c0a19]
 
-## Phase 4: Integration and Edge Case Handling
-- [ ] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying edge cases: dragging off the ends of the trace, dragging vertically far away, and multi-trace snapping priority.
-- [ ] Task: Implement (Green Phase): Finalize edge cases, ensuring the marker correctly tracks the horizontal position of the mouse relative to the trace's bounds.
-- [ ] Task: Conductor - User Manual Verification 'Integration and Edge Case Handling' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or executing `./.venv/bin/python -m pyprobe examples/dsp_demo.py`.*
+## Phase 4: Integration and Edge Case Handling [checkpoint: d84433d]
+- [x] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying edge cases: dragging off the ends of the trace, dragging vertically far away, and multi-trace snapping priority. [add937b]
+- [x] Task: Implement (Green Phase): Finalize edge cases, ensuring the marker correctly tracks the horizontal position of the mouse relative to the trace's bounds. [8be1ea9]
+- [x] Task: Conductor - User Manual Verification 'Integration and Edge Case Handling' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or executing `./.venv/bin/python -m pyprobe examples/dsp_demo.py`.* [d84433d]
