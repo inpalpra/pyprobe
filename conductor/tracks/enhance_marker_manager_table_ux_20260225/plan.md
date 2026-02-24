@@ -7,6 +7,6 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: UX Redesign and Core Implementation' (Protocol in workflow.md) [8d04b33]
 
 ## Phase 2: Interaction and Integration
-- [ ] Task: Write Tests: Verify user interactions including adding, editing, and deleting markers in the new table
-- [ ] Task: Implement Feature: Wire up table interactions to synchronize with the core pyqtgraph plotting engine
+- [x] Task: Write Tests: Verify user interactions including adding, editing, and deleting markers in the new table [26549d9]
+- [x] Task: Implement Feature: Wire up table interactions to synchronize with the core pyqtgraph plotting engine [8d04b33]
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Interaction and Integration' (Protocol in workflow.md)
