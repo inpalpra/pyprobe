@@ -5,12 +5,12 @@
 - [x] Task: Refactor or introduce a unified marker event interface to allow intercepting the `mouseDragEvent` specifically for line/waveform traces. [cedaccb]
 - [x] Task: Conductor - User Manual Verification 'Investigate and Refactor Marker Interaction Logic' (Protocol in workflow.md) - *Note: User is on CLI, verification must be strictly via automated test scripts.* [d3da3d6]
 
-## Phase 2: Implement Continuous Snapping Core Logic
-- [ ] Task: Write Tests (Red Phase): Create extreme TDD headless `pytest-qt` tests verifying that dragging a marker on a waveform calculates the nearest point continuously.
-- [ ] Task: Implement (Green Phase): Implement the core nearest-point calculation and snapping logic during the `mouseDragEvent`, ensuring it works for waveform plots but ignores constellation (scatter) plots.
-- [ ] Task: Write Tests (Red Phase): Create tests verifying that the snapping calculation falls back gracefully or throttles if execution time exceeds a threshold (performance constraint).
-- [ ] Task: Implement (Green Phase): Integrate throttling mechanisms (e.g., `QTimer` or frame-rate limiting) to ensure UI responsiveness on dense data.
-- [ ] Task: Conductor - User Manual Verification 'Implement Continuous Snapping Core Logic' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or demo scripts.*
+## Phase 2: Implement Continuous Snapping Core Logic [checkpoint: 3c50aab]
+- [x] Task: Write Tests (Red Phase): Create extreme TDD headless `pytest-qt` tests verifying that dragging a marker on a waveform calculates the nearest point continuously. [584c2a2]
+- [x] Task: Implement (Green Phase): Implement the core nearest-point calculation and snapping logic during the `mouseDragEvent`, ensuring it works for waveform plots but ignores constellation (scatter) plots. [584c2a2]
+- [x] Task: Write Tests (Red Phase): Create tests verifying that the snapping calculation falls back gracefully or throttles if execution time exceeds a threshold (performance constraint). [584c2a2]
+- [x] Task: Implement (Green Phase): Integrate throttling mechanisms (e.g., `QTimer` or frame-rate limiting) to ensure UI responsiveness on dense data. [584c2a2]
+- [x] Task: Conductor - User Manual Verification 'Implement Continuous Snapping Core Logic' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or demo scripts.* [3c50aab]
 
 ## Phase 3: Implement Smooth Interpolation
 - [ ] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying that when dragging between two discrete data indices, the marker position is interpolated linearly based on the mouse's X-coordinate.
