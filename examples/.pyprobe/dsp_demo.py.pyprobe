@@ -3,21 +3,21 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
+      "col": 26,
+      "symbol": "signal_i",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
       "col": 8,
       "symbol": "received_symbols",
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 79,
-      "col": 8,
-      "symbol": "power_db",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#9d2bee",
       "lens": null
     },
     {
@@ -42,12 +42,12 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
-      "col": 26,
-      "symbol": "signal_i",
+      "line": 79,
+      "col": 8,
+      "symbol": "power_db",
       "func": "main",
       "is_assignment": true,
-      "color": "#2bee64",
+      "color": "#9d2bee",
       "lens": null
     }
   ],

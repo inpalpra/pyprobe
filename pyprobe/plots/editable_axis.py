@@ -98,4 +98,21 @@ class EditableAxisItem(pg.AxisItem):
 
     def wheelEvent(self, event, **kwargs):
         """Allow scrolling the axis to zoom, even if the plot area is in POINTER mode."""
-        self._temporarily_enable_axis_interaction(event, lambda e: super(EditableAxisItem, self).wheelEvent(e, **kwargs))
+        def _handle_wheel(e):
+            view_box = self.linkedView()
+
+            # Invert vertical-axis zoom direction so trackpad drag-up zooms in
+            # and drag-down zooms out for both left and right Y axes.
+            if self.orientation in ['left', 'right'] and view_box is not None:
+                wheel_scale = view_box.state.get('wheelScaleFactor')
+                if wheel_scale is not None:
+                    try:
+                        view_box.state['wheelScaleFactor'] = -wheel_scale
+                        super(EditableAxisItem, self).wheelEvent(e, **kwargs)
+                    finally:
+                        view_box.state['wheelScaleFactor'] = wheel_scale
+                    return
+
+            super(EditableAxisItem, self).wheelEvent(e, **kwargs)
+
+        self._temporarily_enable_axis_interaction(event, _handle_wheel)
