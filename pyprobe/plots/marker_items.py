@@ -40,6 +40,8 @@ class _DraggableScatter(pg.ScatterPlotItem):
 
 class MarkerGlyphSignaler(QObject):
     """QObject that emits signals on behalf of MarkerGlyph (which is not a QObject)."""
+    # Emitted continuously during drag: (marker_id, raw_x, raw_y)
+    marker_moving = pyqtSignal(str, float, float)
     # Emitted when drag finishes: (marker_id, new_x, new_y)
     marker_moved = pyqtSignal(str, float, float)
 
@@ -75,16 +77,21 @@ class MarkerGlyph(pg.ItemGroup):
         self.text.setColor(color)
         self.text.setPos(data.x, data.y)
 
-    def _on_drag_move(self, pos):
-        """Live visual update during drag — move glyph to the dragged position."""
-        # pos is in scatter's local coords which map to data coords
-        x, y = float(pos.x()), float(pos.y())
+    def set_visual_pos(self, x: float, y: float):
+        """Update the visual position without committing to the store."""
         self.scatter.setData([x], [y],
                              symbol=_SHAPE_MAP.get(self.data.shape, 'd'),
                              size=12,
                              brush=pg.mkBrush(self.data.color),
                              pen='w')
         self.text.setPos(x, y)
+
+    def _on_drag_move(self, pos):
+        """Live visual update during drag — move glyph to the dragged position."""
+        # pos is in scatter's local coords which map to data coords
+        x, y = float(pos.x()), float(pos.y())
+        self.set_visual_pos(x, y)
+        self.signaler.marker_moving.emit(self.data.id, x, y)
 
     def _on_drag_finish(self, pos):
         """Emit marker_moved signal when drag finishes."""
