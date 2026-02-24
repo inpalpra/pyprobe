@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
                              QPushButton, QComboBox, QLineEdit,
-                             QDoubleSpinBox, QLabel, QHeaderView, QColorDialog)
+                             QDoubleSpinBox, QLabel, QHeaderView, QColorDialog, QCheckBox)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 
@@ -43,11 +43,14 @@ class MarkerManager(QDialog):
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setWindowFlag(Qt.WindowType.Tool)
         self.setWindowTitle("Marker Manager")
-        self.resize(850, 300)
+        
+        from PyQt6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
 
         self._layout = QVBoxLayout(self)
 
         self.table = QTableWidget(0, 11)
+        self.table.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
         self.table.setHorizontalHeaderLabels([
             "Graph", "ID", "Label", "X", "Y", "Trace", "Type", "Ref", "Shape", "Color", "Delete"
         ])
@@ -59,13 +62,10 @@ class MarkerManager(QDialog):
         self._layout.addWidget(self.table)
 
         bottom_layout = QHBoxLayout()
-        bottom_layout.addWidget(QLabel("Graph:"))
-        self._graph_combo = QComboBox()
-        self._graph_combo.setMinimumWidth(100)
-        bottom_layout.addWidget(self._graph_combo)
-        self.add_btn = QPushButton("Add Marker")
-        self.add_btn.clicked.connect(self._on_add_clicked)
-        bottom_layout.addWidget(self.add_btn)
+        self.detailed_chk = QCheckBox("Detailed View")
+        self.detailed_chk.setChecked(False)
+        self.detailed_chk.stateChanged.connect(self._toggle_columns)
+        bottom_layout.addWidget(self.detailed_chk)
         bottom_layout.addStretch()
 
         self._layout.addLayout(bottom_layout)
@@ -81,15 +81,50 @@ class MarkerManager(QDialog):
                 background-color: {c['bg_dark']};
                 color: {c['text_primary']};
                 gridline-color: {c['border_default']};
-                border: 1px solid {c['border_default']};
+                border: none;
+                alternate-background-color: {c['bg_medium']};
+                selection-background-color: {c['bg_light']};
+                selection-color: {c['text_primary']};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {c['bg_light']};
+                color: {c['text_primary']};
             }}
             QHeaderView::section {{
-                background-color: {c['bg_medium']};
+                background-color: {c['bg_dark']};
                 color: {c['text_secondary']};
-                border: 1px solid {c['border_default']};
+                border: none;
+                border-bottom: 1px solid {c['border_default']};
                 padding: 4px;
+                font-weight: bold;
+            }}
+            QLineEdit, QComboBox, QDoubleSpinBox, QPushButton, QCheckBox {{
+                background: transparent;
+                border: none;
+                color: {c['text_primary']};
+                padding: 2px;
+                margin: 0px;
+            }}
+            QComboBox::drop-down, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                border: none;
+                background: transparent;
+            }}
+            QPushButton {{
+                background-color: {c['bg_medium']};
+                border-radius: 2px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['border_default']};
             }}
         """)
+
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.verticalHeader().hide()
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self._populating = False
         self._self_updating = False
@@ -102,6 +137,30 @@ class MarkerManager(QDialog):
 
         self._sync_store_connections()
         self._populate_table()
+        self._toggle_columns()
+
+    def _toggle_columns(self):
+        detailed = self.detailed_chk.isChecked()
+        # In basic view, only keep ID (1), X (3), and Y (4)
+        self.table.setColumnHidden(0, not detailed) # Graph
+        self.table.setColumnHidden(2, not detailed) # Label
+        self.table.setColumnHidden(5, not detailed) # Trace
+        self.table.setColumnHidden(6, not detailed) # Type
+        self.table.setColumnHidden(7, not detailed) # Ref
+        self.table.setColumnHidden(8, not detailed) # Shape
+        self.table.setColumnHidden(9, not detailed) # Color
+        self.table.setColumnHidden(10, not detailed) # Delete
+        
+        QTimer.singleShot(50, self._adjust_window_width)
+
+    def _adjust_window_width(self):
+        # Calculate needed width: table columns + layout margins + some padding
+        needed_width = self.table.verticalHeader().width() + self.table.horizontalHeader().length() + 40
+        
+        # Ensure it meets bottom layout requirements
+        self.setMinimumWidth(needed_width)
+        self.resize(needed_width, self.height())
+        self.adjustSize()
 
     def _on_stores_changed(self):
         """A store was added or removed — reconnect and rebuild."""
@@ -122,34 +181,6 @@ class MarkerManager(QDialog):
         for store in self._connected_stores:
             store.markers_changed.connect(self._schedule_rebuild)
 
-    def _on_add_clicked(self):
-        idx = self._graph_combo.currentIndex()
-        if idx < 0:
-            return
-        store = self._graph_combo.itemData(idx)
-        if store is None:
-            return
-
-        plot_widget = store.parent()
-
-        # Default trace key
-        trace_key = 0
-        if plot_widget and hasattr(plot_widget, 'series_keys'):
-            keys = plot_widget.series_keys
-            if len(keys) > 0:
-                trace_key = keys[0]
-
-        # Get center of view
-        x_center = 0.0
-        y_center = 0.0
-        if plot_widget and hasattr(plot_widget, '_plot_widget'):
-            vb = plot_widget._plot_widget.getPlotItem().getViewBox()
-            xr, yr = vb.viewRange()
-            x_center = sum(xr) / 2
-            y_center = sum(yr) / 2
-
-        store.add_marker(trace_key, x_center, y_center)
-
     def _schedule_rebuild(self):
         """Defer table rebuild to avoid destroying widgets mid-edit callback."""
         if self._self_updating:
@@ -166,20 +197,6 @@ class MarkerManager(QDialog):
         self._populating = True
 
         stores = MarkerStore.all_stores()
-
-        # Update graph combo
-        self._graph_combo.blockSignals(True)
-        prev_store = self._graph_combo.currentData()
-        self._graph_combo.clear()
-        for store in stores:
-            label = _store_label(store)
-            self._graph_combo.addItem(label, store)
-        # Restore previous selection if still present
-        for i in range(self._graph_combo.count()):
-            if self._graph_combo.itemData(i) is prev_store:
-                self._graph_combo.setCurrentIndex(i)
-                break
-        self._graph_combo.blockSignals(False)
 
         # Collect all markers with their store
         all_rows = []  # list of (store, marker, label)
@@ -210,19 +227,23 @@ class MarkerManager(QDialog):
 
             # Graph (read-only)
             graph_lbl = QLabel(f" {graph_label} ")
+            graph_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setCellWidget(i, 0, graph_lbl)
 
             # ID (read-only)
             id_lbl = QLabel(f" {m.id} ")
+            id_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setCellWidget(i, 1, id_lbl)
 
             # Label
             label_edit = QLineEdit(m.label)
+            label_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label_edit.textChanged.connect(lambda text, s=store, mid=m.id: self._update_marker(s, mid, label=text))
             self.table.setCellWidget(i, 2, label_edit)
 
             # X
             x_spin = QDoubleSpinBox()
+            x_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
             x_spin.setRange(-1e15, 1e15)
             x_spin.setDecimals(6)
             x_spin.setValue(m.x)
@@ -234,6 +255,7 @@ class MarkerManager(QDialog):
             import pyqtgraph as pg
             y_str = pg.siFormat(m.y, suffix='')
             y_lbl = QLabel(f" {y_str} ")
+            y_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setCellWidget(i, 4, y_lbl)
 
             # Trace
@@ -287,14 +309,18 @@ class MarkerManager(QDialog):
             self.table.setCellWidget(i, 8, shape_box)
 
             # Color
-            col_btn = QPushButton("Color")
-            col_btn.setStyleSheet(f"background-color: {m.color}; color: {'#000' if QColor(m.color).lightness() > 128 else '#fff'};")
+            col_btn = QPushButton("")
+            col_btn.setFixedSize(16, 16)
+            col_btn.setStyleSheet(f"background-color: {m.color}; border-radius: 8px; margin: 4px;")
+            col_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             col_btn.clicked.connect(lambda _, s=store, mid=m.id, c=m.color: self._pick_color(s, mid, c))
             self.table.setCellWidget(i, 9, col_btn)
 
             # Delete
             del_btn = QPushButton("\u2715")
-            del_btn.setMaximumWidth(40)
+            del_btn.setFixedSize(20, 20)
+            del_btn.setStyleSheet("QPushButton { border: none; font-weight: bold; font-size: 14px; background: transparent; } QPushButton:hover { color: #ff5555; }")
+            del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda _, s=store, mid=m.id: s.remove_marker(mid))
             self.table.setCellWidget(i, 10, del_btn)
 
@@ -347,7 +373,7 @@ class MarkerManager(QDialog):
             col_btn = self.table.cellWidget(i, 9)
             if col_btn:
                 from PyQt6.QtGui import QColor
-                style = f"background-color: {m.color}; color: {'#000' if QColor(m.color).lightness() > 128 else '#fff'};"
+                style = f"background-color: {m.color}; border-radius: 8px; margin: 4px;"
                 if col_btn.styleSheet() != style:
                     col_btn.setStyleSheet(style)
         self._populating = False
