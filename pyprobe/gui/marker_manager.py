@@ -94,6 +94,7 @@ class MarkerManager(QDialog):
         self._populating = False
         self._self_updating = False
         self._rebuild_pending = False
+        self._current_row_markers = []
         self._connected_stores: list[MarkerStore] = []
 
         # Connect to store lifecycle signals
@@ -163,7 +164,6 @@ class MarkerManager(QDialog):
 
     def _populate_table(self):
         self._populating = True
-        self.table.setRowCount(0)
 
         stores = MarkerStore.all_stores()
 
@@ -195,6 +195,15 @@ class MarkerManager(QDialog):
             except ValueError:
                 return 999
         all_rows.sort(key=safe_sort_key)
+
+        new_row_ids = [(id(store), m.id) for store, m, _ in all_rows]
+        if new_row_ids == self._current_row_markers:
+            self._update_existing_rows(all_rows)
+            return
+
+        self._populating = True
+        self.table.setRowCount(0)
+        self._current_row_markers = new_row_ids
 
         for i, (store, m, graph_label) in enumerate(all_rows):
             self.table.insertRow(i)
@@ -289,6 +298,58 @@ class MarkerManager(QDialog):
             del_btn.clicked.connect(lambda _, s=store, mid=m.id: s.remove_marker(mid))
             self.table.setCellWidget(i, 10, del_btn)
 
+        self._populating = False
+
+    def _update_existing_rows(self, all_rows):
+        self._populating = True
+        for i, (store, m, graph_label) in enumerate(all_rows):
+            lbl = self.table.cellWidget(i, 0)
+            if lbl: lbl.setText(f" {graph_label} ")
+
+            edit = self.table.cellWidget(i, 2)
+            if edit and edit.text() != m.label:
+                edit.setText(m.label)
+            
+            x_spin = self.table.cellWidget(i, 3)
+            if x_spin and x_spin.value() != m.x:
+                x_spin.setValue(m.x)
+
+            import pyqtgraph as pg
+            y_str = pg.siFormat(m.y, suffix='')
+            y_lbl = self.table.cellWidget(i, 4)
+            if y_lbl and y_lbl.text() != f" {y_str} ":
+                y_lbl.setText(f" {y_str} ")
+
+            trace_box = self.table.cellWidget(i, 5)
+            if trace_box:
+                idx = trace_box.findData(m.trace_key)
+                if idx >= 0 and trace_box.currentIndex() != idx:
+                    trace_box.setCurrentIndex(idx)
+
+            type_box = self.table.cellWidget(i, 6)
+            if type_box:
+                idx = list(MarkerType).index(m.marker_type)
+                if type_box.currentIndex() != idx:
+                    type_box.setCurrentIndex(idx)
+
+            ref_box = self.table.cellWidget(i, 7)
+            if ref_box:
+                idx = ref_box.findData(m.ref_marker_id) if m.ref_marker_id else ref_box.findData(None)
+                if idx >= 0 and ref_box.currentIndex() != idx:
+                    ref_box.setCurrentIndex(idx)
+                
+            shape_box = self.table.cellWidget(i, 8)
+            if shape_box:
+                idx = list(MarkerShape).index(m.shape)
+                if shape_box.currentIndex() != idx:
+                    shape_box.setCurrentIndex(idx)
+
+            col_btn = self.table.cellWidget(i, 9)
+            if col_btn:
+                from PyQt6.QtGui import QColor
+                style = f"background-color: {m.color}; color: {'#000' if QColor(m.color).lightness() > 128 else '#fff'};"
+                if col_btn.styleSheet() != style:
+                    col_btn.setStyleSheet(style)
         self._populating = False
 
     def _update_marker(self, store, marker_id, **kwargs):
