@@ -108,3 +108,25 @@ def test_waveform_continuous_snapping_edge_cases(qtbot):
     assert glyph.text.pos().x() == pytest.approx(2.0, abs=0.01)
     assert glyph.text.pos().y() == pytest.approx(2.0, abs=0.01)
 
+def test_waveform_continuous_snapping_finish(qtbot):
+    widget = WaveformWidget("test_var", QColor("#ffffff"))
+    qtbot.addWidget(widget)
+    
+    # 10 points: y = x * 2  => (0,0), (1,2), (2,4)
+    data = np.arange(10, dtype=float) * 2.0
+    widget.update_data(data, DTYPE_ARRAY_1D)
+    
+    widget._marker_store.add_marker(0, 1.0, 2.0)
+    m_id = widget._marker_store.get_markers()[0].id
+    glyph = widget._marker_glyphs[m_id]
+    
+    # Drag to x=1.5. It should interpolate to (1.5, 3.0)
+    glyph._on_drag_move(QPointF(1.5, 9.0))
+    # Finish drag
+    glyph._on_drag_finish(QPointF(1.5, 9.0))
+    
+    # Check the store's values
+    m = widget._marker_store.get_marker(m_id)
+    assert m.x == pytest.approx(1.5, abs=0.01)
+    assert m.y == pytest.approx(3.0, abs=0.01)
+

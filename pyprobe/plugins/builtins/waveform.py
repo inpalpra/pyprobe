@@ -1,5 +1,6 @@
 """Waveform visualization plugin for 1D arrays."""
 from typing import Any, Optional, Tuple, List
+import time
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
@@ -824,8 +825,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
                 curve = self._curves[m.trace_key]
                 x_data, y_data = curve.getData()
                 if x_data is not None and len(x_data) > 0:
-                    idx = np.argmin(np.abs(x_data - m.x))
-                    new_y = float(y_data[idx])
+                    _, new_y = self._get_snapped_position(m, m.x)
                     if new_y != m.y:
                         self._marker_store.update_marker(m.id, y=new_y)
             
@@ -838,9 +838,27 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             
         self._marker_overlay.update_markers(self._marker_store)
 
+    def _get_snapped_position(self, m, raw_x: float) -> tuple[float, float]:
+        """Calculate the snapped position (x, y) for a given marker and raw x coordinate."""
+        if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
+            curve = self._curves[m.trace_key]
+            x_data, y_data = curve.getData()
+            if x_data is not None and len(x_data) > 0:
+                if len(x_data) > 1 and x_data[-1] > x_data[0]:
+                    snapped_y = float(np.interp(raw_x, x_data, y_data))
+                    snapped_x = float(np.clip(raw_x, x_data[0], x_data[-1]))
+                elif len(x_data) > 1 and x_data[0] > x_data[-1]:
+                    snapped_y = float(np.interp(raw_x, x_data[::-1], y_data[::-1]))
+                    snapped_x = float(np.clip(raw_x, x_data[-1], x_data[0]))
+                else:
+                    idx = np.argmin(np.abs(x_data - raw_x))
+                    snapped_x = float(x_data[idx])
+                    snapped_y = float(y_data[idx])
+                return snapped_x, snapped_y
+        return raw_x, 0.0
+
     def _on_marker_moving(self, marker_id: str, new_x: float, new_y: float):
         """Handle live visual updates during drag (continuous snapping) with throttling."""
-        import time
         now = time.perf_counter()
         if hasattr(self, '_last_snap_time') and now - self._last_snap_time < 0.016:  # ~60fps throttle
             return
@@ -851,44 +869,25 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             return
         
         # Snap to curve at the new x
-        if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
-            curve = self._curves[m.trace_key]
-            x_data, y_data = curve.getData()
-            if x_data is not None and len(x_data) > 0:
-                if len(x_data) > 1 and x_data[-1] > x_data[0]:
-                    snapped_y = float(np.interp(new_x, x_data, y_data))
-                    snapped_x = float(np.clip(new_x, x_data[0], x_data[-1]))
-                elif len(x_data) > 1 and x_data[0] > x_data[-1]:
-                    snapped_y = float(np.interp(new_x, x_data[::-1], y_data[::-1]))
-                    snapped_x = float(np.clip(new_x, x_data[-1], x_data[0]))
-                else:
-                    idx = np.argmin(np.abs(x_data - new_x))
-                    snapped_x = float(x_data[idx])
-                    snapped_y = float(y_data[idx])
-                
-                # Update visual position
-                m.x = snapped_x
-                m.y = snapped_y
-                if marker_id in self._marker_glyphs:
-                    self._marker_glyphs[marker_id].set_visual_pos(snapped_x, snapped_y)
-                
-                # Update overlay text
-                self._marker_overlay.update_markers(self._marker_store)
+        snapped_x, snapped_y = self._get_snapped_position(m, new_x)
+        
+        # Update visual position
+        m.x = snapped_x
+        m.y = snapped_y
+        if marker_id in self._marker_glyphs:
+            self._marker_glyphs[marker_id].set_visual_pos(snapped_x, snapped_y)
+        
+        # Update overlay text
+        self._marker_overlay.update_markers(self._marker_store)
 
     def _on_marker_dragged(self, marker_id: str, new_x: float, new_y: float):
         """Handle marker drag — snap to nearest curve point at the dragged x."""
         m = self._marker_store.get_marker(marker_id)
         if m is None:
             return
-        # Snap to curve at the new x
-        if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
-            curve = self._curves[m.trace_key]
-            x_data, y_data = curve.getData()
-            if x_data is not None and len(x_data) > 0:
-                idx = np.argmin(np.abs(x_data - new_x))
-                new_x = float(x_data[idx])
-                new_y = float(y_data[idx])
-        self._marker_store.update_marker(marker_id, x=new_x, y=new_y)
+        
+        snapped_x, snapped_y = self._get_snapped_position(m, new_x)
+        self._marker_store.update_marker(marker_id, x=snapped_x, y=snapped_y)
         
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
