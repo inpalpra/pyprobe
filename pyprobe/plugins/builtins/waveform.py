@@ -855,9 +855,16 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             curve = self._curves[m.trace_key]
             x_data, y_data = curve.getData()
             if x_data is not None and len(x_data) > 0:
-                idx = np.argmin(np.abs(x_data - new_x))
-                snapped_x = float(x_data[idx])
-                snapped_y = float(y_data[idx])
+                if len(x_data) > 1 and x_data[-1] > x_data[0]:
+                    snapped_y = float(np.interp(new_x, x_data, y_data))
+                    snapped_x = float(np.clip(new_x, x_data[0], x_data[-1]))
+                elif len(x_data) > 1 and x_data[0] > x_data[-1]:
+                    snapped_y = float(np.interp(new_x, x_data[::-1], y_data[::-1]))
+                    snapped_x = float(np.clip(new_x, x_data[-1], x_data[0]))
+                else:
+                    idx = np.argmin(np.abs(x_data - new_x))
+                    snapped_x = float(x_data[idx])
+                    snapped_y = float(y_data[idx])
                 
                 # Update visual position
                 m.x = snapped_x

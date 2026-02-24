@@ -59,3 +59,22 @@ def test_waveform_continuous_snapping_throttling(qtbot, monkeypatch):
     current_time[0] = 0.020 # 20ms later
     glyph._on_drag_move(QPointF(8.1, 9.0))
     assert glyph.text.pos().x() == pytest.approx(8.0, abs=0.2)
+def test_waveform_continuous_snapping_interpolation(qtbot):
+    widget = WaveformWidget("test_var", QColor("#ffffff"))
+    qtbot.addWidget(widget)
+    
+    # 10 points: y = x * 2  => (0,0), (1,2), (2,4)
+    data = np.arange(10, dtype=float) * 2.0
+    widget.update_data(data, DTYPE_ARRAY_1D)
+    
+    widget._marker_store.add_marker(0, 1.0, 2.0)
+    m_id = widget._marker_store.get_markers()[0].id
+    glyph = widget._marker_glyphs[m_id]
+    
+    # Drag to x=1.5. It should interpolate between (1, 2) and (2, 4)
+    # y should be 3.0
+    glyph._on_drag_move(QPointF(1.5, 9.0))
+    
+    # Visual position
+    assert glyph.text.pos().x() == pytest.approx(1.5, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(3.0, abs=0.01)
