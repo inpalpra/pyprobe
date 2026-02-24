@@ -104,6 +104,7 @@ class MarkerManager(QDialog):
                 color: {c['text_primary']};
                 padding: 2px;
                 margin: 0px;
+                text-align: center;
             }}
             QComboBox::drop-down, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
                 border: none;
@@ -154,13 +155,14 @@ class MarkerManager(QDialog):
         QTimer.singleShot(50, self._adjust_window_width)
 
     def _adjust_window_width(self):
-        # Calculate needed width: table columns + layout margins + some padding
-        needed_width = self.table.verticalHeader().width() + self.table.horizontalHeader().length() + 40
+        # Calculate needed width exactly based on visible columns plus comfortable padding
+        needed_width = self.table.verticalHeader().width() + self.table.horizontalHeader().length() + 75
         
-        # Ensure it meets bottom layout requirements
-        self.setMinimumWidth(needed_width)
+        # Free the minimum width constraint so it can shrink
+        self.setMinimumWidth(0)
+        
+        # Force the resize to perfectly wrap the contents
         self.resize(needed_width, self.height())
-        self.adjustSize()
 
     def _on_stores_changed(self):
         """A store was added or removed — reconnect and rebuild."""
@@ -221,6 +223,15 @@ class MarkerManager(QDialog):
         self._populating = True
         self.table.setRowCount(0)
         self._current_row_markers = new_row_ids
+        
+        SHAPE_SYMBOLS = {
+            MarkerShape.DIAMOND: "◆",
+            MarkerShape.TRIANGLE_UP: "▲",
+            MarkerShape.SQUARE: "■",
+            MarkerShape.CROSS: "✖",
+            MarkerShape.CIRCLE: "●",
+            MarkerShape.STAR: "★"
+        }
 
         for i, (store, m, graph_label) in enumerate(all_rows):
             self.table.insertRow(i)
@@ -238,14 +249,18 @@ class MarkerManager(QDialog):
             # Label
             label_edit = QLineEdit(m.label)
             label_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label_edit.setMinimumWidth(30)
+            label_edit.setMaximumWidth(80)
             label_edit.textChanged.connect(lambda text, s=store, mid=m.id: self._update_marker(s, mid, label=text))
             self.table.setCellWidget(i, 2, label_edit)
 
             # X
             x_spin = QDoubleSpinBox()
-            x_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            x_spin.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             x_spin.setRange(-1e15, 1e15)
             x_spin.setDecimals(6)
+            x_spin.setMinimumWidth(60)
+            x_spin.setMaximumWidth(100)
             x_spin.setValue(m.x)
             x_spin.setKeyboardTracking(False)
             x_spin.valueChanged.connect(lambda val, s=store, mid=m.id: self._update_marker(s, mid, x=val))
@@ -256,6 +271,7 @@ class MarkerManager(QDialog):
             y_str = pg.siFormat(m.y, suffix='')
             y_lbl = QLabel(f" {y_str} ")
             y_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            y_lbl.setMinimumWidth(50)
             self.table.setCellWidget(i, 4, y_lbl)
 
             # Trace
@@ -275,15 +291,15 @@ class MarkerManager(QDialog):
             if idx >= 0:
                 trace_box.setCurrentIndex(idx)
             trace_box.currentIndexChanged.connect(lambda idx, s=store, mid=m.id, tb=trace_box: self._update_marker(s, mid, trace_key=tb.itemData(idx)))
-            self.table.setCellWidget(i, 5, trace_box)
+            self.table.setCellWidget(i, 5, self._centered_widget(trace_box))
 
             # Type
             type_box = QComboBox()
             for t in MarkerType:
-                type_box.addItem(t.name, t)
+                type_box.addItem(t.name.capitalize(), t)
             type_box.setCurrentIndex(list(MarkerType).index(m.marker_type))
             type_box.currentIndexChanged.connect(lambda idx, s=store, mid=m.id, tb=type_box: self._update_marker(s, mid, marker_type=tb.itemData(idx)))
-            self.table.setCellWidget(i, 6, type_box)
+            self.table.setCellWidget(i, 6, self._centered_widget(type_box))
 
             # Ref — only show markers from the same store
             same_store_markers = [row for row in all_rows if row[0] is store]
@@ -298,15 +314,17 @@ class MarkerManager(QDialog):
                     ref_box.setCurrentIndex(idx)
             ref_box.setEnabled(m.marker_type == MarkerType.RELATIVE)
             ref_box.currentIndexChanged.connect(lambda idx, s=store, mid=m.id, rb=ref_box: self._update_marker(s, mid, ref_marker_id=rb.itemData(idx)))
-            self.table.setCellWidget(i, 7, ref_box)
+            self.table.setCellWidget(i, 7, self._centered_widget(ref_box))
 
             # Shape
             shape_box = QComboBox()
+            shape_box.view().setMinimumWidth(60)
+            shape_box.setStyleSheet(f"font-size: 16px; color: {m.color};")
             for sh in MarkerShape:
-                shape_box.addItem(sh.name, sh)
+                shape_box.addItem(SHAPE_SYMBOLS.get(sh, sh.name), sh)
             shape_box.setCurrentIndex(list(MarkerShape).index(m.shape))
             shape_box.currentIndexChanged.connect(lambda idx, s=store, mid=m.id, sb=shape_box: self._update_marker(s, mid, shape=sb.itemData(idx)))
-            self.table.setCellWidget(i, 8, shape_box)
+            self.table.setCellWidget(i, 8, self._centered_widget(shape_box))
 
             # Color
             col_btn = QPushButton("")
@@ -314,7 +332,7 @@ class MarkerManager(QDialog):
             col_btn.setStyleSheet(f"background-color: {m.color}; border-radius: 8px; margin: 4px;")
             col_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             col_btn.clicked.connect(lambda _, s=store, mid=m.id, c=m.color: self._pick_color(s, mid, c))
-            self.table.setCellWidget(i, 9, col_btn)
+            self.table.setCellWidget(i, 9, self._centered_widget(col_btn))
 
             # Delete
             del_btn = QPushButton("\u2715")
@@ -322,7 +340,7 @@ class MarkerManager(QDialog):
             del_btn.setStyleSheet("QPushButton { border: none; font-weight: bold; font-size: 14px; background: transparent; } QPushButton:hover { color: #ff5555; }")
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda _, s=store, mid=m.id: s.remove_marker(mid))
-            self.table.setCellWidget(i, 10, del_btn)
+            self.table.setCellWidget(i, 10, self._centered_widget(del_btn))
 
         self._populating = False
 
@@ -345,33 +363,42 @@ class MarkerManager(QDialog):
             y_lbl = self.table.cellWidget(i, 4)
             if y_lbl and y_lbl.text() != f" {y_str} ":
                 y_lbl.setText(f" {y_str} ")
+                y_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             trace_box = self.table.cellWidget(i, 5)
-            if trace_box:
+            if trace_box and hasattr(trace_box, '_child_widget'):
+                trace_box = trace_box._child_widget
                 idx = trace_box.findData(m.trace_key)
                 if idx >= 0 and trace_box.currentIndex() != idx:
                     trace_box.setCurrentIndex(idx)
 
             type_box = self.table.cellWidget(i, 6)
-            if type_box:
+            if type_box and hasattr(type_box, '_child_widget'):
+                type_box = type_box._child_widget
                 idx = list(MarkerType).index(m.marker_type)
                 if type_box.currentIndex() != idx:
                     type_box.setCurrentIndex(idx)
 
             ref_box = self.table.cellWidget(i, 7)
-            if ref_box:
+            if ref_box and hasattr(ref_box, '_child_widget'):
+                ref_box = ref_box._child_widget
                 idx = ref_box.findData(m.ref_marker_id) if m.ref_marker_id else ref_box.findData(None)
                 if idx >= 0 and ref_box.currentIndex() != idx:
                     ref_box.setCurrentIndex(idx)
                 
             shape_box = self.table.cellWidget(i, 8)
-            if shape_box:
+            if shape_box and hasattr(shape_box, '_child_widget'):
+                shape_box = shape_box._child_widget
                 idx = list(MarkerShape).index(m.shape)
                 if shape_box.currentIndex() != idx:
                     shape_box.setCurrentIndex(idx)
+                style = f"font-size: 16px; color: {m.color};"
+                if shape_box.styleSheet() != style:
+                    shape_box.setStyleSheet(style)
 
             col_btn = self.table.cellWidget(i, 9)
-            if col_btn:
+            if col_btn and hasattr(col_btn, '_child_widget'):
+                col_btn = col_btn._child_widget
                 from PyQt6.QtGui import QColor
                 style = f"background-color: {m.color}; border-radius: 8px; margin: 4px;"
                 if col_btn.styleSheet() != style:
@@ -383,6 +410,21 @@ class MarkerManager(QDialog):
             self._self_updating = True
             store.update_marker(marker_id, **kwargs)
             self._self_updating = False
+
+    def _centered_widget(self, widget, stretch=True):
+        from PyQt6.QtWidgets import QWidget, QHBoxLayout
+        from PyQt6.QtCore import Qt
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        if stretch:
+            layout.addStretch()
+        layout.addWidget(widget)
+        if stretch:
+            layout.addStretch()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        container._child_widget = widget
+        return container
 
     def _pick_color(self, store, marker_id, current_color):
         color = QColorDialog.getColor(QColor(current_color), self, "Pick Marker Color")
