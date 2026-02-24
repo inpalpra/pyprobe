@@ -845,6 +845,10 @@ class ComplexFftMagAngleWidget(ComplexWidget):
 
         self._p1.vb.sigResized.connect(self._update_views)
         self._first_data = True
+        # FFT angle is bounded to [-180, 180], so keep a fixed phase axis
+        # instead of auto-ranging y on every update.
+        self._p2.enableAutoRange(axis='y', enable=False)
+        self._p2.setYRange(-180.0, 180.0, padding=0)
         
         self._fft_freqs = None
         self._fft_mag = None
@@ -857,7 +861,9 @@ class ComplexFftMagAngleWidget(ComplexWidget):
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         super()._on_pin_state_changed(axis, is_pinned)
         if axis == 'y':
-            self._p2.enableAutoRange(axis='y', enable=not is_pinned)
+            self._p2.enableAutoRange(axis='y', enable=False)
+            if not is_pinned:
+                self._p2.setYRange(-180.0, 180.0, padding=0)
 
     def set_series_color(self, series_key: str, color: QColor) -> None:
         """Override to also update axis label colors for dual-axis layout."""
@@ -948,9 +954,9 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         # autoRange y only — the x-range from downsampled data is truncated
         # by min-max decimation, so we set x explicitly to the true freq bounds
         vb.enableAutoRange(axis='y')
-        self._p2.enableAutoRange(axis='y')
         vb.autoRange(padding=0)
-        self._p2.autoRange(padding=0)
+        self._p2.enableAutoRange(axis='y', enable=False)
+        self._p2.setYRange(-180.0, 180.0, padding=0)
         if self._fft_freqs is not None and len(self._fft_freqs) > 0:
             self._plot_widget.getPlotItem().setXRange(
                 float(self._fft_freqs[0]), float(self._fft_freqs[-1]), padding=0

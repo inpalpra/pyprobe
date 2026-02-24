@@ -439,11 +439,30 @@ class ConstellationWidget(QWidget):
                         self._marker_store.update_marker(m.id, **updates)
             
             glyph = MarkerGlyph(m)
+            glyph.signaler.marker_moved.connect(self._on_marker_dragged)
             plot_item.addItem(glyph)
             self._marker_glyphs[m.id] = glyph
         self._marker_store.blockSignals(False)
             
         self._marker_overlay.update_markers(self._marker_store)
+
+    def _on_marker_dragged(self, marker_id: str, new_x: float, new_y: float):
+        """Handle marker drag — snap to nearest constellation point and persist."""
+        m = self._marker_store.get_marker(marker_id)
+        if m is None:
+            return
+
+        curve_dict = {f"history_{i}": scatter for i, scatter in enumerate(self._scatter_items)}
+        curve = curve_dict.get(m.trace_key)
+        if curve is not None:
+            x_data, y_data = curve.getData()
+            if x_data is not None and len(x_data) > 0:
+                dist = (x_data - new_x)**2 + (y_data - new_y)**2
+                idx = np.argmin(dist)
+                new_x = float(x_data[idx])
+                new_y = float(y_data[idx])
+
+        self._marker_store.update_marker(marker_id, x=new_x, y=new_y)
 
     def get_plot_data(self) -> dict:
         """

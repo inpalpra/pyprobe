@@ -925,6 +925,7 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         self._plot_widget.setLabel('left', 'Magnitude (dB)')
         self._info_label.setText("FFT Mag (dB) / Angle (deg)")
         self.MAX_DISPLAY_POINTS = 1000000
+        self._phase_display_points = 5000
         self._first_data = True
         
         # Calculate a complementary color for the phase axis & curves
@@ -952,6 +953,10 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         self._phase_curves = []
         self._current_phase_data = None
         self._p1.vb.sigResized.connect(self._update_views)
+        # FFT angle is naturally bounded to [-180, 180] and doesn't need
+        # continuous y auto-ranging on every frame update.
+        self._p2.enableAutoRange(axis='y', enable=False)
+        self._p2.setYRange(-180.0, 180.0, padding=0)
 
     def _update_views(self):
         self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
@@ -960,7 +965,9 @@ class WaveformFftMagAngleWidget(WaveformWidget):
     def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
         super()._on_pin_state_changed(axis, is_pinned)
         if axis == 'y':
-            self._p2.enableAutoRange(axis='y', enable=not is_pinned)
+            self._p2.enableAutoRange(axis='y', enable=False)
+            if not is_pinned:
+                self._p2.setYRange(-180.0, 180.0, padding=0)
 
     def _setup_editable_secondary_axis(self, secondary_color: str, label: str = '') -> None:
         """Replace the right axis with an EditableAxisItem for double-click editing."""
@@ -1019,7 +1026,7 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         while len(self._phase_curves) < num_rows:
             idx = len(self._phase_curves)
             color = self._get_row_color(idx) if num_rows > 1 else self._phase_color
-            pen = pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine)
+            pen = pg.mkPen(color=color, width=1.2)
             curve = pg.PlotDataItem(pen=pen, antialias=False)
             self._p2.addItem(curve)
             self._phase_curves.append(curve)
@@ -1030,12 +1037,17 @@ class WaveformFftMagAngleWidget(WaveformWidget):
             curve = self._phase_curves.pop()
             self._p2.removeItem(curve)
 
+    def _has_visible_phase_curves(self) -> bool:
+        return any(curve.isVisible() for curve in self._phase_curves)
+
     def _render_phase_curves_full(self):
-        if self._current_phase_data is None:
+        if self._current_phase_data is None or not self._has_visible_phase_curves():
             return
         self._updating_curves = True
         if self._current_phase_data.ndim == 1:
-            x_idx, y_disp = self.downsample(self._current_phase_data)
+            x_idx, y_disp = self.downsample(
+                self._current_phase_data, n_points=self._phase_display_points
+            )
             if self._t_vector is not None and len(self._t_vector) == len(self._current_phase_data):
                 self._phase_curves[0].setData(self._t_vector[x_idx], y_disp)
             else:
@@ -1043,7 +1055,9 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         elif self._current_phase_data.ndim == 2:
             n_cols = self._current_phase_data.shape[1]
             for row_idx in range(min(self._current_phase_data.shape[0], len(self._phase_curves))):
-                x_idx, y_disp = self.downsample(self._current_phase_data[row_idx])
+                x_idx, y_disp = self.downsample(
+                    self._current_phase_data[row_idx], n_points=self._phase_display_points
+                )
                 if self._t_vector is not None and len(self._t_vector) == n_cols:
                     self._phase_curves[row_idx].setData(self._t_vector[x_idx], y_disp)
                 else:
@@ -1052,7 +1066,7 @@ class WaveformFftMagAngleWidget(WaveformWidget):
 
     def _rerender_for_zoom(self):
         super()._rerender_for_zoom()
-        if self._current_phase_data is None:
+        if self._current_phase_data is None or not self._has_visible_phase_curves():
             return
             
         plot_item = self._plot_widget.getPlotItem()
@@ -1074,10 +1088,12 @@ class WaveformFftMagAngleWidget(WaveformWidget):
             i_min, i_max = get_indices(n)
             if i_min < i_max:
                 slice_data = self._current_phase_data[i_min:i_max]
-                if len(slice_data) <= self.MAX_DISPLAY_POINTS:
+                if len(slice_data) <= self._phase_display_points:
                     x, y = np.arange(i_min, i_max), slice_data
                 else:
-                    x, y = self.downsample(slice_data, x_offset=i_min)
+                    x, y = self.downsample(
+                        slice_data, n_points=self._phase_display_points, x_offset=i_min
+                    )
                 
                 if self._t_vector is not None and len(self._t_vector) == n:
                     self._phase_curves[0].setData(self._t_vector[x], y)
@@ -1090,10 +1106,12 @@ class WaveformFftMagAngleWidget(WaveformWidget):
             if i_min < i_max:
                 for row_idx in range(min(self._current_phase_data.shape[0], len(self._phase_curves))):
                     row_slice = self._current_phase_data[row_idx, i_min:i_max]
-                    if len(row_slice) <= self.MAX_DISPLAY_POINTS:
+                    if len(row_slice) <= self._phase_display_points:
                         x, y = np.arange(i_min, i_max), row_slice
                     else:
-                        x, y = self.downsample(row_slice, x_offset=i_min)
+                        x, y = self.downsample(
+                            row_slice, n_points=self._phase_display_points, x_offset=i_min
+                        )
                         
                     if self._t_vector is not None and len(self._t_vector) == n_cols:
                         self._phase_curves[row_idx].setData(self._t_vector[x], y)
@@ -1104,7 +1122,7 @@ class WaveformFftMagAngleWidget(WaveformWidget):
     def reset_view(self) -> None:
         super().reset_view()
         self._render_phase_curves_full()
-        self._p2.autoRange(padding=0)
+        self._p2.setYRange(-180.0, 180.0, padding=0)
 
     def update_data(self, value: Any, dtype: str, shape: Optional[Tuple[int, ...]] = None, source_info: str = "") -> None:
         if value is None:

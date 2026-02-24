@@ -81,6 +81,35 @@ class TestConstellationHistory:
             assert len(scatter.data) == 1
 
 
+class TestConstellationMarkers:
+    def test_marker_drag_updates_stored_position(self, constellation, qapp):
+        """Dragging a marker commits the new position to MarkerStore."""
+        data = np.array([0 + 0j, 10 + 10j])
+        constellation.update_data(data, DTYPE_ARRAY_COMPLEX)
+
+        store = constellation._marker_store
+        marker = store.add_marker("history_4", 0.0, 0.0)
+        qapp.processEvents()
+
+        assert marker.id in constellation._marker_glyphs
+        glyph = constellation._marker_glyphs[marker.id]
+        glyph.signaler.marker_moved.emit(marker.id, 9.5, 9.5)
+        qapp.processEvents()
+
+        updated = store.get_marker(marker.id)
+        assert updated is not None
+        assert updated.x == pytest.approx(10.0)
+        assert updated.y == pytest.approx(10.0)
+
+        # Simulate pressing Run again: marker should stay at dragged location.
+        constellation.update_data(data, DTYPE_ARRAY_COMPLEX)
+        qapp.processEvents()
+        updated = store.get_marker(marker.id)
+        assert updated is not None
+        assert updated.x == pytest.approx(10.0)
+        assert updated.y == pytest.approx(10.0)
+
+
 class TestConstellationStats:
     def test_power_display(self, constellation):
         """Stats label shows power in dB and symbol count."""
