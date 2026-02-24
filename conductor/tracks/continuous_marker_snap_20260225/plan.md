@@ -12,10 +12,10 @@
 - [x] Task: Implement (Green Phase): Integrate throttling mechanisms (e.g., `QTimer` or frame-rate limiting) to ensure UI responsiveness on dense data. [584c2a2]
 - [x] Task: Conductor - User Manual Verification 'Implement Continuous Snapping Core Logic' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or demo scripts.* [3c50aab]
 
-## Phase 3: Implement Smooth Interpolation
-- [ ] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying that when dragging between two discrete data indices, the marker position is interpolated linearly based on the mouse's X-coordinate.
-- [ ] Task: Implement (Green Phase): Enhance the snapping logic to calculate the exact fractional position between points (smooth interpolation) instead of rigidly jumping to the nearest integer index.
-- [ ] Task: Conductor - User Manual Verification 'Implement Smooth Interpolation' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts.*
+## Phase 3: Implement Smooth Interpolation [checkpoint: e9c0a19]
+- [x] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying that when dragging between two discrete data indices, the marker position is interpolated linearly based on the mouse's X-coordinate. [8be1ea9]
+- [x] Task: Implement (Green Phase): Enhance the snapping logic to calculate the exact fractional position between points (smooth interpolation) instead of rigidly jumping to the nearest integer index. [8be1ea9]
+- [x] Task: Conductor - User Manual Verification 'Implement Smooth Interpolation' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts.* [e9c0a19]
 
 ## Phase 4: Integration and Edge Case Handling
 - [ ] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying edge cases: dragging off the ends of the trace, dragging vertically far away, and multi-trace snapping priority.
