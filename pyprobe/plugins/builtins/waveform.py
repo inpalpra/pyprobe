@@ -831,11 +831,42 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             
             glyph = MarkerGlyph(m)
             glyph.signaler.marker_moved.connect(self._on_marker_dragged)
+            glyph.signaler.marker_moving.connect(self._on_marker_moving)
             plot_item.addItem(glyph)
             self._marker_glyphs[m.id] = glyph
         self._marker_store.blockSignals(False)
             
         self._marker_overlay.update_markers(self._marker_store)
+
+    def _on_marker_moving(self, marker_id: str, new_x: float, new_y: float):
+        """Handle live visual updates during drag (continuous snapping) with throttling."""
+        import time
+        now = time.perf_counter()
+        if hasattr(self, '_last_snap_time') and now - self._last_snap_time < 0.016:  # ~60fps throttle
+            return
+        self._last_snap_time = now
+
+        m = self._marker_store.get_marker(marker_id)
+        if m is None:
+            return
+        
+        # Snap to curve at the new x
+        if isinstance(m.trace_key, int) and m.trace_key < len(self._curves):
+            curve = self._curves[m.trace_key]
+            x_data, y_data = curve.getData()
+            if x_data is not None and len(x_data) > 0:
+                idx = np.argmin(np.abs(x_data - new_x))
+                snapped_x = float(x_data[idx])
+                snapped_y = float(y_data[idx])
+                
+                # Update visual position
+                m.x = snapped_x
+                m.y = snapped_y
+                if marker_id in self._marker_glyphs:
+                    self._marker_glyphs[marker_id].set_visual_pos(snapped_x, snapped_y)
+                
+                # Update overlay text
+                self._marker_overlay.update_markers(self._marker_store)
 
     def _on_marker_dragged(self, marker_id: str, new_x: float, new_y: float):
         """Handle marker drag — snap to nearest curve point at the dragged x."""
