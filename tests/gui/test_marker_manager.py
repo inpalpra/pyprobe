@@ -41,3 +41,29 @@ def test_marker_manager_initialization(qtbot, clean_marker_stores):
     new_label_edit = manager.table.cellWidget(0, 2)
     assert new_label_edit is label_edit, "Table was fully rebuilt, widgets were destroyed!"
     assert label_edit.text() == "Updated M1"
+
+def test_marker_manager_interactions(qtbot, clean_marker_stores):
+    store1 = MarkerStore(parent=None)
+    m1 = store1.add_marker(trace_key=0, x=1.0, y=2.0)
+    
+    manager = MarkerManager()
+    qtbot.addWidget(manager)
+    manager.show()
+    
+    qtbot.waitUntil(lambda: manager.table.rowCount() == 1)
+    
+    # Test editing the X value
+    x_spin = manager.table.cellWidget(0, 3)
+    x_spin.setValue(5.5)
+    
+    # Process events to allow the valueChanged signal to propagate to the store
+    qtbot.wait(10)
+    
+    assert store1.get_marker(m1.id).x == 5.5
+    
+    # Test deleting the marker
+    del_btn = manager.table.cellWidget(0, 10)
+    qtbot.mouseClick(del_btn, Qt.MouseButton.LeftButton)
+    
+    qtbot.waitUntil(lambda: manager.table.rowCount() == 0)
+    assert len(store1.get_markers()) == 0
