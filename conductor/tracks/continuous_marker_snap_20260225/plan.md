@@ -21,3 +21,5 @@
 - [x] Task: Write Tests (Red Phase): Create `pytest-qt` tests verifying edge cases: dragging off the ends of the trace, dragging vertically far away, and multi-trace snapping priority. [add937b]
 - [x] Task: Implement (Green Phase): Finalize edge cases, ensuring the marker correctly tracks the horizontal position of the mouse relative to the trace's bounds. [8be1ea9]
 - [x] Task: Conductor - User Manual Verification 'Integration and Edge Case Handling' (Protocol in workflow.md) - *Note: User is on CLI, verify by running headless test scripts or executing `./.venv/bin/python -m pyprobe examples/dsp_demo.py`.* [d84433d]
+## Phase 5: Review Fixes
+- [x] Task: Apply review suggestions [e29ebda]
