@@ -62,7 +62,8 @@ def test_marker_manager_interactions(qtbot, clean_marker_stores):
     assert store1.get_marker(m1.id).x == 5.5
     
     # Test deleting the marker
-    del_btn = manager.table.cellWidget(0, 10)
+    del_btn_container = manager.table.cellWidget(0, 10)
+    del_btn = del_btn_container._child_widget
     qtbot.mouseClick(del_btn, Qt.MouseButton.LeftButton)
     
     qtbot.waitUntil(lambda: manager.table.rowCount() == 0)

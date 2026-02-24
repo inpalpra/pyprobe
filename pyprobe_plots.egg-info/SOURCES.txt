@@ -41,6 +41,7 @@ pyprobe/gui/focus_manager.py
 pyprobe/gui/layout_manager.py
 pyprobe/gui/lens_dropdown.py
 pyprobe/gui/main_window.py
+pyprobe/gui/marker_manager.py
 pyprobe/gui/message_handler.py
 pyprobe/gui/panel_container.py
 pyprobe/gui/plot_toolbar.py
@@ -82,6 +83,8 @@ pyprobe/plots/base_plot.py
 pyprobe/plots/constellation.py
 pyprobe/plots/draw_mode.py
 pyprobe/plots/editable_axis.py
+pyprobe/plots/marker_items.py
+pyprobe/plots/marker_model.py
 pyprobe/plots/pin_indicator.py
 pyprobe/plots/pin_layout_mixin.py
 pyprobe/plots/plot_factory.py
@@ -112,6 +115,7 @@ tests/test_constellation_verify.py
 tests/test_dock_bar.py
 tests/test_e2e_capture_pipeline.py
 tests/test_e2e_folder_browsing.py
+tests/test_editable_axis.py
 tests/test_focus_manager.py
 tests/test_layout_manager.py
 tests/test_overlay_drag_drop_single_frame.py
