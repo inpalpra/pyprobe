@@ -78,3 +78,33 @@ def test_waveform_continuous_snapping_interpolation(qtbot):
     # Visual position
     assert glyph.text.pos().x() == pytest.approx(1.5, abs=0.01)
     assert glyph.text.pos().y() == pytest.approx(3.0, abs=0.01)
+def test_waveform_continuous_snapping_edge_cases(qtbot):
+    widget = WaveformWidget("test_var", QColor("#ffffff"))
+    qtbot.addWidget(widget)
+    
+    # 5 points: y = x => (0,0), (1,1), (2,2), (3,3), (4,4)
+    data = np.arange(5, dtype=float)
+    widget.update_data(data, DTYPE_ARRAY_1D)
+    
+    widget._marker_store.add_marker(0, 2.0, 2.0)
+    m_id = widget._marker_store.get_markers()[0].id
+    glyph = widget._marker_glyphs[m_id]
+    
+    import time
+    # Drag off the left end (x = -5.0) -> should clamp to x=0.0
+    glyph._on_drag_move(QPointF(-5.0, 10.0))
+    assert glyph.text.pos().x() == pytest.approx(0.0, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(0.0, abs=0.01)
+    
+    time.sleep(0.02)
+    # Drag off the right end (x = 10.0) -> should clamp to x=4.0
+    glyph._on_drag_move(QPointF(10.0, -10.0))
+    assert glyph.text.pos().x() == pytest.approx(4.0, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(4.0, abs=0.01)
+    
+    time.sleep(0.02)
+    # Drag vertically far away (x = 2.0, y = 1000.0) -> should track horizontal and ignore vertical
+    glyph._on_drag_move(QPointF(2.0, 1000.0))
+    assert glyph.text.pos().x() == pytest.approx(2.0, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(2.0, abs=0.01)
+
