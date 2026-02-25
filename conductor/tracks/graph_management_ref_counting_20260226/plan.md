@@ -42,4 +42,4 @@ Connect the reference manager to the rest of the application (Code Viewer, Probe
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Global Unprobing Integration' (Protocol in workflow.md) 2afb65e
 
 ## Phase: Review Fixes
-- [~] Task: Apply review suggestions
+- [x] Task: Apply review suggestions 1b53791
