@@ -1,6 +1,6 @@
 # Implementation Plan: Graph Window Management and Trace Reference Counting
 
-## Phase 1: Window ID and Reference Counting Core
+## Phase 1: Window ID and Reference Counting Core [checkpoint: 7fb5599]
 Establish the underlying data structures to track windows and their trace dependencies.
 
 - [x] Task: Implement `WindowIDManager` to provide globally unique `w0, w1, ...` IDs. 0041d11
