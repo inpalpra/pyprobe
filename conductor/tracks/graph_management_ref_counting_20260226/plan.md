@@ -40,3 +40,6 @@ Connect the reference manager to the rest of the application (Code Viewer, Probe
 - [x] Task: Ensure the `ProbeEngine` stops collecting data for traces with zero references. 2afb65e
 - [x] Task: Write Tests: E2E test verifying that dragging a variable to a plot, then removing it, correctly cleans up the code viewer highlights. 2afb65e
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Global Unprobing Integration' (Protocol in workflow.md) 2afb65e
+
+## Phase: Review Fixes
+- [~] Task: Apply review suggestions

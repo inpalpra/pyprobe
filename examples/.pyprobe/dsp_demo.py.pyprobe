@@ -7,19 +7,6 @@
       "symbol": "signal_q",
       "func": "main",
       "is_assignment": true,
-      "color": "#eed52b",
-      "lens": null,
-      "markers": {
-        "Waveform": []
-      }
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
-      "col": 26,
-      "symbol": "signal_i",
-      "func": "main",
-      "is_assignment": true,
       "color": "#9d2bee",
       "lens": null,
       "markers": {
@@ -41,30 +28,5 @@
     }
   ],
   "watches": [],
-  "overlays": [
-    {
-      "target": {
-        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-        "line": 72,
-        "col": 26,
-        "symbol": "signal_i",
-        "func": "main",
-        "is_assignment": true,
-        "color": null,
-        "lens": null,
-        "markers": {}
-      },
-      "overlay": {
-        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-        "line": 72,
-        "col": 36,
-        "symbol": "signal_q",
-        "func": "main",
-        "is_assignment": true,
-        "color": null,
-        "lens": null,
-        "markers": {}
-      }
-    }
-  ]
+  "overlays": []
 }
