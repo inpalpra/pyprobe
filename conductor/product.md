@@ -17,5 +17,6 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 ## Core Features
 - Built-in support for waveforms (real/imag/mag/phase).
 - Constellation diagrams and scalar histories.
+- **Persistent Marker System:** Markers survive view/lens switches and application restarts.
 - Highly customizable themes (Cyberpunk, Monokai, Ocean).
 - Real-time performance.
