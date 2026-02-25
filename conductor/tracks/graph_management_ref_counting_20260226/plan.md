@@ -6,7 +6,7 @@ Establish the underlying data structures to track windows and their trace depend
 - [x] Task: Implement `WindowIDManager` to provide globally unique `w0, w1, ...` IDs. 0041d11
 - [x] Task: Implement `TraceReferenceManager` to track which windows are using which `tr<n>` or `eq<n>` IDs. 2198fba
 - [x] Task: Write Tests: Verify that `TraceReferenceManager` correctly increments/decrements counts and triggers a "cleanup" signal when a count hits zero. 2198fba
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Window ID and Reference Counting Core' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Window ID and Reference Counting Core' (Protocol in workflow.md) a79198d
 
 ## Phase 2: Graph Window Lifecycle (Creation & Destruction)
 Integrate the new window management into the UI and implement the "Close" functionality.
