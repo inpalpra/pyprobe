@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: when dragging markers in waveform graph or fft mag/phase lens of waveform, markers stick to the trace smoothly. the same is not true for complex waveforms.**
+- [~] **Track: when dragging markers in waveform graph or fft mag/phase lens of waveform, markers stick to the trace smoothly. the same is not true for complex waveforms.**
 *Link: [./tracks/complex_marker_snap_20260225/](./tracks/complex_marker_snap_20260225/)*
