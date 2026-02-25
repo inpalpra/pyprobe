@@ -8,17 +8,35 @@
       "func": "main",
       "is_assignment": true,
       "color": "#2bee64",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
-      "col": 36,
-      "symbol": "signal_q",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#eed52b",
-      "lens": null
+      "lens": null,
+      "markers": {
+        "Waveform": [
+          {
+            "id": "m0",
+            "x": 77.0,
+            "y": 0.09562500242446209,
+            "trace_key": 0,
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m0",
+            "shape": "DIAMOND",
+            "color": "#ff5555"
+          }
+        ],
+        "FFT Mag (dB) / Angle (deg)": [
+          {
+            "id": "m4",
+            "x": 633.0,
+            "y": -63.87354568668051,
+            "trace_key": 0,
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m4",
+            "shape": "CIRCLE",
+            "color": "#ff55ff"
+          }
+        ]
+      }
     },
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
@@ -28,7 +46,132 @@
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
-      "lens": null
+      "lens": null,
+      "markers": {
+        "Constellation": [
+          {
+            "id": "m2",
+            "x": -0.3420672088942876,
+            "y": -0.9617293874624518,
+            "trace_key": "history_4",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m2",
+            "shape": "SQUARE",
+            "color": "#5555ff"
+          }
+        ],
+        "FFT Mag (dB) / Angle (deg)": [
+          {
+            "id": "m5",
+            "x": -758.0,
+            "y": -67.95748659142866,
+            "trace_key": "FFT Mag (dB)",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m5",
+            "shape": "STAR",
+            "color": "#ffff00"
+          }
+        ],
+        "Real & Imag": [
+          {
+            "id": "m6",
+            "x": 129.0,
+            "y": 0.35018837044045786,
+            "trace_key": "Real",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m6",
+            "shape": "DIAMOND",
+            "color": "#00ffff"
+          },
+          {
+            "id": "m7",
+            "x": 215.0,
+            "y": 0.29814169082923603,
+            "trace_key": "Real",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m7",
+            "shape": "TRIANGLE_UP",
+            "color": "#00ffff"
+          },
+          {
+            "id": "m8",
+            "x": 80.0,
+            "y": 0.8941413785451486,
+            "trace_key": "Imag",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m8",
+            "shape": "SQUARE",
+            "color": "#ff00ff"
+          }
+        ],
+        "Mag & Phase": [
+          {
+            "id": "m9",
+            "x": 271.0,
+            "y": -1.899447608195919,
+            "trace_key": "Phase",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m9",
+            "shape": "CROSS",
+            "color": "#00ff7f"
+          },
+          {
+            "id": "m10",
+            "x": 222.0,
+            "y": 0.04809721894937381,
+            "trace_key": "Log Mag",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m10",
+            "shape": "CIRCLE",
+            "color": "#ffff00"
+          }
+        ]
+      }
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
+      "col": 36,
+      "symbol": "signal_q",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#eed52b",
+      "lens": null,
+      "markers": {
+        "Waveform": [
+          {
+            "id": "m1",
+            "x": 130.0,
+            "y": 0.40984414965422333,
+            "trace_key": 0,
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m1",
+            "shape": "TRIANGLE_UP",
+            "color": "#55ff55"
+          }
+        ],
+        "FFT Mag (dB) / Angle (deg)": [
+          {
+            "id": "m3",
+            "x": 584.0,
+            "y": -67.33329862015358,
+            "trace_key": 0,
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m3",
+            "shape": "CROSS",
+            "color": "#ffff55"
+          }
+        ]
+      }
     }
   ],
   "watches": [],
