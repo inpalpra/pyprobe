@@ -118,7 +118,59 @@ class ProbeController(QObject):
             if not is_obj_deleted(p) and not getattr(p, 'is_closing', False):
                 return True
         return False
-    
+
+    def handle_panel_closing(self, panel) -> None:
+        """Clean up overlay highlights before a panel is closed.
+
+        Called by ProbePanelContainer.panel_closing signal, before
+        the panel is marked as is_closing.
+        """
+        if is_obj_deleted(panel):
+            return
+        overlay_anchors = getattr(panel, '_overlay_anchors', None)
+        if not overlay_anchors:
+            return
+
+        logger.debug(f"Cleaning up {len(overlay_anchors)} overlay(s) for closing panel")
+
+        for overlay_anchor in list(overlay_anchors):
+            # Check if any OTHER panel still uses this overlay
+            anchor_still_used = False
+            for panel_list in self._probe_panels.values():
+                for p in panel_list:
+                    if p is panel or is_obj_deleted(p) or getattr(p, 'is_closing', False):
+                        continue
+                    if hasattr(p, '_overlay_anchors') and overlay_anchor in p._overlay_anchors:
+                        anchor_still_used = True
+                        break
+                if anchor_still_used:
+                    break
+
+            if not anchor_still_used:
+                # Decrement highlight ref count
+                self._code_viewer.remove_probe(overlay_anchor)
+
+                # Full cleanup for overlay-only probes
+                has_panels = self.has_active_panels(overlay_anchor)
+                in_watch = self._is_in_watch(overlay_anchor)
+                if not has_panels and not in_watch:
+                    meta = self._probe_metadata.get(overlay_anchor)
+                    is_overlay_only = meta and meta.get('overlay_target')
+                    if is_overlay_only:
+                        self._registry.remove_probe(overlay_anchor)
+                        line_still_probed = any(
+                            a.line == overlay_anchor.line and a != overlay_anchor
+                            for a in self._registry.active_anchors
+                        )
+                        if not line_still_probed:
+                            self._gutter.clear_probed_line(overlay_anchor.line)
+                        if overlay_anchor in self._probe_metadata:
+                            del self._probe_metadata[overlay_anchor]
+                        ipc = self._get_ipc()
+                        if ipc and self._get_is_running():
+                            msg = make_remove_probe_cmd(overlay_anchor)
+                            ipc.send_command(msg)
+
     def add_probe(self, anchor: ProbeAnchor, lens_name: Optional[str] = None) -> Optional[QWidget]:
         """
         Add a probe for the given anchor.

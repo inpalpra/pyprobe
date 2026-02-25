@@ -3,22 +3,24 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/loop_counter.py",
       "line": 3,
-      "col": 12,
-      "symbol": "i",
-      "func": "main",
-      "is_assignment": false,
-      "color": "#ee2b2b",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/loop_counter.py",
-      "line": 3,
       "col": 8,
       "symbol": "j",
       "func": "main",
       "is_assignment": true,
       "color": "#2bee64",
-      "lens": null
+      "lens": null,
+      "markers": {}
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/loop_counter.py",
+      "line": 3,
+      "col": 12,
+      "symbol": "i",
+      "func": "main",
+      "is_assignment": false,
+      "color": "#ee2b2b",
+      "lens": null,
+      "markers": {}
     }
   ],
   "watches": [],

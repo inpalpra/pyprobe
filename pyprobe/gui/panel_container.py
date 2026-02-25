@@ -6,7 +6,7 @@ from typing import Dict, Optional, List
 from PyQt6.QtWidgets import (
     QWidget, QScrollArea, QGridLayout, QLabel
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from pyprobe.logging import get_logger
@@ -24,6 +24,9 @@ class ProbePanelContainer(QScrollArea):
 
     Uses a grid layout to arrange panels.
     """
+
+    # Emitted before a panel is removed, so controllers can clean up overlays etc.
+    panel_closing = pyqtSignal(object)  # ProbePanel
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -210,6 +213,9 @@ class ProbePanelContainer(QScrollArea):
         if target_panel is None:
             logger.debug(f"  No panel found to remove")
             return
+
+        # Notify controllers before marking as closing (so they can clean up overlays etc.)
+        self.panel_closing.emit(target_panel)
 
         # Mark as closing to prevent redundant removal calls from signals
         if hasattr(target_panel, "is_closing"):

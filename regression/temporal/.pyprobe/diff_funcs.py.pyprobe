@@ -8,7 +8,8 @@
       "func": "bar",
       "is_assignment": true,
       "color": "#2bee64",
-      "lens": null
+      "lens": null,
+      "markers": {}
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/diff_funcs.py",
@@ -18,7 +19,8 @@
       "func": "foo",
       "is_assignment": true,
       "color": "#ee2b2b",
-      "lens": null
+      "lens": null,
+      "markers": {}
     }
   ],
   "watches": [],

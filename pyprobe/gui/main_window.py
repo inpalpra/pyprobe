@@ -433,6 +433,7 @@ class MainWindow(QMainWindow):
 
         # Probe panel container (right panel)
         self._probe_container = ProbePanelContainer()
+        self._probe_container.panel_closing.connect(self._on_panel_closing)
         splitter.addWidget(self._probe_container)
 
         # Scalar watch sidebar (collapsed until needed)
@@ -1650,6 +1651,10 @@ class MainWindow(QMainWindow):
     def _on_overlay_remove_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
         """Handle overlay removal request - delegate to ProbeController."""
         self._probe_controller.remove_overlay(target_panel, overlay_anchor)
+
+    def _on_panel_closing(self, panel) -> None:
+        """Clean up overlay highlights before a panel is removed."""
+        self._probe_controller.handle_panel_closing(panel)
 
     @pyqtSlot(str)
     def _on_unprobe_requested(self, trace_id: str) -> None:

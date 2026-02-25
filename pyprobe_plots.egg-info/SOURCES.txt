@@ -15,11 +15,16 @@ pyprobe/core/anchor_matcher.py
 pyprobe/core/capture_manager.py
 pyprobe/core/capture_record.py
 pyprobe/core/data_classifier.py
+pyprobe/core/equation_engine.py
+pyprobe/core/equation_manager.py
 pyprobe/core/probe_persistence.py
 pyprobe/core/runner.py
 pyprobe/core/sequence.py
 pyprobe/core/settings.py
+pyprobe/core/trace_id_manager.py
+pyprobe/core/trace_reference_manager.py
 pyprobe/core/tracer.py
+pyprobe/core/window_id_manager.py
 pyprobe/gui/__init__.py
 pyprobe/gui/animations.py
 pyprobe/gui/app.py
@@ -35,6 +40,7 @@ pyprobe/gui/debug_overlay.py
 pyprobe/gui/dock_bar.py
 pyprobe/gui/drag_helpers.py
 pyprobe/gui/edge_strip.py
+pyprobe/gui/equation_editor.py
 pyprobe/gui/file_tree.py
 pyprobe/gui/file_watcher.py
 pyprobe/gui/focus_manager.py

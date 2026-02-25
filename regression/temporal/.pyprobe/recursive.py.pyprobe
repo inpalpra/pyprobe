@@ -8,7 +8,8 @@
       "func": "countdown",
       "is_assignment": true,
       "color": "#ee2b2b",
-      "lens": null
+      "lens": null,
+      "markers": {}
     }
   ],
   "watches": [],

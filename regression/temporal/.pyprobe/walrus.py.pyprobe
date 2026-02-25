@@ -8,7 +8,8 @@
       "func": "main",
       "is_assignment": false,
       "color": "#ee2b2b",
-      "lens": null
+      "lens": null,
+      "markers": {}
     }
   ],
   "watches": [],
