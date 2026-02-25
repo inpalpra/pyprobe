@@ -19,10 +19,10 @@ Ensure the fix works correctly for all complex-data lenses, including those with
 - [x] Task: Write Tests: Add test cases for `SingleCurveWidget` (used for Log Mag, Linear Mag, Phase (rad/deg)) to verify marker snapping. [0c482dc]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Verification Across Complex Lenses' (Protocol in workflow.md) [0c482dc]
 
-## Phase 3: Final Verification and Cleanup
+## Phase 3: Final Verification and Cleanup [checkpoint: c48c475]
 Perform final checks and ensure no regressions.
 
-- [x] Task: Write Tests: Verify that Constellation markers are still NOT constrained to a trace (as they are scatter points).
-- [x] Task: Write Tests: Verify that real-valued Waveform markers still work correctly.
-- [x] Task: Commit and finalize the track.
-- [x] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md)
+- [x] Task: Write Tests: Verify that Constellation markers are still NOT constrained to a trace (as they are scatter points). [c48c475]
+- [x] Task: Write Tests: Verify that real-valued Waveform markers still work correctly. [c48c475]
+- [x] Task: Commit and finalize the track. [c48c475]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md) [c48c475]
