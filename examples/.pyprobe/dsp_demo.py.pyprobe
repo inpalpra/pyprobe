@@ -22,16 +22,6 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 69,
-      "col": 8,
-      "symbol": "snr_db",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#2bcdee",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
       "col": 36,
       "symbol": "signal_q",
@@ -39,27 +29,8 @@
       "is_assignment": true,
       "color": "#eed52b",
       "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 79,
-      "col": 8,
-      "symbol": "power_db",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#9d2bee",
-      "lens": null
     }
   ],
-  "watches": [
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 79,
-      "col": 8,
-      "symbol": "power_db",
-      "func": "main",
-      "is_assignment": true
-    }
-  ],
+  "watches": [],
   "overlays": []
 }
