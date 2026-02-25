@@ -8,7 +8,10 @@
       "func": "main",
       "is_assignment": true,
       "color": "#ee2b2b",
-      "lens": null
+      "lens": null,
+      "markers": {
+        "Waveform": []
+      }
     }
   ],
   "watches": [],
@@ -22,7 +25,8 @@
         "func": "main",
         "is_assignment": true,
         "color": null,
-        "lens": null
+        "lens": null,
+        "markers": {}
       },
       "overlay": {
         "file": "/Users/ppal/repos/pyprobe/regression/dsp_demo_two_frames.py",
@@ -32,7 +36,8 @@
         "func": "main",
         "is_assignment": false,
         "color": null,
-        "lens": null
+        "lens": null,
+        "markers": {}
       }
     }
   ]

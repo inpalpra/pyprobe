@@ -164,6 +164,7 @@ class MainWindow(QMainWindow):
             gutter=self._code_gutter,
             get_ipc=lambda: self._script_runner.ipc,
             get_is_running=lambda: self._script_runner.is_running,
+            is_in_watch=lambda a: self._scalar_watch_sidebar.has_scalar(a),
             parent=self
         )
         self._setup_probe_controller()
@@ -183,6 +184,16 @@ class MainWindow(QMainWindow):
     def _probe_metadata(self) -> Dict[ProbeAnchor, dict]:
         """Delegate to ProbeController's probe_metadata."""
         return self._probe_controller.probe_metadata
+
+    def _anchor_in_use_anywhere(self, anchor: ProbeAnchor) -> bool:
+        """Check if anchor is still in use in any panel, overlay, or watch sidebar."""
+        if self._probe_controller.has_active_panels(anchor):
+            return True
+        if self._probe_controller.is_used_as_overlay(anchor):
+            return True
+        if self._scalar_watch_sidebar.has_scalar(anchor):
+            return True
+        return False
 
     def _process_cli_probes(self):
         """Process CLI probe and watch arguments."""
@@ -682,6 +693,16 @@ class MainWindow(QMainWindow):
                 'dtype': record.dtype,
                 'shape': record.shape,
             })
+
+            # Populate trace data for equations
+            trace_id = self._probe_registry.get_trace_id(anchor)
+            if trace_id:
+                self._latest_trace_data[trace_id] = record.value
+
+        # Evaluate equations if any exist
+        if self._equation_manager.equations:
+            self._equation_manager.evaluate_all(self._latest_trace_data)
+            self._update_equation_plots()
 
         self._maybe_redraw()
 
@@ -1252,17 +1273,36 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_watch_scalar_removed(self, anchor: ProbeAnchor):
         """Handle removal of scalar from watch sidebar."""
-        # Clear from code viewer highlight
+        # Always decrement highlight ref count for the watch's contribution
         self._code_viewer.remove_probe(anchor)
-        # Release from registry
-        self._probe_registry.remove_probe(anchor)
-        
-        # Send remove probe command to subprocess if running
-        ipc = self._script_runner.ipc
-        if ipc and self._script_runner.is_running:
-            msg = make_remove_probe_cmd(anchor)
-            ipc.send_command(msg)
-        
+
+        # Only do global cleanup if not still used by panels or overlays
+        still_has_panels = self._probe_controller.has_active_panels(anchor)
+        still_as_overlay = self._probe_controller.is_used_as_overlay(anchor)
+
+        if still_has_panels or still_as_overlay:
+            logger.debug(
+                f"Watch removed for {anchor.symbol} but still in use "
+                f"(panels={still_has_panels}, overlay={still_as_overlay}), "
+                f"skipping global cleanup"
+            )
+        else:
+            # Only clear gutter if no other active probes on same line
+            line_still_probed = any(
+                a.line == anchor.line and a != anchor
+                for a in self._probe_registry.active_anchors
+            )
+            if not line_still_probed:
+                self._code_gutter.clear_probed_line(anchor.line)
+            # Release from registry
+            self._probe_registry.remove_probe(anchor)
+
+            # Send remove probe command to subprocess if running
+            ipc = self._script_runner.ipc
+            if ipc and self._script_runner.is_running:
+                msg = make_remove_probe_cmd(anchor)
+                ipc.send_command(msg)
+
         logger.debug(f"Removed {anchor.symbol} from scalar watch sidebar")
 
     @pyqtSlot(object)
@@ -1631,21 +1671,40 @@ class MainWindow(QMainWindow):
                 print(f"DEBUG:   Active panels: {len(active_panels)}", file=sys.stderr)
                 
                 if not active_panels:
-                    print(f"DEBUG:   Performing global cleanup for {anchor.symbol}", file=sys.stderr)
-                    # Global cleanup (copy from controller.complete_probe_removal logic)
-                    self._probe_registry.remove_probe(anchor)
+                    # Always decrement highlight ref count for the panel's contribution
                     self._code_viewer.remove_probe(anchor)
-                    self._code_gutter.clear_probed_line(anchor.line)
-                    
-                    # Remove from metadata if present
-                    if anchor in self._probe_controller._probe_metadata:
-                        del self._probe_controller._probe_metadata[anchor]
-                    
-                    # Send to runner
-                    ipc = self._script_runner.ipc
-                    if ipc and self._script_runner.is_running:
-                        msg = make_remove_probe_cmd(anchor)
-                        ipc.send_command(msg)
+
+                    # Check if anchor is still used as overlay or in watch sidebar
+                    still_in_watch = self._scalar_watch_sidebar.has_scalar(anchor)
+                    still_as_overlay = self._probe_controller.is_used_as_overlay(anchor)
+
+                    if still_in_watch or still_as_overlay:
+                        logger.debug(
+                            f"Trace {trace_id} has no panels but still in use "
+                            f"(watch={still_in_watch}, overlay={still_as_overlay}), "
+                            f"skipping global cleanup"
+                        )
+                    else:
+                        print(f"DEBUG:   Performing global cleanup for {anchor.symbol}", file=sys.stderr)
+                        # Global cleanup (copy from controller.complete_probe_removal logic)
+                        self._probe_registry.remove_probe(anchor)
+                        # Only clear gutter if no other active probes on same line
+                        line_still_probed = any(
+                            a.line == anchor.line and a != anchor
+                            for a in self._probe_registry.active_anchors
+                        )
+                        if not line_still_probed:
+                            self._code_gutter.clear_probed_line(anchor.line)
+
+                        # Remove from metadata if present
+                        if anchor in self._probe_controller._probe_metadata:
+                            del self._probe_controller._probe_metadata[anchor]
+
+                        # Send to runner
+                        ipc = self._script_runner.ipc
+                        if ipc and self._script_runner.is_running:
+                            msg = make_remove_probe_cmd(anchor)
+                            ipc.send_command(msg)
                     
                     self._status_bar.showMessage(f"Probe removed globally: {anchor.symbol}", 3000)
                 else:

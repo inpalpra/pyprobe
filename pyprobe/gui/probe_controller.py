@@ -50,18 +50,19 @@ class ProbeController(QObject):
     overlay_remove_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
     
     def __init__(
-        self, 
+        self,
         registry,
         container,
         code_viewer,
         gutter,
         get_ipc: Callable,
         get_is_running: Callable,
+        is_in_watch: Optional[Callable] = None,
         parent: Optional[QObject] = None
     ):
         """
         Initialize ProbeController.
-        
+
         Args:
             registry: ProbeRegistry for probe state management
             container: ProbePanelContainer for creating panels
@@ -69,6 +70,7 @@ class ProbeController(QObject):
             gutter: CodeGutter for gutter markers
             get_ipc: Callable returning current IPC channel (or None)
             get_is_running: Callable returning whether script is running
+            is_in_watch: Callable(anchor) -> bool, checks watch sidebar
             parent: Parent QObject
         """
         super().__init__(parent)
@@ -78,6 +80,7 @@ class ProbeController(QObject):
         self._gutter = gutter
         self._get_ipc = get_ipc
         self._get_is_running = get_is_running
+        self._is_in_watch = is_in_watch or (lambda a: False)
         
         # Probe panels by anchor - supports multiple panels per anchor via Ctrl+click
         self._probe_panels: Dict[ProbeAnchor, List[QWidget]] = {}
@@ -98,6 +101,23 @@ class ProbeController(QObject):
     def probe_metadata(self) -> Dict[ProbeAnchor, dict]:
         """Access to probe metadata dict."""
         return self._probe_metadata
+
+    def is_used_as_overlay(self, anchor: ProbeAnchor) -> bool:
+        """Check if anchor is currently used as an overlay on any active panel."""
+        for panel_list in self._probe_panels.values():
+            for panel in panel_list:
+                if is_obj_deleted(panel) or getattr(panel, 'is_closing', False):
+                    continue
+                if hasattr(panel, '_overlay_anchors') and anchor in panel._overlay_anchors:
+                    return True
+        return False
+
+    def has_active_panels(self, anchor: ProbeAnchor) -> bool:
+        """Check if anchor has any non-deleted, non-closing panels."""
+        for p in self._probe_panels.get(anchor, []):
+            if not is_obj_deleted(p) and not getattr(p, 'is_closing', False):
+                return True
+        return False
     
     def add_probe(self, anchor: ProbeAnchor, lens_name: Optional[str] = None) -> Optional[QWidget]:
         """
@@ -129,6 +149,15 @@ class ProbeController(QObject):
             }
         elif lens_name:
             self._probe_metadata[anchor]['lens'] = lens_name
+
+        # Clean stale (deleted/closing) panels before checking
+        if anchor in self._probe_panels:
+            self._probe_panels[anchor] = [
+                p for p in self._probe_panels[anchor]
+                if not is_obj_deleted(p) and not getattr(p, 'is_closing', False)
+            ]
+            if not self._probe_panels[anchor]:
+                del self._probe_panels[anchor]
 
         # Check if this is the first panel for this anchor
         is_first_panel = anchor not in self._probe_panels or not self._probe_panels[anchor]
@@ -283,6 +312,12 @@ class ProbeController(QObject):
             # Use the existing anchor identity for overlay registration
             logger.debug(f"Using existing anchor for {overlay_anchor.symbol}")
             overlay_anchor = existing_anchor
+            # Increment highlight ref count if this is the first overlay usage,
+            # so removing the standalone panel won't drop the highlight
+            if not self.is_used_as_overlay(overlay_anchor):
+                color = self._registry.get_color(overlay_anchor)
+                if color:
+                    self._code_viewer.set_probe_active(overlay_anchor, color)
         else:
             # Add to registry without creating a separate panel
             color = self._registry.add_probe(overlay_anchor)
@@ -367,22 +402,35 @@ class ProbeController(QObject):
             if anchor_still_used:
                 break
 
-        # If not used anywhere else and not a standalone probe, remove from registry
-        if not anchor_still_used and overlay_anchor not in self._probe_panels:
-            meta = self._probe_metadata.get(overlay_anchor)
-            if meta and meta.get('overlay_target'):
-                # This was an overlay-only anchor, clean up
-                self._registry.remove_probe(overlay_anchor)
-                self._code_viewer.remove_probe(overlay_anchor)
-                self._gutter.clear_probed_line(overlay_anchor.line)
-                if overlay_anchor in self._probe_metadata:
-                    del self._probe_metadata[overlay_anchor]
-                
-                # Tell runner to stop tracking this probe
-                ipc = self._get_ipc()
-                if ipc and self._get_is_running():
-                    msg = make_remove_probe_cmd(overlay_anchor)
-                    ipc.send_command(msg)
+        if not anchor_still_used:
+            # Decrement the overlay ref count that was added by handle_overlay_requested
+            self._code_viewer.remove_probe(overlay_anchor)
+
+            has_panels = self.has_active_panels(overlay_anchor)
+            in_watch = self._is_in_watch(overlay_anchor)
+
+            # Only do full cleanup if not used anywhere else
+            if not has_panels and not in_watch:
+                meta = self._probe_metadata.get(overlay_anchor)
+                is_overlay_only = meta and meta.get('overlay_target')
+
+                if is_overlay_only:
+                    self._registry.remove_probe(overlay_anchor)
+                    # Only clear gutter if no other active probes on same line
+                    line_still_probed = any(
+                        a.line == overlay_anchor.line and a != overlay_anchor
+                        for a in self._registry.active_anchors
+                    )
+                    if not line_still_probed:
+                        self._gutter.clear_probed_line(overlay_anchor.line)
+                    if overlay_anchor in self._probe_metadata:
+                        del self._probe_metadata[overlay_anchor]
+
+                    # Tell runner to stop tracking this probe
+                    ipc = self._get_ipc()
+                    if ipc and self._get_is_running():
+                        msg = make_remove_probe_cmd(overlay_anchor)
+                        ipc.send_command(msg)
         
         self.status_message.emit(f"Overlay removed: {overlay_anchor.symbol}")
     

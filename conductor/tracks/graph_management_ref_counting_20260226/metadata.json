@@ -1,8 +1,0 @@
-{
-  "track_id": "graph_management_ref_counting_20260226",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-02-26T14:30:00Z",
-  "updated_at": "2026-02-26T14:30:00Z",
-  "description": "equation editor does not plot anything, even if i re-run. clicking plot button in equation editor window multiple times creates multiple graph windows but all empty. Once created, these multiple graph windows can't be removed - that's not good either. There must be a way remove a graph created from an equation in eqn editor. A related bug is - if i drag and drop a variable from code viewer pane to an existing graph window, i don't think there is a way to remove that variable from being probed. Need a way to unprobe a variable from any window. I think we need to think about how to best manage graoh windows, traces within each graph window and reference counting how many graphs refer to a particular trace. when a trace is not referred to in any graph, the corresponding variable in code viewer is no longer higlighted and eye in the gutter is removed, provided there are no more vars being probed in the same line of code of course. in the first phase, lets define these terms clearly and permanently. need a good nomenclature. i think graph windows should be w0, w1, w2, ... etc. globally unique. Define the rest of the things, and relationships."
-}

@@ -3,8 +3,8 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
-      "col": 36,
-      "symbol": "signal_q",
+      "col": 26,
+      "symbol": "signal_i",
       "func": "main",
       "is_assignment": true,
       "color": "#9d2bee",
@@ -24,6 +24,19 @@
       "lens": null,
       "markers": {
         "Constellation": []
+      }
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
+      "col": 36,
+      "symbol": "signal_q",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
+      "lens": null,
+      "markers": {
+        "Waveform": []
       }
     }
   ],
