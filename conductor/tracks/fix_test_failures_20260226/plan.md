@@ -7,10 +7,10 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: IPC Collection Fix' (Protocol in workflow.md) [9de2c7c]
 
 ## Phase 2: Scalar Watch Tests Update
-- [x] Task: Update `add_scalar` calls in `tests/gui/test_scalar_watch_gui.py`.
+- [x] Task: Update `add_scalar` calls in `tests/gui/test_scalar_watch_gui.py` [dee819a].
     - [x] Inject `trace_id` (tr0, tr1, etc.) into all calls.
     - [x] Verify tests pass: `uv run pytest tests/gui/test_scalar_watch_gui.py`.
-- [x] Task: Update `add_scalar` calls in `tests/gui/test_folder_browsing.py`.
+- [x] Task: Update `add_scalar` calls in `tests/gui/test_folder_browsing.py` [dee819a].
     - [x] Inject `trace_id` into all calls.
     - [x] Verify tests pass: `uv run pytest tests/gui/test_folder_browsing.py`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Scalar Watch Tests Update' (Protocol in workflow.md)
