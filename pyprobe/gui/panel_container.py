@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 from ..core.anchor import ProbeAnchor
 from ..core.window_id_manager import WindowIDManager
+from ..core.trace_reference_manager import TraceReferenceManager
 from .probe_panel import ProbePanel
 
 
@@ -121,6 +122,11 @@ class ProbePanelContainer(QScrollArea):
 
         # Create panel
         panel = ProbePanel(anchor, color, dtype, trace_id, window_id, self._content)
+        
+        # Track reference
+        if trace_id:
+            TraceReferenceManager.instance().add_reference(trace_id, window_id)
+
         if anchor not in self._panels:
             self._panels[anchor] = []
         self._panels[anchor].append(panel)
@@ -131,6 +137,7 @@ class ProbePanelContainer(QScrollArea):
 
         # M2.5: Connect maximize/park signals and register with focus manager
         panel.maximize_requested.connect(lambda p=panel: self._layout_manager.toggle_maximize(p))
+        panel.close_requested.connect(lambda p=panel: self.remove_panel(panel=p))
         self._focus_manager.register_panel(panel)
 
         # Add to grid via relayout to handle spanning logic
@@ -212,7 +219,9 @@ class ProbePanelContainer(QScrollArea):
 
         # Release window ID
         if hasattr(target_panel, "window_id"):
-            self._wid_manager.release(target_panel.window_id)
+            wid = target_panel.window_id
+            self._wid_manager.release(wid)
+            TraceReferenceManager.instance().cleanup_window(wid)
 
         self._layout.removeWidget(target_panel)
         target_panel.deleteLater()

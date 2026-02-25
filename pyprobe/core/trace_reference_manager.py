@@ -6,6 +6,13 @@ class TraceReferenceManager(QObject):
     Emits a signal when a trace is no longer referenced in any window.
     """
     unprobe_signal = pyqtSignal(str)  # Emits trace_id
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None:
+            cls._instance = TraceReferenceManager()
+        return cls._instance
 
     def __init__(self):
         super().__init__()
