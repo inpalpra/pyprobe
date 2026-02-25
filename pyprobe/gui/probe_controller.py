@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 
 from ..core.anchor import ProbeAnchor
 from ..ipc.messages import make_add_probe_cmd, make_remove_probe_cmd
+from .probe_panel import ProbePanel, RemovableLegendItem
 
 
 class ProbeController(QObject):
@@ -345,9 +346,9 @@ class ProbeController(QObject):
             from pyprobe.plugins.builtins.constellation import ConstellationWidget
             
             if isinstance(plot, WaveformWidget):
-                self._remove_overlay_from_waveform(plot, overlay_key)
+                self._remove_overlay_from_waveform(plot, overlay_anchor)
             elif isinstance(plot, ConstellationWidget):
-                self._remove_overlay_from_constellation(plot, overlay_key)
+                self._remove_overlay_from_constellation(plot, overlay_anchor)
         
         # Check if this overlay anchor is used by any other panels
         anchor_still_used = False
@@ -378,36 +379,52 @@ class ProbeController(QObject):
         
         self.status_message.emit(f"Overlay removed: {overlay_anchor.symbol}")
     
-    def _remove_overlay_from_waveform(self, plot, symbol_key: str):
+    def _remove_overlay_from_waveform(self, plot, anchor: ProbeAnchor):
         """Remove overlay curves from a waveform plot."""
-        if not hasattr(plot, '_overlay_curves'):
+        if not hasattr(plot, "_overlay_curves_by_anchor"):
             return
-        
-        # Find all curve keys that start with this symbol key
-        keys_to_remove = [k for k in plot._overlay_curves.keys() 
-                         if k == symbol_key or k.startswith(f"{symbol_key}_")]
-        
-        for key in keys_to_remove:
-            curve = plot._overlay_curves.pop(key)
-            # Remove from plot widget
-            plot._plot_widget.removeItem(curve)
-            # Remove from legend if present
-            if hasattr(plot, '_legend') and plot._legend is not None:
-                try:
-                    plot._legend.removeItem(curve)
-                except Exception:
-                    pass  # Legend item may not exist
-            logger.debug(f"Removed overlay curve: {key}")
+
+        if anchor in plot._overlay_curves_by_anchor:
+            curves = plot._overlay_curves_by_anchor.pop(anchor)
+            for curve in curves:
+                # Remove from plot widget
+                plot._plot_widget.removeItem(curve)
+                # Remove from legend if present
+                if hasattr(plot, "_legend") and plot._legend is not None:
+                    try:
+                        plot._legend.removeItem(curve)
+                    except Exception:
+                        pass
+                
+                # Also remove from _overlay_curves dict (requires finding the key)
+                keys_to_remove = [k for k, v in getattr(plot, "_overlay_curves", {}).items() if v is curve]
+                for k in keys_to_remove:
+                    del plot._overlay_curves[k]
+                    
+            logger.debug(f"Removed overlay curves for: {anchor.symbol}")
     
-    def _remove_overlay_from_constellation(self, plot, symbol_key: str):
+    def _remove_overlay_from_constellation(self, plot, anchor: ProbeAnchor):
         """Remove overlay scatter from a constellation plot."""
-        if not hasattr(plot, '_overlay_scatters'):
+        if not hasattr(plot, "_overlay_scatters_by_anchor"):
             return
-        
-        if symbol_key in plot._overlay_scatters:
-            scatter = plot._overlay_scatters.pop(symbol_key)
-            plot._plot_widget.removeItem(scatter)
-            logger.debug(f"Removed overlay scatter: {symbol_key}")
+
+        if anchor in plot._overlay_scatters_by_anchor:
+            scatters = plot._overlay_scatters_by_anchor.pop(anchor)
+            for scatter in scatters:
+                plot._plot_widget.removeItem(scatter)
+                # Remove from legend if present
+                if hasattr(plot, "_legend") and plot._legend is not None:
+                    try:
+                        plot._legend.removeItem(scatter)
+                    except Exception:
+                        pass
+                
+                # Also remove from _overlay_scatters dict
+                keys_to_remove = [k for k, v in getattr(plot, "_overlay_scatters", {}).items() if v is scatter]
+                for k in keys_to_remove:
+                    del plot._overlay_scatters[k]
+                    
+            logger.debug(f"Removed overlay scatters for: {anchor.symbol}")
     
     def forward_overlay_data(self, anchor: ProbeAnchor, payload: dict):
         """
@@ -468,7 +485,8 @@ class ProbeController(QObject):
                         payload['value'],
                         payload['dtype'],
                         payload.get('shape'),
-                        primary_anchor=panel._anchor
+                        primary_anchor=panel._anchor,
+                        target_panel=panel
                     )
                 elif isinstance(plot, ConstellationWidget):
                     self._add_overlay_to_constellation(
@@ -477,7 +495,8 @@ class ProbeController(QObject):
                         payload['value'],
                         payload['dtype'],
                         payload.get('shape'),
-                        primary_anchor=panel._anchor
+                        primary_anchor=panel._anchor,
+                        target_panel=panel
                     )
     
     def flush_pending_overlays(self):
@@ -529,7 +548,8 @@ class ProbeController(QObject):
                             pending['value'],
                             pending['dtype'],
                             pending['shape'],
-                            primary_anchor=panel._anchor
+                            primary_anchor=panel._anchor,
+                            target_panel=panel
                         )
                     elif isinstance(plot, ConstellationWidget):
                         self._add_overlay_to_constellation(
@@ -538,7 +558,8 @@ class ProbeController(QObject):
                             pending['value'],
                             pending['dtype'],
                             pending['shape'],
-                            primary_anchor=panel._anchor
+                            primary_anchor=panel._anchor,
+                            target_panel=panel
                         )
                     logger.debug(f"Flushed pending overlay: {pending['overlay_key']}")
                 
@@ -548,16 +569,16 @@ class ProbeController(QObject):
         for pid in flushed_ids:
             del self._pending_overlays[pid]
     
-    def _add_overlay_to_waveform(
-        self, 
-        plot, 
-        anchor: ProbeAnchor,
-        value, 
-        dtype: str, 
-        shape,
-        primary_anchor: Optional[ProbeAnchor] = None
-    ) -> None:
-        """Add an overlay trace to a waveform plot."""
+        def _add_overlay_to_waveform(
+            self,
+            plot,
+            anchor: ProbeAnchor,
+            value,
+            dtype: str,
+            shape,
+            primary_anchor: Optional[ProbeAnchor] = None,
+            target_panel: Optional[ProbePanel] = None
+        ) -> None:        """Add an overlay trace to a waveform plot."""
         import numpy as np
         import pyqtgraph as pg
         from PyQt6.QtCore import Qt
@@ -590,18 +611,45 @@ class ProbeController(QObject):
         trace_id = self._registry.get_trace_id(anchor) or ""
         symbol = anchor.symbol
         
+        def on_legend_remove(item):
+            # item might be a pg.PlotCurveItem or a pg.LegendItem.ItemSample
+            actual_item = item
+            if hasattr(item, "item"):
+                actual_item = item.item
+
+            # Find which anchor this item belongs to
+            # First check primary curves
+            if hasattr(plot, "_curves") and actual_item in plot._curves:
+                if target_panel:
+                    target_panel.close_requested.emit()
+                return
+
+            # Then check overlays
+            for a, curves in getattr(plot, "_overlay_curves_by_anchor", {}).items():
+                if actual_item in curves:
+                    if target_panel:
+                        target_panel.overlay_remove_requested.emit(target_panel, a)
+                    return
+
         def ensure_legend():
             """Create legend on-demand and add primary curve if needed."""
-            if not hasattr(plot, '_legend') or plot._legend is None:
-                plot._legend = plot._plot_widget.addLegend(
+            if not hasattr(plot, "_legend") or plot._legend is None:
+                plot._legend = RemovableLegendItem(
                     offset=(10, 10),
-                    labelTextColor=theme.colors.get('text_primary', '#ffffff'),
-                    brush=pg.mkBrush(theme.colors.get('bg_medium', '#1a1a1a') + '80')
+                    labelTextColor=theme.colors.get("text_primary", "#ffffff"),
+                    brush=pg.mkBrush(theme.colors.get("bg_medium", "#1a1a1a") + "80"),
                 )
+                plot._legend.setParentItem(plot._plot_widget.getPlotItem())
+                plot._legend.trace_removal_requested.connect(on_legend_remove)
+
                 # Add primary curve(s) to legend
-                if hasattr(plot, '_curves') and plot._curves and primary_anchor:
+                if hasattr(plot, "_curves") and plot._curves and primary_anchor:
                     p_id = self._registry.get_trace_id(primary_anchor) or ""
                     plot._legend.addItem(plot._curves[0], f"{p_id}: {plot._var_name}")
+
+        # Track curves by anchor for removal lookup
+        if not hasattr(plot, "_overlay_curves_by_anchor"):
+            plot._overlay_curves_by_anchor = {}
         
         # Check if complex data
         is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
@@ -623,6 +671,12 @@ class ProbeController(QObject):
                 )
                 curve.setZValue(20)
                 plot._overlay_curves[real_key] = curve
+                
+                # Track for removal
+                if anchor not in plot._overlay_curves_by_anchor:
+                    plot._overlay_curves_by_anchor[anchor] = []
+                plot._overlay_curves_by_anchor[anchor].append(curve)
+
                 ensure_legend()
                 plot._legend.addItem(curve, f"{trace_id}: {symbol} (real)")
             
@@ -636,6 +690,12 @@ class ProbeController(QObject):
                 )
                 curve.setZValue(20)
                 plot._overlay_curves[imag_key] = curve
+                
+                # Track for removal
+                if anchor not in plot._overlay_curves_by_anchor:
+                    plot._overlay_curves_by_anchor[anchor] = []
+                plot._overlay_curves_by_anchor[anchor].append(curve)
+
                 ensure_legend()
                 plot._legend.addItem(curve, f"{trace_id}: {symbol} (imag)")
             
@@ -664,6 +724,12 @@ class ProbeController(QObject):
                 )
                 curve.setZValue(20)
                 plot._overlay_curves[symbol_key] = curve
+                
+                # Track for removal
+                if anchor not in plot._overlay_curves_by_anchor:
+                    plot._overlay_curves_by_anchor[anchor] = []
+                plot._overlay_curves_by_anchor[anchor].append(curve)
+
                 ensure_legend()
                 plot._legend.addItem(curve, f"{trace_id}: {symbol}")
             
@@ -682,7 +748,8 @@ class ProbeController(QObject):
         value,
         dtype: str,
         shape,
-        primary_anchor: Optional[ProbeAnchor] = None
+        primary_anchor: Optional[ProbeAnchor] = None,
+        target_panel: Optional[ProbePanel] = None
     ) -> None:
         """Add an overlay scatter to a constellation plot."""
         import numpy as np
@@ -702,47 +769,80 @@ class ProbeController(QObject):
             return
         
         # Get or create overlay scatters dict on the plot
-        if not hasattr(plot, '_overlay_scatters'):
+        if not hasattr(plot, "_overlay_scatters"):
             plot._overlay_scatters = {}
-            
+
+        if not hasattr(plot, "_overlay_scatters_by_anchor"):
+            plot._overlay_scatters_by_anchor = {}
+
         from pyprobe.gui.theme.theme_manager import ThemeManager
+
         theme = ThemeManager.instance().current
         theme_palette = list(theme.row_colors)
-        marker_color = theme.colors.get('accent_marker', theme.plot_colors.get('marker', '#ffbf5f'))
+        marker_color = theme.colors.get(
+            "accent_marker", theme.plot_colors.get("marker", "#ffbf5f")
+        )
         overlay_palette = [marker_color]
-        overlay_palette.extend([c for c in theme_palette if c.lower() != marker_color.lower()])
+        overlay_palette.extend(
+            [c for c in theme_palette if c.lower() != marker_color.lower()]
+        )
         if not overlay_palette:
-            overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
+            overlay_palette = ["#ffbf5f", "#4fc3f7", "#6bd47a"]
 
         trace_id = self._registry.get_trace_id(anchor) or ""
         symbol = anchor.symbol
         symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
+        def on_legend_remove(item):
+            # item might be a pg.ScatterPlotItem or a pg.LegendItem.ItemSample
+            actual_item = item
+            if hasattr(item, "item"):
+                actual_item = item.item
+
+            # Check primary scatters
+            if hasattr(plot, "_scatter_items") and actual_item in plot._scatter_items:
+                if target_panel:
+                    target_panel.close_requested.emit()
+                return
+
+            # Check overlays
+            for a, scatters in getattr(plot, "_overlay_scatters_by_anchor", {}).items():
+                if actual_item in scatters:
+                    if target_panel:
+                        target_panel.overlay_remove_requested.emit(target_panel, a)
+                    return
+
         def ensure_legend():
-            if not hasattr(plot, '_legend') or plot._legend is None:
-                plot._legend = plot._plot_widget.addLegend(
+            if not hasattr(plot, "_legend") or plot._legend is None:
+                plot._legend = RemovableLegendItem(
                     offset=(10, 10),
-                    labelTextColor=theme.colors.get('text_primary', '#ffffff'),
-                    brush=pg.mkBrush(theme.colors.get('bg_medium', '#1a1a1a') + '80')
+                    labelTextColor=theme.colors.get("text_primary", "#ffffff"),
+                    brush=pg.mkBrush(theme.colors.get("bg_medium", "#1a1a1a") + "80"),
                 )
+                plot._legend.setParentItem(plot._plot_widget.getPlotItem())
+                plot._legend.trace_removal_requested.connect(on_legend_remove)
+
                 # Add primary scatter to legend
-                if hasattr(plot, '_scatter_items') and plot._scatter_items and primary_anchor:
+                if hasattr(plot, "_scatter_items") and plot._scatter_items and primary_anchor:
                     p_id = self._registry.get_trace_id(primary_anchor) or ""
-                    plot._legend.addItem(plot._scatter_items[-1], f"{p_id}: {plot._var_name}")
+                    plot._legend.addItem(
+                        plot._scatter_items[-1], f"{p_id}: {plot._var_name}"
+                    )
 
         if symbol_key not in plot._overlay_scatters:
             color_idx = len(plot._overlay_scatters) + 1
             color = overlay_palette[color_idx % len(overlay_palette)]
-            
+
             # Create scatter for overlay
-            scatter = pg.ScatterPlotItem(
-                pen=None,
-                brush=pg.mkBrush(color),
-                size=5
-            )
+            scatter = pg.ScatterPlotItem(pen=None, brush=pg.mkBrush(color), size=5)
             plot._plot_widget.addItem(scatter)
             plot._overlay_scatters[symbol_key] = scatter
-            
+
+            # Track for removal
+            if anchor not in plot._overlay_scatters_by_anchor:
+                plot._overlay_scatters_by_anchor[anchor] = []
+            plot._overlay_scatters_by_anchor[anchor].append(scatter)
+
             ensure_legend()
             plot._legend.addItem(scatter, f"{trace_id}: {symbol}")
 

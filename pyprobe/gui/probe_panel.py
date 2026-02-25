@@ -23,6 +23,29 @@ from .lens_dropdown import LensDropdown
 from .plot_toolbar import PlotToolbar, InteractionMode
 from .drag_helpers import has_anchor_mime, decode_anchor_mime
 from .probe_buffer import ProbeDataBuffer
+import pyqtgraph as pg
+
+
+class RemovableLegendItem(pg.LegendItem):
+    """
+    Subclass of pyqtgraph.LegendItem that emits a signal when a label is clicked.
+    Used for trace removal.
+    """
+    trace_removal_requested = pyqtSignal(object)  # Emits the curve/item
+
+    def __init__(self, size=None, offset=None, **kwargs):
+        super().__init__(size, offset, **kwargs)
+
+    def mouseDoubleClickEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            # Check which label was clicked
+            pos = ev.pos()
+            for item, label in self.items:
+                if label.contains(label.mapFromParent(pos)):
+                    self.trace_removal_requested.emit(item)
+                    ev.accept()
+                    return
+        super().mouseDoubleClickEvent(ev)
 
 
 class ProbePanel(QFrame):
@@ -476,13 +499,23 @@ class ProbePanel(QFrame):
                 }}
             """)
         
-        # M2.5: Remove Overlays submenu (if any overlays exist)
+        # M2.5 & Phase 3: Remove Trace submenu
+        menu.addSeparator()
+        remove_menu = menu.addMenu("Remove Trace")
+        
+        # Add primary trace
+        primary_label = f"{self._trace_id}: {self._anchor.symbol}" if self._trace_id else self._anchor.symbol
+        primary_action = remove_menu.addAction(primary_label)
+        primary_action.setToolTip("Remove the primary trace and close this panel")
+        primary_action.triggered.connect(self.close_requested.emit)
+        
+        # Add overlay traces if any
         if hasattr(self, '_overlay_anchors') and self._overlay_anchors:
-            menu.addSeparator()
-            overlay_menu = menu.addMenu("Remove Overlays")
+            remove_menu.addSeparator()
             for overlay in self._overlay_anchors:
-                action = overlay_menu.addAction(overlay.symbol)
-                # Capture anchor in closure using default argument
+                # We don't easily have the overlay's trace_id here without more lookups,
+                # but symbol is usually enough for overlays.
+                action = remove_menu.addAction(overlay.symbol)
                 action.triggered.connect(
                     lambda checked, oa=overlay: self.overlay_remove_requested.emit(self, oa)
                 )

@@ -20,7 +20,7 @@ Integrate the new window management into the UI and implement the "Close" functi
 ## Phase 3: Trace Removal (Unprobing) UI
 Enable users to remove specific traces without closing the entire window.
 
-- [ ] Task: Update `LegendItem` or `PlotLegend` to include an 'X' button for each trace.
+- [~] Task: Update `LegendItem` or `PlotLegend` to include an 'X' button for each trace.
 - [ ] Task: Add a "Remove Trace" option to the plot context menu.
 - [ ] Task: Write Tests: Verify that removing a trace via the legend correctly updates the window and the reference manager.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Trace Removal (Unprobing) UI' (Protocol in workflow.md)
