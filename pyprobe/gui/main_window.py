@@ -15,6 +15,7 @@ import multiprocessing as mp
 import os
 import sys
 import numpy as np
+import sip
 
 from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
@@ -1550,9 +1551,7 @@ class MainWindow(QMainWindow):
                 
             for panel in list(panels):
                 # Check if panel still exists
-                try:
-                    panel.objectName()
-                except RuntimeError:
+                if sip.isdeleted(panel):
                     panels.remove(panel)
                     continue
                 

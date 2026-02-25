@@ -9,6 +9,7 @@ from typing import Dict, Optional, List, Callable
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget
+import sip
 
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
@@ -16,6 +17,11 @@ logger = get_logger(__name__)
 from ..core.anchor import ProbeAnchor
 from ..ipc.messages import make_add_probe_cmd, make_remove_probe_cmd
 from .probe_panel import ProbePanel, RemovableLegendItem
+
+
+def is_obj_deleted(obj):
+    """Safely check if a Qt object has been deleted."""
+    return obj is None or sip.isdeleted(obj)
 
 
 class ProbeController(QObject):
@@ -257,6 +263,12 @@ class ProbeController(QObject):
 
         self.status_message.emit(f"Probe removed: {anchor.identity_label()}")
         self.probe_removed.emit(anchor)
+
+        # Global cleanup of any deleted objects from _probe_panels to prevent RuntimeErrors
+        for a in list(self._probe_panels.keys()):
+            self._probe_panels[a] = [p for p in self._probe_panels[a] if not is_obj_deleted(p)]
+            if not self._probe_panels[a]:
+                del self._probe_panels[a]
     
     def handle_lens_changed(self, anchor: ProbeAnchor, lens_name: str):
         """Handle lens change from probe panel."""
@@ -354,6 +366,8 @@ class ProbeController(QObject):
         anchor_still_used = False
         for panel_list in self._probe_panels.values():
             for panel in panel_list:
+                if is_obj_deleted(panel):
+                    continue
                 if hasattr(panel, '_overlay_anchors') and overlay_anchor in panel._overlay_anchors:
                     anchor_still_used = True
                     break
@@ -436,6 +450,8 @@ class ProbeController(QObject):
         # Find all panels that have this anchor as an overlay
         for panel_list in self._probe_panels.values():
             for panel in panel_list:
+                if is_obj_deleted(panel):
+                    continue
                 if not hasattr(panel, '_overlay_anchors'):
                     continue
 
@@ -515,6 +531,8 @@ class ProbeController(QObject):
         
         for panel_list in self._probe_panels.values():
             for panel in panel_list:
+                if is_obj_deleted(panel):
+                    continue
                 panel_id = id(panel)
                 if panel_id not in self._pending_overlays:
                     continue
