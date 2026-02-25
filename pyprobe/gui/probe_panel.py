@@ -34,6 +34,7 @@ class ProbePanel(QFrame):
     """
 
     maximize_requested = pyqtSignal()
+    close_requested = pyqtSignal()
     park_requested = pyqtSignal()
     status_message_requested = pyqtSignal(str)
     color_changed = pyqtSignal(object, object)  # (ProbeAnchor, QColor)
@@ -140,6 +141,15 @@ class ProbePanel(QFrame):
         self._throttle_label.hide()
         header.addWidget(self._throttle_label)
 
+        # Close button (×)
+        from PyQt6.QtWidgets import QPushButton
+        self._close_btn = QPushButton("×")
+        self._close_btn.setToolTip("Close this panel")
+        self._close_btn.setFixedSize(16, 16)
+        self._close_btn.setFlat(True)
+        self._close_btn.clicked.connect(self.close_requested.emit)
+        header.addWidget(self._close_btn)
+
         self._layout.addLayout(header)
 
         # Create the appropriate plot widget
@@ -197,6 +207,22 @@ class ProbePanel(QFrame):
         self._throttle_label.setStyleSheet(
             f"QLabel {{ color: {c['warning']}; font-size: 12px; }}"
         )
+        self._close_btn.setStyleSheet(f"""
+            QPushButton {{
+                color: {c['text_muted']};
+                font-weight: bold;
+                font-size: 14px;
+                border: none;
+                background: transparent;
+                padding: 0px;
+                margin: 0px;
+            }}
+            QPushButton:hover {{
+                color: {c['error']};
+                background-color: {c['bg_medium']};
+                border-radius: 2px;
+            }}
+        """)
 
     def update_data(self, value, dtype: str, shape=None, source_info: str = ""):
         """Update the plot with new data."""
