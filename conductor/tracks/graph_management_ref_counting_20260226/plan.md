@@ -17,13 +17,13 @@ Integrate the new window management into the UI and implement the "Close" functi
 - [x] Task: Write Tests: Verify that closing a window correctly removes it from the UI and reduces reference counts for all contained traces. 0a368d6
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Graph Window Lifecycle' (Protocol in workflow.md) c5b2fb4
 
-## Phase 3: Trace Removal (Unprobing) UI
+## Phase 3: Trace Removal (Unprobing) UI [checkpoint: b4e0057]
 Enable users to remove specific traces without closing the entire window.
 
-- [~] Task: Update `LegendItem` or `PlotLegend` to include an 'X' button for each trace.
-- [ ] Task: Add a "Remove Trace" option to the plot context menu.
-- [ ] Task: Write Tests: Verify that removing a trace via the legend correctly updates the window and the reference manager.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Trace Removal (Unprobing) UI' (Protocol in workflow.md)
+- [x] Task: Update `LegendItem` or `PlotLegend` to include an 'X' button for each trace. 502f060
+- [x] Task: Add a "Remove Trace" option to the plot context menu. 502f060
+- [x] Task: Write Tests: Verify that removing a trace via the legend correctly updates the window and the reference manager. 502f060
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Trace Removal (Unprobing) UI' (Protocol in workflow.md) 502f060
 
 ## Phase 4: Equation Editor Fixes
 Resolve the bugs related to empty plots and redundant windows in the Equation Editor.
