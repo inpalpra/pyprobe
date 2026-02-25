@@ -17,5 +17,6 @@
 
 ## Phase 3: Global Audit & Final Validation
 - [x] Task: Global `grep` for outdated `add_scalar(..., ...)` calls (2 args) [dee819a].
-- [x] Task: Run full test suite: `uv run pytest --cov=pyprobe` [dee819a].
+- [x] Task: Run full test suite: `uv run pytest --cov=pyprobe` [3442d4a].
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: Global Audit & Final Validation' (Protocol in workflow.md)
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Global Audit & Final Validation' (Protocol in workflow.md)
