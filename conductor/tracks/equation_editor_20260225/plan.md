@@ -3,7 +3,7 @@
 ## Phase 1: Trace ID Management
 Implement the logic to assign and manage unique `tr<n>` IDs for all probed variables.
 
-- [ ] Task: Implement `TraceIDManager` to handle ID allocation and reuse.
+- [x] Task: Implement `TraceIDManager` to handle ID allocation and reuse. eb7cba6
 - [ ] Task: Integrate `TraceIDManager` with the probing system (likely in `pyprobe/core/` or `pyprobe/gui/`).
 - [ ] Task: Ensure `tr<n>` IDs are displayed in the UI (Watch window and Plot legends).
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Trace ID Management' (Protocol in workflow.md)
