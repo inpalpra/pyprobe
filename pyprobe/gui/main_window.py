@@ -694,7 +694,8 @@ class MainWindow(QMainWindow):
         for anchor, buffer in dirty.items():
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
-                    panel.update_from_buffer(buffer)
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.update_from_buffer(buffer)
         
         # Flush any pending overlay data now that plot widgets may exist
         self._probe_controller.flush_pending_overlays()
@@ -705,7 +706,8 @@ class MainWindow(QMainWindow):
         for anchor, buffer in dirty.items():
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
-                    panel.update_from_buffer(buffer)
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.update_from_buffer(buffer)
         
         # Flush any pending overlay data now that plot widgets may exist
         self._probe_controller.flush_pending_overlays()
@@ -750,11 +752,12 @@ class MainWindow(QMainWindow):
                 self._probe_metadata[anchor]['dtype'] = payload['dtype']
 
             for panel in self._probe_panels[anchor]:
-                panel.update_data(
-                    value=payload['value'],
-                    dtype=payload['dtype'],
-                    shape=payload.get('shape'),
-                )
+                if not is_obj_deleted(panel) and not panel.is_closing:
+                    panel.update_data(
+                        value=payload['value'],
+                        dtype=payload['dtype'],
+                        shape=payload.get('shape'),
+                    )
 
         # Route to scalar watch sidebar if it has this anchor
         if self._scalar_watch_sidebar.has_scalar(anchor):
@@ -867,7 +870,8 @@ class MainWindow(QMainWindow):
         for anchor in list(self._probe_panels.keys()):
             if anchor.file == self._script_path:
                 for panel in self._probe_panels[anchor]:
-                    panel.hide()
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.hide()
                 self._probe_container.park_panel(anchor)
 
         # Clear gutter marks (line numbers are file-specific)
@@ -887,7 +891,8 @@ class MainWindow(QMainWindow):
             if anchor.file == file_path:
                 self._probe_container.unpark_panel(anchor)
                 for panel in self._probe_panels[anchor]:
-                    panel.show()
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.show()
                 color = self._probe_registry.get_color(anchor)
                 if color:
                     self._code_viewer.set_probe_active(anchor, color)
@@ -1035,10 +1040,10 @@ class MainWindow(QMainWindow):
                     lens = metadata.get('lens')
                 
                 # Check panels for markers
-                panel_list = self._probe_controller._probe_panels.get(anchor, [])
+                panel_list = [p for p in self._probe_controller._probe_panels.get(anchor, []) if not is_obj_deleted(p)]
                 if panel_list:
                     panel = panel_list[-1]
-                    if hasattr(panel, 'get_marker_state'):
+                    if not getattr(panel, "is_closing", False) and hasattr(panel, 'get_marker_state'):
                         markers = panel.get_marker_state()
             
             spec = ProbeSpec.from_anchor(anchor, color=color_hex, lens=lens, markers=markers)
@@ -1055,9 +1060,11 @@ class MainWindow(QMainWindow):
             for target_anchor, panel_list in self._probe_controller._probe_panels.items():
                 if target_anchor.file != self._script_path:
                     continue
-                if not panel_list:
+                # Filter out deleted panels
+                valid_panels = [p for p in panel_list if not is_obj_deleted(p) and not getattr(p, "is_closing", False)]
+                if not valid_panels:
                     continue
-                target_panel = panel_list[-1]
+                target_panel = valid_panels[-1]
                 if hasattr(target_panel, '_overlay_anchors'):
                     for overlay_anchor in target_panel._overlay_anchors:
                         settings.overlays.append(OverlaySpec(
@@ -1299,7 +1306,8 @@ class MainWindow(QMainWindow):
             self._code_viewer.set_probe_invalid(anchor)
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
-                    panel.set_state(ProbeState.INVALID)
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.set_state(ProbeState.INVALID)
 
         self._probe_registry.invalidate_anchors(invalid)
 
@@ -1322,7 +1330,8 @@ class MainWindow(QMainWindow):
         """Handle probe state change from registry."""
         if anchor in self._probe_panels:
             for panel in self._probe_panels[anchor]:
-                panel.set_state(state)
+                if not is_obj_deleted(panel) and not panel.is_closing:
+                    panel.set_state(state)
 
     @pyqtSlot()
     def _on_script_ended(self):
@@ -1444,6 +1453,8 @@ class MainWindow(QMainWindow):
 
         for anchor, panel_list in self._probe_panels.items():
             for panel in panel_list:
+                if is_obj_deleted(panel) or panel.is_closing:
+                    continue
                 plot_data = panel.get_plot_data()
                 export_record = {
                     'symbol': anchor.symbol,
@@ -1485,7 +1496,8 @@ class MainWindow(QMainWindow):
 
         # Hide all panels for this anchor
         for panel in self._probe_panels[anchor]:
-            panel.hide()
+            if not is_obj_deleted(panel) and not panel.is_closing:
+                panel.hide()
 
         # Mark panels as parked and relayout remaining panels
         self._probe_container.park_panel(anchor)
@@ -1505,7 +1517,8 @@ class MainWindow(QMainWindow):
         for anchor, panel_list in self._probe_panels.items():
             if anchor.identity_label() == anchor_key:
                 for panel in panel_list:
-                    panel.show()
+                    if not is_obj_deleted(panel) and not panel.is_closing:
+                        panel.show()
                 self._dock_bar.remove_panel(anchor_key)
                 # Unpark and relayout all panels including restored ones
                 self._probe_container.unpark_panel(anchor)

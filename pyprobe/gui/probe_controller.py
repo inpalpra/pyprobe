@@ -238,7 +238,8 @@ class ProbeController(QObject):
                 logger.debug(f"Removed last panel, {len(panel_list)} remaining")
 
             # Clean up container
-            self._container.remove_probe_panel(panel=panel)
+            if not is_obj_deleted(panel):
+                self._container.remove_probe_panel(panel=panel)
 
             # If no more panels for this anchor, remove from internal list
             if not panel_list:
@@ -307,6 +308,10 @@ class ProbeController(QObject):
                 ipc.send_command(msg)
         
         # Register this overlay relationship for data forwarding
+        if is_obj_deleted(target_panel) or target_panel.is_closing:
+            logger.warning("Attempted to add overlay to a deleted or closing panel")
+            return
+
         if not hasattr(target_panel, '_overlay_anchors'):
             target_panel._overlay_anchors = []
         
@@ -324,6 +329,10 @@ class ProbeController(QObject):
             target_panel: The panel to remove the overlay from
             overlay_anchor: The anchor to remove
         """
+        if is_obj_deleted(target_panel) or target_panel.is_closing:
+            logger.debug("Skipping remove_overlay for a deleted or closing panel")
+            return
+
         logger.debug(f"Removing overlay: {overlay_anchor.symbol} from {target_panel._anchor.symbol}")
         
         # Remove from overlay anchors list
