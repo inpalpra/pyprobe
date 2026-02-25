@@ -501,6 +501,14 @@ class MainWindow(QMainWindow):
         if not eq:
             return
             
+        # Check if we already have a panel for this equation
+        if eq_id in self._equation_to_panels and self._equation_to_panels[eq_id]:
+            # Just bring it to focus or show it if parked?
+            # For now, let's just avoid creating a new one if one already exists.
+            # We could potentially highlight it.
+            self._status_bar.showMessage(f"Panel for {eq_id} already exists")
+            return
+
         # Create a dummy anchor for the equation
         dummy_anchor = ProbeAnchor(file="<equation>", line=0, col=0, symbol=eq_id)
         
@@ -1521,7 +1529,7 @@ class MainWindow(QMainWindow):
                 self._update_equation_plots()
 
     def _update_equation_plots(self):
-        """Update all panels that have equation overlays."""
+        """Update all panels that have equation overlays or are primary equation plots."""
         if not hasattr(self, "_equation_to_panels"):
             return
             
@@ -1537,6 +1545,8 @@ class MainWindow(QMainWindow):
             result = eq.result
             if not isinstance(result, np.ndarray):
                 result = np.atleast_1d(result)
+            
+            dtype = 'array_1d' if not np.iscomplexobj(result) else 'array_complex'
                 
             for panel in list(panels):
                 # Check if panel still exists
@@ -1544,6 +1554,11 @@ class MainWindow(QMainWindow):
                     panel.objectName()
                 except RuntimeError:
                     panels.remove(panel)
+                    continue
+                
+                # If this is the primary panel for the equation, update it normally
+                if panel._anchor.symbol == eq_id:
+                    panel.update_data(result, dtype, result.shape)
                     continue
                     
                 plot = panel._plot
@@ -1555,15 +1570,16 @@ class MainWindow(QMainWindow):
                 dummy_anchor = ProbeAnchor(file="", line=0, col=0, symbol=eq_id)
                 
                 if isinstance(plot, WaveformWidget):
-                    dtype = 'array_1d' if not np.iscomplexobj(result) else 'array_complex'
                     self._probe_controller._add_overlay_to_waveform(
                         plot, dummy_anchor, result, dtype, result.shape,
-                        primary_anchor=panel._anchor
+                        primary_anchor=panel._anchor,
+                        target_panel=panel
                     )
                 elif isinstance(plot, ConstellationWidget):
                     self._probe_controller._add_overlay_to_constellation(
                         plot, dummy_anchor, result, 'array_complex', result.shape,
-                        primary_anchor=panel._anchor
+                        primary_anchor=panel._anchor,
+                        target_panel=panel
                     )
 
     def _forward_overlay_data(self, anchor: ProbeAnchor, payload: dict) -> None:
