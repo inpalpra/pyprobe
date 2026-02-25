@@ -568,17 +568,17 @@ class ProbeController(QObject):
         # Clean up flushed entries
         for pid in flushed_ids:
             del self._pending_overlays[pid]
-    
-        def _add_overlay_to_waveform(
-            self,
-            plot,
-            anchor: ProbeAnchor,
-            value,
-            dtype: str,
-            shape,
-            primary_anchor: Optional[ProbeAnchor] = None,
-            target_panel: Optional[ProbePanel] = None
-        ) -> None:        """Add an overlay trace to a waveform plot."""
+    def _add_overlay_to_waveform(
+        self,
+        plot,
+        anchor: ProbeAnchor,
+        value,
+        dtype: str,
+        shape,
+        primary_anchor: Optional[ProbeAnchor] = None,
+        target_panel: Optional[ProbePanel] = None
+    ) -> None:
+        """Add an overlay trace to a waveform plot."""
         import numpy as np
         import pyqtgraph as pg
         from PyQt6.QtCore import Qt
