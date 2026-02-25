@@ -46,8 +46,12 @@ from .scalar_watch_window import ScalarWatchSidebar
 from .redraw_throttler import RedrawThrottler
 from .file_tree import FileTreePanel
 from .collapsible_pane import CollapsiblePane
+from .equation_editor import EquationEditorDialog
+from ..core.equation_manager import EquationManager
+
 
 # === PERSISTENCE IMPORTS ===
+
 from ..core.probe_persistence import (
     load_probe_settings, save_probe_settings, ProbeSettings, ProbeSpec, WatchSpec, OverlaySpec
 )
@@ -122,6 +126,10 @@ class MainWindow(QMainWindow):
         # M1: Source file content cache for anchor mapping
         self._last_source_content: Optional[str] = None
         self._pending_markers = {} # (line, symbol) -> markers_dict
+
+        # M4: Equation Manager
+        self._equation_manager = EquationManager()
+        self._latest_trace_data = {}
 
         self._setup_ui()
         self._setup_signals()
@@ -449,11 +457,21 @@ class MainWindow(QMainWindow):
     def _setup_theme_menu(self) -> None:
         """Create View -> Theme menu and wire runtime switching."""
         view_menu = self.menuBar().addMenu("View")
+        
+        # M4: Equation Editor
+        eq_action = view_menu.addAction("Equation Editor")
+        eq_action.triggered.connect(self._show_equation_editor)
+        view_menu.addSeparator()
+
         theme_menu = view_menu.addMenu("Theme")
 
         self._theme_actions: dict[str, QAction] = {}
         self._theme_action_group = QActionGroup(self)
         self._theme_action_group.setExclusive(True)
+
+    def _show_equation_editor(self):
+        """Show the equation editor dialog."""
+        EquationEditorDialog.show_instance(self._equation_manager, self)
 
         manager = ThemeManager.instance()
         current_theme_id = manager.current.id
@@ -687,6 +705,12 @@ class MainWindow(QMainWindow):
         """Handle batched probe values from MessageHandler."""
         for probe_data in probes:
             anchor = ProbeAnchor.from_dict(probe_data['anchor'])
+            
+            # Update trace data for equations
+            trace_id = self._probe_registry.get_trace_id(anchor)
+            if trace_id:
+                self._latest_trace_data[trace_id] = probe_data['value']
+
             print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
             self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_panels:
@@ -703,6 +727,12 @@ class MainWindow(QMainWindow):
             
             # M2.5: Forward overlay data to target panels
             self._forward_overlay_data(anchor, probe_data)
+
+        # M4: Evaluate equations
+        if self._equation_manager.equations:
+            self._equation_manager.evaluate_all(self._latest_trace_data)
+            # Update any widgets currently plotting equations
+            # self._update_equation_plots() # To be implemented in Phase 4
 
     def _update_fps(self):
         """Update FPS display."""

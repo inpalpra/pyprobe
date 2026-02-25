@@ -19,10 +19,10 @@ Implement the logic to parse and evaluate mathematical expressions using raw dat
 ## Phase 3: Equation Editor UI
 Build the modal dialog for managing equations.
 
-- [ ] Task: Create `EquationEditorDialog` using PyQt6.
-- [ ] Task: Implement the "Add Equation" row logic.
-- [ ] Task: Connect the UI to the `EquationEngine`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Equation Editor UI' (Protocol in workflow.md)
+- [x] Task: Create `EquationEditorDialog` using PyQt6. 5f7a9b2
+- [x] Task: Implement the "Add Equation" row logic. 5f7a9b2
+- [x] Task: Connect the UI to the `EquationEngine`. 5f7a9b2
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Equation Editor UI' (Protocol in workflow.md)
 
 ## Phase 4: Plotting and Drag-and-Drop
 Enable plotting equation results and dragging them into windows.
