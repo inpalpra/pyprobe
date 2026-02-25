@@ -1128,8 +1128,11 @@ class MainWindow(QMainWindow):
             if color is None:
                 color = QColor('#00ffff')
         
+        # Get Trace ID
+        trace_id = self._probe_registry.get_trace_id(anchor)
+        
         # Add to watch sidebar
-        self._scalar_watch_sidebar.add_scalar(anchor, color)
+        self._scalar_watch_sidebar.add_scalar(anchor, color, trace_id)
         
         # Show sidebar if collapsed
         if not self._watch_pane.is_expanded:

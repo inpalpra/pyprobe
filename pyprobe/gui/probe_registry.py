@@ -6,6 +6,7 @@ from PyQt6.QtGui import QColor
 from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.gui.probe_state import ProbeState
 from pyprobe.gui.color_manager import ColorManager
+from pyprobe.core.trace_id_manager import TraceIDManager
 
 
 class ProbeRegistry(QObject):
@@ -15,6 +16,7 @@ class ProbeRegistry(QObject):
     Manages:
     - Probe lifecycle (add, remove, invalidate)
     - Color assignments via ColorManager
+    - Trace ID (tr<n>) assignments via TraceIDManager
     - Liveness tracking (ARMED -> LIVE -> STALE transitions)
     - Signals for UI updates
     """
@@ -38,6 +40,9 @@ class ProbeRegistry(QObject):
 
         # Color management
         self._color_manager = ColorManager()
+        
+        # Trace ID management
+        self._trace_id_manager = TraceIDManager()
 
         # Stale detection timer
         self._stale_timer = QTimer(self)
@@ -72,6 +77,9 @@ class ProbeRegistry(QObject):
         # Initialize state
         self._probes[anchor] = ProbeState.ARMED
         self._last_data_time[anchor] = self._current_time_ms
+        
+        # Allocate Trace ID
+        self._trace_id_manager.allocate(anchor.identity_label())
 
         # Emit signal
         self.probe_added.emit(anchor, color)
@@ -89,11 +97,18 @@ class ProbeRegistry(QObject):
 
         # Release color for reuse
         self._color_manager.release_color(anchor)
+        
+        # Release Trace ID
+        self._trace_id_manager.release(anchor.identity_label())
 
         # Emit signal
         self.probe_removed.emit(anchor)
 
-    def update_data_received(self, anchor: ProbeAnchor) -> None:
+    def get_trace_id(self, anchor: ProbeAnchor) -> Optional[str]:
+        """Get the assigned tr<n> ID for an anchor."""
+        if anchor in self._probes:
+            return self._trace_id_manager.allocate(anchor.identity_label())
+        return None
         """
         Update liveness when data is received.
 

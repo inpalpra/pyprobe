@@ -148,7 +148,7 @@ class ScalarWatchSidebar(QWidget):
     
 
     
-    def add_scalar(self, anchor: ProbeAnchor, color: QColor) -> None:
+    def add_scalar(self, anchor: ProbeAnchor, color: QColor, trace_id: str) -> None:
         """Add a scalar to the watch window."""
         if anchor in self._scalars:
             return  # Already watching
@@ -165,10 +165,15 @@ class ScalarWatchSidebar(QWidget):
         
         # Top row: label + remove button
         top_row = QWidget()
-        top_layout = QVBoxLayout(top_row)
+        top_layout = QHBoxLayout(top_row) # Change to horizontal for trace_id + symbol
         top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(0)
+        top_layout.setSpacing(4)
         
+        # Trace ID label (e.g., tr0)
+        id_label = QLabel(trace_id)
+        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: monospace; font-size: 10px;")
+        top_layout.addWidget(id_label)
+
         # Label with highlight background (like code viewer probes)
         # Use semi-transparent fill with solid border
         name_label = QLabel(anchor.symbol)
@@ -180,7 +185,10 @@ class ScalarWatchSidebar(QWidget):
             border-radius: 2px;
             padding: 1px 4px;
         """)
-        card_layout.addWidget(name_label)
+        top_layout.addWidget(name_label)
+        top_layout.addStretch()
+        
+        card_layout.addWidget(top_row)
         
         # Value (large, bright)
         value_label = QLabel("--")

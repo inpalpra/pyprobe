@@ -127,8 +127,11 @@ class ProbeController(QObject):
             self._code_viewer.set_probe_active(anchor, color)
             self._gutter.set_probed_line(anchor.line, color)
 
+        # Get Trace ID
+        trace_id = self._registry.get_trace_id(anchor) or ""
+
         # Create probe panel
-        panel = self._container.create_probe_panel(anchor, color)
+        panel = self._container.create_probe_panel(anchor, color, trace_id)
         if anchor not in self._probe_panels:
             self._probe_panels[anchor] = []
         self._probe_panels[anchor].append(panel)
@@ -451,18 +454,20 @@ class ProbeController(QObject):
                 if isinstance(plot, WaveformWidget):
                     self._add_overlay_to_waveform(
                         plot,
-                        overlay_key,
+                        matching_overlay,
                         payload['value'],
                         payload['dtype'],
-                        payload.get('shape')
+                        payload.get('shape'),
+                        primary_anchor=panel._anchor
                     )
                 elif isinstance(plot, ConstellationWidget):
                     self._add_overlay_to_constellation(
                         plot,
-                        overlay_key,
+                        matching_overlay,
                         payload['value'],
                         payload['dtype'],
-                        payload.get('shape')
+                        payload.get('shape'),
+                        primary_anchor=panel._anchor
                     )
     
     def flush_pending_overlays(self):
@@ -495,21 +500,35 @@ class ProbeController(QObject):
                 
                 # Apply all pending overlay data
                 for pending in self._pending_overlays[panel_id]:
+                    # Match pending key to an anchor in panel._overlay_anchors if possible
+                    match_anchor = None
+                    if hasattr(panel, '_overlay_anchors'):
+                        for oa in panel._overlay_anchors:
+                            key = f"{oa.symbol}_{'lhs' if oa.is_assignment else 'rhs'}"
+                            if key == pending['overlay_key']:
+                                match_anchor = oa
+                                break
+                    
+                    if not match_anchor:
+                        continue
+
                     if isinstance(plot, WaveformWidget):
                         self._add_overlay_to_waveform(
                             plot,
-                            pending['overlay_key'],
+                            match_anchor,
                             pending['value'],
                             pending['dtype'],
-                            pending['shape']
+                            pending['shape'],
+                            primary_anchor=panel._anchor
                         )
                     elif isinstance(plot, ConstellationWidget):
                         self._add_overlay_to_constellation(
                             plot,
-                            pending['overlay_key'],
+                            match_anchor,
                             pending['value'],
                             pending['dtype'],
-                            pending['shape']
+                            pending['shape'],
+                            primary_anchor=panel._anchor
                         )
                     logger.debug(f"Flushed pending overlay: {pending['overlay_key']}")
                 
@@ -522,10 +541,11 @@ class ProbeController(QObject):
     def _add_overlay_to_waveform(
         self, 
         plot, 
-        symbol: str,
+        anchor: ProbeAnchor,
         value, 
         dtype: str, 
-        shape
+        shape,
+        primary_anchor: Optional[ProbeAnchor] = None
     ) -> None:
         """Add an overlay trace to a waveform plot."""
         import numpy as np
@@ -557,6 +577,9 @@ class ProbeController(QObject):
         if not overlay_palette:
             overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
         
+        trace_id = self._registry.get_trace_id(anchor) or ""
+        symbol = anchor.symbol
+        
         def ensure_legend():
             """Create legend on-demand and add primary curve if needed."""
             if not hasattr(plot, '_legend') or plot._legend is None:
@@ -566,16 +589,19 @@ class ProbeController(QObject):
                     brush=pg.mkBrush(theme.colors.get('bg_medium', '#1a1a1a') + '80')
                 )
                 # Add primary curve(s) to legend
-                if hasattr(plot, '_curves') and plot._curves:
-                    plot._legend.addItem(plot._curves[0], plot._var_name)
+                if hasattr(plot, '_curves') and plot._curves and primary_anchor:
+                    p_id = self._registry.get_trace_id(primary_anchor) or ""
+                    plot._legend.addItem(plot._curves[0], f"{p_id}: {plot._var_name}")
         
         # Check if complex data
         is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
         
         if is_complex:
             # Create real and imag curve keys
-            real_key = f"{symbol}_real"
-            imag_key = f"{symbol}_imag"
+            # Use symbol + is_assignment to match forward_overlay_data logic
+            symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
+            real_key = f"{symbol_key}_real"
+            imag_key = f"{symbol_key}_imag"
             
             # Create real curve if needed
             if real_key not in plot._overlay_curves:
@@ -588,7 +614,7 @@ class ProbeController(QObject):
                 curve.setZValue(20)
                 plot._overlay_curves[real_key] = curve
                 ensure_legend()
-                plot._legend.addItem(curve, f"{symbol} (real)")
+                plot._legend.addItem(curve, f"{trace_id}: {symbol} (real)")
             
             # Create imag curve if needed
             if imag_key not in plot._overlay_curves:
@@ -601,7 +627,7 @@ class ProbeController(QObject):
                 curve.setZValue(20)
                 plot._overlay_curves[imag_key] = curve
                 ensure_legend()
-                plot._legend.addItem(curve, f"{symbol} (imag)")
+                plot._legend.addItem(curve, f"{trace_id}: {symbol} (imag)")
             
             # Update curve data
             real_data = data.real.copy()
@@ -618,46 +644,42 @@ class ProbeController(QObject):
             plot._overlay_curves[imag_key].setData(x, imag_data)
         else:
             # Single real curve
-            if symbol not in plot._overlay_curves:
+            symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
+            if symbol_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
                 color = overlay_palette[color_idx % len(overlay_palette)]
-                
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False
                 )
                 curve.setZValue(20)
-                plot._overlay_curves[symbol] = curve
-                
+                plot._overlay_curves[symbol_key] = curve
                 ensure_legend()
-                plot._legend.addItem(curve, symbol)
-                logger.debug(f"Created overlay curve for {symbol}")
+                plot._legend.addItem(curve, f"{trace_id}: {symbol}")
             
-            # Update the curve data
-            curve = plot._overlay_curves[symbol]
+            # Update curve data
             x = np.arange(len(data))
-            
-            # Downsample if needed
+            y = data
             if len(data) > plot.MAX_DISPLAY_POINTS:
-                data = plot.downsample(data)
-                x = np.arange(len(data))
+                x, y = plot.downsample(data)
             
-            curve.setData(x, data)
+            plot._overlay_curves[symbol_key].setData(x, y)
     
     def _add_overlay_to_constellation(
-        self, 
-        plot, 
-        symbol: str,
-        value, 
-        dtype: str, 
-        shape
+        self,
+        plot,
+        anchor: ProbeAnchor,
+        value,
+        dtype: str,
+        shape,
+        primary_anchor: Optional[ProbeAnchor] = None
     ) -> None:
         """Add an overlay scatter to a constellation plot."""
         import numpy as np
         import pyqtgraph as pg
         
         # Skip if not complex data
-        if dtype not in ('complex_1d', 'array_complex', 'array_1d'):
+        if dtype not in ('complex_1d', 'array_complex', 'array_1d', 'waveform_complex'):
             return
         
         try:
@@ -665,45 +687,55 @@ class ProbeController(QObject):
             
             # Convert to complex if not already
             if not np.issubdtype(data.dtype, np.complexfloating):
-                return
+                data = data.astype(np.complex128)
         except (ValueError, TypeError):
             return
         
         # Get or create overlay scatters dict on the plot
         if not hasattr(plot, '_overlay_scatters'):
             plot._overlay_scatters = {}
-        
-        # Create or update the scatter for this symbol
-        if symbol not in plot._overlay_scatters:
-            from pyprobe.gui.theme.theme_manager import ThemeManager
+            
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme = ThemeManager.instance().current
+        theme_palette = list(theme.row_colors)
+        marker_color = theme.colors.get('accent_marker', theme.plot_colors.get('marker', '#ffbf5f'))
+        overlay_palette = [marker_color]
+        overlay_palette.extend([c for c in theme_palette if c.lower() != marker_color.lower()])
+        if not overlay_palette:
+            overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
 
-            theme = ThemeManager.instance().current
-            theme_palette = list(theme.row_colors)
-            marker_color = theme.colors.get('accent_marker', theme.plot_colors.get('marker', '#ffbf5f'))
-            overlay_palette = [marker_color]
-            overlay_palette.extend([c for c in theme_palette if c.lower() != marker_color.lower()])
-            if not overlay_palette:
-                overlay_palette = ['#ffbf5f', '#4fc3f7', '#6bd47a']
+        trace_id = self._registry.get_trace_id(anchor) or ""
+        symbol = anchor.symbol
+        symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
+        def ensure_legend():
+            if not hasattr(plot, '_legend') or plot._legend is None:
+                plot._legend = plot._plot_widget.addLegend(
+                    offset=(10, 10),
+                    labelTextColor=theme.colors.get('text_primary', '#ffffff'),
+                    brush=pg.mkBrush(theme.colors.get('bg_medium', '#1a1a1a') + '80')
+                )
+                # Add primary scatter to legend
+                if hasattr(plot, '_scatter_items') and plot._scatter_items and primary_anchor:
+                    p_id = self._registry.get_trace_id(primary_anchor) or ""
+                    plot._legend.addItem(plot._scatter_items[-1], f"{p_id}: {plot._var_name}")
+
+        if symbol_key not in plot._overlay_scatters:
             color_idx = len(plot._overlay_scatters) + 1
             color = overlay_palette[color_idx % len(overlay_palette)]
             
+            # Create scatter for overlay
             scatter = pg.ScatterPlotItem(
                 pen=None,
                 brush=pg.mkBrush(color),
-                size=6,
-                name=symbol
+                size=5
             )
-            scatter.setZValue(20)
             plot._plot_widget.addItem(scatter)
-            plot._overlay_scatters[symbol] = scatter
-            logger.debug(f"Created overlay scatter for {symbol}")
-        
-        # Update the scatter data
-        scatter = plot._overlay_scatters[symbol]
-        
-        # Downsample if needed
-        if len(data) > plot.MAX_DISPLAY_POINTS:
-            data = plot.downsample(data)
-        
-        scatter.setData(x=data.real, y=data.imag)
+            plot._overlay_scatters[symbol_key] = scatter
+            
+            ensure_legend()
+            plot._legend.addItem(scatter, f"{trace_id}: {symbol}")
+
+        # Downsample and update
+        display_data = plot.downsample(data)
+        plot._overlay_scatters[symbol_key].setData(x=display_data.real, y=display_data.imag)

@@ -45,6 +45,7 @@ class ProbePanel(QFrame):
         anchor: ProbeAnchor,
         color: QColor,
         dtype: str,
+        trace_id: str = "",
         parent: Optional[QWidget] = None
     ):
         super().__init__(parent)
@@ -52,6 +53,7 @@ class ProbePanel(QFrame):
         self._anchor = anchor
         self._color = color
         self._dtype = dtype
+        self._trace_id = trace_id
         self._plot: Optional[BasePlot] = None
         self._current_plugin: Optional['ProbePlugin'] = None
         self._removal_animation = None
@@ -97,6 +99,11 @@ class ProbePanel(QFrame):
         # State indicator (16x16 pulsing/solid circle)
         self._state_indicator = ProbeStateIndicator()
         header.addWidget(self._state_indicator)
+
+        # Trace ID label (e.g., tr0)
+        self._id_label = QLabel(self._trace_id)
+        self._id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: monospace; font-size: 11px;")
+        header.addWidget(self._id_label)
 
         # Identity label with colored styling
         self._identity_label = QLabel(self._anchor.identity_label())
