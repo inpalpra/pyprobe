@@ -1,10 +1,87 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
-                             QPushButton, QComboBox, QLineEdit,
+                             QPushButton, QComboBox, QLineEdit, QWidget,
                              QDoubleSpinBox, QLabel, QHeaderView, QColorDialog, QCheckBox)
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from ..plots.marker_model import MarkerStore, MarkerType, MarkerShape
+
+
+class TypeToggleWidget(QWidget):
+    """A segmented toggle for Absolute/Relative marker types."""
+    
+    typeChanged = pyqtSignal(object) # MarkerType
+
+    def __init__(self, current_type: MarkerType, parent=None):
+        super().__init__(parent)
+        self._type = current_type
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        self.abs_btn = QPushButton("Abs")
+        self.abs_btn.setCheckable(True)
+        self.abs_btn.setFixedSize(32, 20)
+        
+        self.rel_btn = QPushButton("Rel")
+        self.rel_btn.setCheckable(True)
+        self.rel_btn.setFixedSize(32, 20)
+        
+        layout.addWidget(self.abs_btn)
+        layout.addWidget(self.rel_btn)
+        
+        self.abs_btn.clicked.connect(lambda: self._set_type(MarkerType.ABSOLUTE))
+        self.rel_btn.clicked.connect(lambda: self._set_type(MarkerType.RELATIVE))
+        
+        self._update_styles()
+
+    def _set_type(self, marker_type: MarkerType):
+        if self._type != marker_type:
+            self._type = marker_type
+            self._update_styles()
+            self.typeChanged.emit(marker_type)
+        else:
+            # Re-ensure correct state if clicked while already active
+            self._update_styles()
+
+    def setType(self, marker_type: MarkerType):
+        if self._type != marker_type:
+            self._type = marker_type
+            self._update_styles()
+
+    def _update_styles(self):
+        from .theme.theme_manager import ThemeManager
+        c = ThemeManager.instance().current.colors
+        
+        active_style = f"""
+            QPushButton {{
+                background-color: {c['bg_light']};
+                color: {c['text_primary']};
+                font-size: 10px;
+                font-weight: bold;
+                border: 1px solid {c['border_default']};
+                border-radius: 2px;
+            }}
+        """
+        inactive_style = f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {c['text_secondary']};
+                font-size: 10px;
+                border: 1px solid transparent;
+                border-radius: 2px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['bg_medium']};
+            }}
+        """
+        
+        self.abs_btn.setChecked(self._type == MarkerType.ABSOLUTE)
+        self.rel_btn.setChecked(self._type == MarkerType.RELATIVE)
+        
+        self.abs_btn.setStyleSheet(active_style if self._type == MarkerType.ABSOLUTE else inactive_style)
+        self.rel_btn.setStyleSheet(active_style if self._type == MarkerType.RELATIVE else inactive_style)
 
 
 def _store_label(store: MarkerStore) -> str:
@@ -294,12 +371,9 @@ class MarkerManager(QDialog):
             self.table.setCellWidget(i, 5, self._centered_widget(trace_box))
 
             # Type
-            type_box = QComboBox()
-            for t in MarkerType:
-                type_box.addItem(t.name.capitalize(), t)
-            type_box.setCurrentIndex(list(MarkerType).index(m.marker_type))
-            type_box.currentIndexChanged.connect(lambda idx, s=store, mid=m.id, tb=type_box: self._update_marker(s, mid, marker_type=tb.itemData(idx)))
-            self.table.setCellWidget(i, 6, self._centered_widget(type_box))
+            type_toggle = TypeToggleWidget(m.marker_type)
+            type_toggle.typeChanged.connect(lambda t, s=store, mid=m.id: self._update_marker(s, mid, marker_type=t))
+            self.table.setCellWidget(i, 6, self._centered_widget(type_toggle))
 
             # Ref — only show markers from the same store
             same_store_markers = [row for row in all_rows if row[0] is store]
@@ -372,12 +446,11 @@ class MarkerManager(QDialog):
                 if idx >= 0 and trace_box.currentIndex() != idx:
                     trace_box.setCurrentIndex(idx)
 
-            type_box = self.table.cellWidget(i, 6)
-            if type_box and hasattr(type_box, '_child_widget'):
-                type_box = type_box._child_widget
-                idx = list(MarkerType).index(m.marker_type)
-                if type_box.currentIndex() != idx:
-                    type_box.setCurrentIndex(idx)
+            type_toggle = self.table.cellWidget(i, 6)
+            if type_toggle and hasattr(type_toggle, '_child_widget'):
+                type_toggle = type_toggle._child_widget
+                if isinstance(type_toggle, TypeToggleWidget):
+                    type_toggle.setType(m.marker_type)
 
             ref_box = self.table.cellWidget(i, 7)
             if ref_box and hasattr(ref_box, '_child_widget'):
