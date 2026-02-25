@@ -1,0 +1,8 @@
+{
+  "track_id": "equation_editor_20260225",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-25T14:00:00Z",
+  "updated_at": "2026-02-25T14:00:00Z",
+  "description": "similar to how keysight PXA or keysight VNA have equation editor, i want pyprobe to have an equation editor as well."
+}
