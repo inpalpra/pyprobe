@@ -33,10 +33,10 @@ Resolve the bugs related to empty plots and redundant windows in the Equation Ed
 - [x] Task: Write Tests: Verify that clicking "Plot" in the Equation Editor creates a populated window and that re-running the equation updates the plot. 60811a6
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Equation Editor Fixes' (Protocol in workflow.md) e6bad99
 
-## Phase 5: Global Unprobing Integration
+## Phase 5: Global Unprobing Integration [checkpoint: 9d16beb]
 Connect the reference manager to the rest of the application (Code Viewer, Probe Engine).
 
-- [~] Task: Integrate `TraceReferenceManager` with the `CodeViewer` to remove highlights and "eye" icons when a trace is no longer referenced.
-- [ ] Task: Ensure the `ProbeEngine` stops collecting data for traces with zero references.
-- [ ] Task: Write Tests: E2E test verifying that dragging a variable to a plot, then removing it, correctly cleans up the code viewer highlights.
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Global Unprobing Integration' (Protocol in workflow.md)
+- [x] Task: Integrate `TraceReferenceManager` with the `CodeViewer` to remove highlights and "eye" icons when a trace is no longer referenced. 2afb65e
+- [x] Task: Ensure the `ProbeEngine` stops collecting data for traces with zero references. 2afb65e
+- [x] Task: Write Tests: E2E test verifying that dragging a variable to a plot, then removing it, correctly cleans up the code viewer highlights. 2afb65e
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Global Unprobing Integration' (Protocol in workflow.md) 2afb65e
