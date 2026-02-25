@@ -25,13 +25,13 @@ Enable users to remove specific traces without closing the entire window.
 - [x] Task: Write Tests: Verify that removing a trace via the legend correctly updates the window and the reference manager. 502f060
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Trace Removal (Unprobing) UI' (Protocol in workflow.md) 502f060
 
-## Phase 4: Equation Editor Fixes
+## Phase 4: Equation Editor Fixes [checkpoint: c482ba5]
 Resolve the bugs related to empty plots and redundant windows in the Equation Editor.
 
-- [ ] Task: Debug and fix the race condition causing empty plots in the Equation Editor.
-- [ ] Task: Refactor Equation Editor's "Plot" button to use the new `LayoutManager` window creation flow.
-- [ ] Task: Write Tests: Verify that clicking "Plot" in the Equation Editor creates a populated window and that re-running the equation updates the plot.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Equation Editor Fixes' (Protocol in workflow.md)
+- [x] Task: Debug and fix the race condition causing empty plots in the Equation Editor. 60811a6
+- [x] Task: Refactor Equation Editor's "Plot" button to use the new `LayoutManager` window creation flow. 60811a6
+- [x] Task: Write Tests: Verify that clicking "Plot" in the Equation Editor creates a populated window and that re-running the equation updates the plot. 60811a6
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Equation Editor Fixes' (Protocol in workflow.md) e6bad99
 
 ## Phase 5: Global Unprobing Integration
 Connect the reference manager to the rest of the application (Code Viewer, Probe Engine).
