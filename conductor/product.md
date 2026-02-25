@@ -22,5 +22,6 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - **Interactive Trace Control:** Easily remove specific traces via legend double-clicks or right-click context menus.
 - **Global Trace IDs:** Unique tr<n> IDs for all probed variables for easy reference in equations.
 - **Persistent Marker System:** Markers survive view/lens switches and application restarts.
+- **Decoupled Tracer Architecture:** The debugger logic is decoupled from the GUI, running as a lightweight `pyprobe-tracer` package in a separate process for maximum stability and performance.
 - Highly customizable themes (Cyberpunk, Monokai, Ocean).
 - Real-time performance.
