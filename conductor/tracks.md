@@ -11,3 +11,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: similar to how keysight PXA or keysight VNA have equation editor, i want pyprobe to have an equation editor as well.**
 *Link: [./tracks/equation_editor_20260225/](./tracks/equation_editor_20260225/)*
+
+---
+
+- [ ] **Track: Fix test failures in ScalarWatchSidebar (missing trace_id argument) and IPC collection error (missing wire_protocol module).**
+*Link: [./tracks/fix_test_failures_20260226/](./tracks/fix_test_failures_20260226/)*
