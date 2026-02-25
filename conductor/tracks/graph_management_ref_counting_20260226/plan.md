@@ -13,8 +13,8 @@ Integrate the new window management into the UI and implement the "Close" functi
 
 - [x] Task: Update `LayoutManager` to assign `WindowID` to all new plot windows. 5dbc35f
 - [x] Task: Add a 'Close' button (X) to the `PlotWidget` header/container. 00fbe4d
-- [~] Task: Implement `PlotWidget.close_window()` which removes itself from the layout and notifies `TraceReferenceManager`.
-- [ ] Task: Write Tests: Verify that closing a window correctly removes it from the UI and reduces reference counts for all contained traces.
+- [x] Task: Implement `PlotWidget.close_window()` which removes itself from the layout and notifies `TraceReferenceManager`. 6d7edca
+- [~] Task: Write Tests: Verify that closing a window correctly removes it from the UI and reduces reference counts for all contained traces.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Graph Window Lifecycle' (Protocol in workflow.md)
 
 ## Phase 3: Trace Removal (Unprobing) UI
