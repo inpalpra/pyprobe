@@ -11,10 +11,10 @@ Implement the logic to assign and manage unique `tr<n>` IDs for all probed varia
 ## Phase 2: Equation Evaluation Engine
 Implement the logic to parse and evaluate mathematical expressions using raw data.
 
-- [ ] Task: Implement `EquationEngine` that takes an expression and a dictionary of raw data.
-- [ ] Task: Support `numpy` and `scipy.signal` in the evaluation scope.
-- [ ] Task: Implement dependency tracking (recursive equations).
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Equation Evaluation Engine' (Protocol in workflow.md)
+- [x] Task: Implement `EquationEngine` that takes an expression and a dictionary of raw data. 3f9a7b1
+- [x] Task: Support `numpy` and `scipy.signal` in the evaluation scope. 3f9a7b1
+- [x] Task: Implement dependency tracking (recursive equations). 3f9a7b1
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Equation Evaluation Engine' (Protocol in workflow.md)
 
 ## Phase 3: Equation Editor UI
 Build the modal dialog for managing equations.
