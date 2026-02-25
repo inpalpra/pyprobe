@@ -1,9 +1,9 @@
 # Implementation Plan: Fix Test Failures & Collection Errors
 
 ## Phase 1: IPC Collection Fix
-- [x] Task: Research `wire_protocol` in `pyprobe/ipc/socket_channel.py`.
-- [x] Task: Fix `ImportError` in `socket_channel.py` (Implement stub or correct path).
-- [x] Task: Verify `uv run pytest --collect-only` succeeds.
+- [x] Task: Research `wire_protocol` in `pyprobe/ipc/socket_channel.py` [28b4d55]
+- [x] Task: Fix `ImportError` in `socket_channel.py` (Implement stub or correct path) [28b4d55]
+- [x] Task: Verify `uv run pytest --collect-only` succeeds [28b4d55]
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: IPC Collection Fix' (Protocol in workflow.md)
 
 ## Phase 2: Scalar Watch Tests Update
