@@ -450,7 +450,8 @@ def test_clear_all_probes_cleans_everything(win, qapp):
         func="main",
         is_assignment=True,
     )
-    win._scalar_watch_sidebar.add_scalar(scalar_anchor, QColor("#00ffff"))
+    sidebar = win._scalar_watch_sidebar
+    sidebar.add_scalar(scalar_anchor, QColor("#00ffff"), "tr0")
     _pev(qapp)
 
     # Set non-empty CLI lists to verify they get reset
@@ -1219,7 +1220,7 @@ def test_watch_scalars_cleared_on_file_switch(win, qapp, cleanup_sidecar):
     win._on_file_tree_selected(LOOP_SCRIPT)
     _pev(qapp)
 
-    win._scalar_watch_sidebar.add_scalar(_y_anchor(), QColor("#00ffff"))
+    win._scalar_watch_sidebar.add_scalar(_y_anchor(), QColor("#00ffff"), "tr0")
     _pev(qapp)
     assert win._scalar_watch_sidebar._scalars, (
         "Precondition: scalar sidebar must have an entry after add_scalar"

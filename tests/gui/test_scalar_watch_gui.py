@@ -30,7 +30,7 @@ class TestScalarWatchAdd:
     def test_add_scalar_creates_card(self, sidebar, qapp):
         """Adding a scalar creates a card widget."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         qapp.processEvents()
 
         assert sidebar.has_scalar(anchor)
@@ -38,7 +38,7 @@ class TestScalarWatchAdd:
     def test_add_scalar_hides_placeholder(self, sidebar, qapp):
         """Adding a scalar hides the placeholder."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         qapp.processEvents()
 
         assert not sidebar._placeholder.isVisible()
@@ -46,8 +46,8 @@ class TestScalarWatchAdd:
     def test_duplicate_add_ignored(self, sidebar, qapp):
         """Adding the same anchor twice doesn't duplicate."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         qapp.processEvents()
 
         assert len(sidebar.get_watched_anchors()) == 1
@@ -57,7 +57,7 @@ class TestScalarWatchUpdate:
     def test_update_changes_value_label(self, sidebar, qapp):
         """Updating a scalar changes the displayed value."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         sidebar.update_scalar(anchor, 42.0)
         qapp.processEvents()
 
@@ -67,7 +67,7 @@ class TestScalarWatchUpdate:
     def test_update_float_formatting(self, sidebar, qapp):
         """Float values are formatted correctly."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         sidebar.update_scalar(anchor, 3.14159)
         qapp.processEvents()
 
@@ -77,7 +77,7 @@ class TestScalarWatchUpdate:
     def test_update_complex_formatting(self, sidebar, qapp):
         """Complex values are formatted with real+imag notation."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         sidebar.update_scalar(anchor, 1.5 + 2.3j)
         qapp.processEvents()
 
@@ -89,7 +89,7 @@ class TestScalarWatchUpdate:
     def test_update_scientific_notation(self, sidebar, qapp):
         """Very small float uses scientific notation."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         sidebar.update_scalar(anchor, 0.00012345)
         qapp.processEvents()
 
@@ -106,7 +106,7 @@ class TestScalarWatchRemove:
     def test_remove_scalar(self, sidebar, qapp):
         """Removing a scalar removes its card."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         qapp.processEvents()
         assert sidebar.has_scalar(anchor)
 
@@ -117,7 +117,7 @@ class TestScalarWatchRemove:
     def test_remove_shows_placeholder(self, sidebar, qapp):
         """Removing all scalars shows placeholder again."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
         sidebar.remove_scalar(anchor)
         qapp.processEvents()
 
@@ -126,7 +126,7 @@ class TestScalarWatchRemove:
     def test_remove_emits_signal(self, sidebar, qapp):
         """Removing scalar emits scalar_removed signal."""
         anchor = _make_anchor()
-        sidebar.add_scalar(anchor, QColor("#00ffff"))
+        sidebar.add_scalar(anchor, QColor("#00ffff"), "tr0")
 
         received = []
         sidebar.scalar_removed.connect(lambda a: received.append(a))
@@ -141,8 +141,8 @@ class TestScalarWatchMultiple:
     def test_multiple_scalars_tracked(self, sidebar, qapp):
         """Multiple scalars can be added and all are tracked."""
         anchors = [_make_anchor(f"s{i}", line=i) for i in range(3)]
-        for a in anchors:
-            sidebar.add_scalar(a, QColor("#00ffff"))
+        for i, a in enumerate(anchors):
+            sidebar.add_scalar(a, QColor("#00ffff"), f"tr{i}")
         qapp.processEvents()
 
         watched = sidebar.get_watched_anchors()
@@ -154,8 +154,8 @@ class TestScalarWatchMultiple:
         """Removing one scalar keeps the others."""
         a1 = _make_anchor("keep", line=1)
         a2 = _make_anchor("remove", line=2)
-        sidebar.add_scalar(a1, QColor("#00ffff"))
-        sidebar.add_scalar(a2, QColor("#ff00ff"))
+        sidebar.add_scalar(a1, QColor("#00ffff"), "tr0")
+        sidebar.add_scalar(a2, QColor("#ff00ff"), "tr1")
         qapp.processEvents()
 
         sidebar.remove_scalar(a2)
