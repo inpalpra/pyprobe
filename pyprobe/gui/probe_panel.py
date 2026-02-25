@@ -66,6 +66,8 @@ class ProbePanel(QFrame):
         self._saved_x_range = None
         self._saved_y_range = None
 
+        self._marker_vault = {}  # lens_name -> list[MarkerData]
+
         self._setup_ui()
 
         # M2.5: Focus policy for keyboard shortcuts
@@ -262,9 +264,12 @@ class ProbePanel(QFrame):
         if not plugin:
             return
             
-        # Dispose old marker store so the unified manager drops its markers
+        # Capture markers before disposing old widget
         if self._plot and hasattr(self._plot, '_marker_store'):
-            self._plot._marker_store.dispose()
+            old_lens = self._current_plugin.name if self._current_plugin else "Unknown"
+            self._marker_vault[old_lens] = self._plot._marker_store.get_markers()
+            # Dispose old marker store but KEEP the IDs in the global registry
+            self._plot._marker_store.dispose(release_ids=False)
 
         # Remove old plot widget
         if self._plot:
@@ -276,6 +281,12 @@ class ProbePanel(QFrame):
         self._current_plugin = plugin
         self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
         
+        # Restore markers from vault if any
+        if hasattr(self._plot, '_marker_store'):
+            parked = self._marker_vault.get(plugin_name, [])
+            for m_data in parked:
+                self._plot._marker_store.add_marker_data(m_data)
+
         # Insert into layout (index 1, after header)
         self._layout.insertWidget(1, self._plot)
         self._plot.show()  # Ensure new widget is visible
@@ -860,4 +871,47 @@ class ProbePanel(QFrame):
         if self._plot and hasattr(self._plot, 'get_plot_data'):
             return self._plot.get_plot_data()
         return {'x': [], 'y': []}
+
+    def get_marker_state(self) -> dict:
+        """Return a dictionary mapping lens names to lists of MarkerData."""
+        from ..plots.marker_model import MarkerData
+        state = {lens: list(markers) for lens, markers in self._marker_vault.items()}
+        
+        # Add active markers
+        if self._plot and hasattr(self._plot, '_marker_store'):
+            active_lens = self._current_plugin.name if self._current_plugin else "Unknown"
+            state[active_lens] = self._plot._marker_store.get_markers()
+            
+        return state
+
+    def restore_marker_state(self, state: dict):
+        """Restore marker state from a dictionary of MarkerSpec objects."""
+        from ..plots.marker_model import MarkerData, MarkerType, MarkerShape
+        
+        self._marker_vault = {}
+        for lens_name, spec_list in state.items():
+            markers = []
+            for spec in spec_list:
+                m = MarkerData(
+                    id=spec.id,
+                    x=spec.x,
+                    y=spec.y,
+                    trace_key=spec.trace_key,
+                    marker_type=MarkerType[spec.marker_type],
+                    ref_marker_id=spec.ref_marker_id,
+                    label=spec.label,
+                    shape=MarkerShape[spec.shape] if spec.shape else None,
+                    color=spec.color or '#ffffff'
+                )
+                markers.append(m)
+            self._marker_vault[lens_name] = markers
+            
+        # If any markers for current lens, inject them
+        if self._plot and hasattr(self._plot, '_marker_store'):
+            active_lens = self._current_plugin.name if self._current_plugin else "Unknown"
+            parked = self._marker_vault.get(active_lens, [])
+            if parked:
+                self._plot._marker_store.clear_markers()
+                for m_data in parked:
+                    self._plot._marker_store.add_marker_data(m_data)
 

@@ -87,17 +87,18 @@ class ProbeController(QObject):
         """Access to probe metadata dict."""
         return self._probe_metadata
     
-    def add_probe(self, anchor: ProbeAnchor) -> Optional[QWidget]:
+    def add_probe(self, anchor: ProbeAnchor, lens_name: Optional[str] = None) -> Optional[QWidget]:
         """
         Add a probe for the given anchor.
         
         Args:
             anchor: The anchor to probe
+            lens_name: Optional lens preference to apply immediately
             
         Returns:
             The created ProbePanel, or None if registry is full
         """
-        logger.debug(f"add_probe called with anchor: {anchor}")
+        logger.debug(f"add_probe called with anchor: {anchor}, lens: {lens_name}")
         
         if self._registry.is_full():
             logger.debug("Registry is full, returning")
@@ -111,9 +112,11 @@ class ProbeController(QObject):
         # Initialize metadata
         if anchor not in self._probe_metadata:
             self._probe_metadata[anchor] = {
-                'lens': None,
+                'lens': lens_name,
                 'dtype': None
             }
+        elif lens_name:
+            self._probe_metadata[anchor]['lens'] = lens_name
 
         # Check if this is the first panel for this anchor
         is_first_panel = anchor not in self._probe_panels or not self._probe_panels[anchor]

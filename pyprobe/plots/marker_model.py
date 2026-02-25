@@ -7,6 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 class _StoreSignals(QObject):
     """Module-level signals for MarkerStore lifecycle events."""
     stores_changed = pyqtSignal()
+    marker_content_changed = pyqtSignal()
 
 _store_signals = _StoreSignals()
 
@@ -89,14 +90,21 @@ class MarkerStore(QObject):
         MarkerStore._all_stores.append(self)
         _store_signals.stores_changed.emit()
 
-    def dispose(self):
+    def dispose(self, release_ids: bool = True):
         """Release all IDs owned by this store from the global set. Call before discarding."""
-        for m_id in list(self._markers.keys()):
-            MarkerStore._global_used_ids.discard(m_id)
+        if release_ids:
+            for m_id in list(self._markers.keys()):
+                MarkerStore._global_used_ids.discard(m_id)
         self._markers.clear()
         if self in MarkerStore._all_stores:
             MarkerStore._all_stores.remove(self)
         _store_signals.stores_changed.emit()
+
+    def add_marker_data(self, data: MarkerData):
+        """Add an existing MarkerData object (e.g., from persistence)."""
+        self._markers[data.id] = data
+        MarkerStore._global_used_ids.add(data.id)
+        self.markers_changed.emit()
 
     def add_marker(self, trace_key: Union[int, str], x: float, y: float, color: str = '#ffffff') -> MarkerData:
         m_id = self.get_next_id()
@@ -110,6 +118,7 @@ class MarkerStore(QObject):
         data = MarkerData(id=m_id, x=x, y=y, trace_key=trace_key, color=color)
         self._markers[m_id] = data
         self.markers_changed.emit()
+        _store_signals.marker_content_changed.emit()
         return data
 
     def remove_marker(self, marker_id: str):
@@ -123,6 +132,7 @@ class MarkerStore(QObject):
             del self._markers[marker_id]
             MarkerStore._global_used_ids.discard(marker_id)
             self.markers_changed.emit()
+            _store_signals.marker_content_changed.emit()
 
     def update_marker(self, marker_id: str, **kwargs):
         if marker_id not in self._markers:
@@ -145,6 +155,7 @@ class MarkerStore(QObject):
                         dep.x += dx
 
         self.markers_changed.emit()
+        _store_signals.marker_content_changed.emit()
 
     def clear_markers(self) -> None:
         """Remove all markers."""
@@ -154,6 +165,7 @@ class MarkerStore(QObject):
             MarkerStore._global_used_ids.discard(m_id)
         self._markers.clear()
         self.markers_changed.emit()
+        _store_signals.marker_content_changed.emit()
 
     def get_markers(self) -> List[MarkerData]:
         return list(self._markers.values())

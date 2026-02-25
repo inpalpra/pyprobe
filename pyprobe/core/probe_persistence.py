@@ -17,6 +17,20 @@ logger = get_logger(__name__)
 
 
 @dataclass
+class MarkerSpec:
+    """Specification for a saved marker."""
+    id: str
+    x: float
+    y: float
+    trace_key: Any
+    marker_type: str
+    ref_marker_id: Optional[str] = None
+    label: Optional[str] = None
+    shape: Optional[str] = None
+    color: Optional[str] = None
+
+
+@dataclass
 class ProbeSpec:
     """Specification for a saved probe."""
     file: str
@@ -27,10 +41,11 @@ class ProbeSpec:
     is_assignment: bool
     color: Optional[str] = None
     lens: Optional[str] = None
+    markers: Dict[str, List[MarkerSpec]] = field(default_factory=dict)
     
     @classmethod
-    def from_anchor(cls, anchor: ProbeAnchor, color: str = None, lens: str = None) -> 'ProbeSpec':
-        return cls(
+    def from_anchor(cls, anchor: ProbeAnchor, color: str = None, lens: str = None, markers: dict = None) -> 'ProbeSpec':
+        spec = cls(
             file=anchor.file,
             line=anchor.line,
             col=anchor.col,
@@ -40,6 +55,23 @@ class ProbeSpec:
             color=color,
             lens=lens,
         )
+        if markers:
+            from ..plots.marker_model import MarkerData
+            for lens_name, m_list in markers.items():
+                spec.markers[lens_name] = []
+                for m in m_list:
+                    spec.markers[lens_name].append(MarkerSpec(
+                        id=m.id,
+                        x=m.x,
+                        y=m.y,
+                        trace_key=m.trace_key,
+                        marker_type=m.marker_type.name,
+                        ref_marker_id=m.ref_marker_id,
+                        label=m.label,
+                        shape=m.shape.name if m.shape else None,
+                        color=m.color
+                    ))
+        return spec
     
     def to_anchor(self) -> ProbeAnchor:
         return ProbeAnchor(
@@ -109,7 +141,12 @@ class ProbeSettings:
         
         for p in data.get("probes", []):
             try:
-                settings.probes.append(ProbeSpec(**p))
+                # Extract markers if present
+                markers_data = p.pop("markers", {})
+                spec = ProbeSpec(**p)
+                for lens_name, m_list in markers_data.items():
+                    spec.markers[lens_name] = [MarkerSpec(**m) for m in m_list]
+                settings.probes.append(spec)
             except TypeError as e:
                 logger.warning(f"Failed to parse ProbeSpec: {e}")
                 

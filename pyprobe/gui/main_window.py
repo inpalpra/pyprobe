@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
 
         # M1: Source file content cache for anchor mapping
         self._last_source_content: Optional[str] = None
+        self._pending_markers = {} # (line, symbol) -> markers_dict
 
         self._setup_ui()
         self._setup_signals()
@@ -255,11 +256,15 @@ class MainWindow(QMainWindow):
                         self._probe_registry._color_manager.reserve_color(anchor, color)
                 
                 # Add probe
-                self._on_probe_requested(anchor)
+                self._on_probe_requested(anchor, lens_name=lens_str)
                 
-                # Apply lens if specified
-                if lens_str and anchor in self._probe_controller._probe_metadata:
-                    self._probe_controller._probe_metadata[anchor]['lens'] = lens_str
+                # Apply stored markers if any
+                panel_list = self._probe_controller.probe_panels.get(anchor, [])
+                if panel_list and (anchor.line, anchor.symbol) in self._pending_markers:
+                    panel = panel_list[-1]
+                    markers_data = self._pending_markers[(anchor.line, anchor.symbol)]
+                    if hasattr(panel, 'restore_marker_state'):
+                        panel.restore_marker_state(markers_data)
                     
                 logger.info(f"Added CLI probe for {symbol} at {line}:{var_loc.col_start}")
             else:
@@ -537,6 +542,10 @@ class MainWindow(QMainWindow):
         lm = self._probe_container.layout_manager
         lm.panel_park_requested.connect(self._on_panel_park_requested)
         lm.panel_unpark_requested.connect(self._on_dock_bar_restore_anchor)
+
+        # M3: Connect marker changes to save
+        from ..plots.marker_model import MarkerStore
+        MarkerStore.store_signals().marker_content_changed.connect(self._save_probe_settings)
 
     def _setup_fps_timer(self):
         """Set up timer for FPS counter."""
@@ -875,6 +884,7 @@ class MainWindow(QMainWindow):
             return
             
         settings = load_probe_settings(self._script_path)
+        self._pending_markers = {}
         
         # Load probes
         for p in settings.probes:
@@ -886,6 +896,10 @@ class MainWindow(QMainWindow):
                 if p.lens:
                     cli_str += f":{p.lens}"
             self._cli_probes.append(cli_str)
+            
+            # Store markers for later restoration
+            if p.markers:
+                self._pending_markers[(p.line, p.symbol)] = p.markers
             
         # Load watches
         for w in settings.watches:
@@ -909,21 +923,32 @@ class MainWindow(QMainWindow):
         for anchor in self._probe_registry.active_anchors:
             if anchor.file != self._script_path:
                 continue  # Only save probes belonging to this file
-            spec = ProbeSpec.from_anchor(anchor)
             
             # Extract color
+            color_hex = None
             color = self._probe_registry.get_color(anchor)
             if color:
-                spec.color = color.name()
+                color_hex = color.name()
                 
-            # Extract lens if available in controller metadata
-            if hasattr(self, '_probe_controller') and anchor in self._probe_controller._probe_metadata:
-                metadata = self._probe_controller._probe_metadata[anchor]
-                # Only save active probes (not purely overlay sources)
-                if metadata.get('overlay_target') is not None:
-                    continue
-                spec.lens = metadata.get('lens')
+            # Extract lens and markers from panels if available
+            lens = None
+            markers = None
+            if hasattr(self, '_probe_controller'):
+                # Check metadata for lens
+                if anchor in self._probe_controller._probe_metadata:
+                    metadata = self._probe_controller._probe_metadata[anchor]
+                    if metadata.get('overlay_target') is not None:
+                        continue
+                    lens = metadata.get('lens')
                 
+                # Check panels for markers
+                panel_list = self._probe_controller._probe_panels.get(anchor, [])
+                if panel_list:
+                    panel = panel_list[-1]
+                    if hasattr(panel, 'get_marker_state'):
+                        markers = panel.get_marker_state()
+            
+            spec = ProbeSpec.from_anchor(anchor, color=color_hex, lens=lens, markers=markers)
             settings.probes.append(spec)
             
         # Save watches from sidebar (only those belonging to this file)
@@ -1075,9 +1100,9 @@ class MainWindow(QMainWindow):
     # === M1: ANCHOR-BASED PROBE HANDLERS ===
 
     @pyqtSlot(object)
-    def _on_probe_requested(self, anchor: ProbeAnchor):
+    def _on_probe_requested(self, anchor: ProbeAnchor, lens_name: Optional[str] = None):
         """Handle click-to-probe request from code viewer."""
-        panel = self._probe_controller.add_probe(anchor)
+        panel = self._probe_controller.add_probe(anchor, lens_name=lens_name)
         if panel:
             # Mark as graphical probe in code viewer
             self._code_viewer.set_probe_graphical(anchor)
