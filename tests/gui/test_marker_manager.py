@@ -68,3 +68,43 @@ def test_marker_manager_interactions(qtbot, clean_marker_stores):
     
     qtbot.waitUntil(lambda: manager.table.rowCount() == 0)
     assert len(store1.get_markers()) == 0
+
+def test_marker_manager_relative_selection(qtbot, clean_marker_stores):
+    store = MarkerStore(parent=None)
+    m1 = store.add_marker(trace_key=0, x=1.0, y=10.0)
+    m2 = store.add_marker(trace_key=0, x=2.0, y=20.0)
+    
+    manager = MarkerManager()
+    qtbot.addWidget(manager)
+    manager.detailed_chk.setChecked(True)
+    manager.show()
+    
+    qtbot.waitUntil(lambda: manager.table.rowCount() == 2)
+    
+    # m2 is row 1 (m1 is m0, m2 is m1 internally often, but let's check labels)
+    row_m2 = -1
+    for r in range(2):
+        if m2.id in manager.table.cellWidget(r, 1).text():
+            row_m2 = r
+            break
+            
+    # Click "Rel" button in TypeToggleWidget
+    toggle_container = manager.table.cellWidget(row_m2, 6)
+    from pyprobe.gui.marker_manager import TypeToggleWidget
+    toggle = toggle_container._child_widget
+    assert isinstance(toggle, TypeToggleWidget)
+    
+    qtbot.mouseClick(toggle.rel_btn, Qt.MouseButton.LeftButton)
+    assert store.get_marker(m2.id).marker_type == MarkerType.RELATIVE
+    
+    # Check that ref_box is now enabled
+    ref_container = manager.table.cellWidget(row_m2, 7)
+    ref_box = ref_container._child_widget
+    assert ref_box.isEnabled()
+    
+    # Select m1 as reference
+    idx = ref_box.findText(m1.id)
+    ref_box.setCurrentIndex(idx)
+    
+    qtbot.wait(10)
+    assert store.get_marker(m2.id).ref_marker_id == m1.id

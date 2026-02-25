@@ -1,10 +1,18 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
                              QPushButton, QComboBox, QLineEdit, QWidget,
-                             QDoubleSpinBox, QLabel, QHeaderView, QColorDialog, QCheckBox)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+                             QDoubleSpinBox, QLabel, QHeaderView, QColorDialog, QCheckBox,
+                             QStyledItemDelegate)
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
 from PyQt6.QtGui import QColor
 
 from ..plots.marker_model import MarkerStore, MarkerType, MarkerShape
+
+
+class ItemHeightDelegate(QStyledItemDelegate):
+    def sizeHint(self, option, index):
+        size = super().sizeHint(option, index)
+        size.setHeight(24)
+        return size
 
 
 class TypeToggleWidget(QWidget):
@@ -183,6 +191,25 @@ class MarkerManager(QDialog):
                 margin: 0px;
                 text-align: center;
             }}
+            QComboBox QAbstractItemView {{
+                background-color: {c['bg_medium']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border_default']};
+                selection-background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
+                selection-color: {c['bg_dark'] if 'accent_primary' in c else c['text_primary']};
+                min-height: 100px;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 24px;
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
+                color: {c['bg_darkest'] if 'bg_darkest' in c else c['bg_dark']};
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
+                color: {c['bg_darkest'] if 'bg_darkest' in c else c['bg_dark']};
+            }}
             QComboBox::drop-down, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
                 border: none;
                 background: transparent;
@@ -209,6 +236,7 @@ class MarkerManager(QDialog):
         self._rebuild_pending = False
         self._current_row_markers = []
         self._connected_stores: list[MarkerStore] = []
+        self._combo_delegate = ItemHeightDelegate(self)
 
         # Connect to store lifecycle signals
         MarkerStore.store_signals().stores_changed.connect(self._on_stores_changed)
@@ -362,6 +390,8 @@ class MarkerManager(QDialog):
                 keys = [0]
 
             trace_box = QComboBox()
+            trace_box.setItemDelegate(self._combo_delegate)
+            trace_box.setMaxVisibleItems(15)
             for k in keys:
                 trace_box.addItem(str(k), k)
             idx = trace_box.findData(m.trace_key)
@@ -378,6 +408,9 @@ class MarkerManager(QDialog):
             # Ref — only show markers from the same store
             same_store_markers = [row for row in all_rows if row[0] is store]
             ref_box = QComboBox()
+            ref_box.setItemDelegate(self._combo_delegate)
+            ref_box.view().setMinimumWidth(80) # Ensure menu is wide enough
+            ref_box.setMaxVisibleItems(15) # Show more items to avoid scrolling
             ref_box.addItem("None", None)
             for _, other_m, _ in same_store_markers:
                 if other_m.id != m.id:
@@ -392,7 +425,9 @@ class MarkerManager(QDialog):
 
             # Shape
             shape_box = QComboBox()
+            shape_box.setItemDelegate(self._combo_delegate)
             shape_box.view().setMinimumWidth(60)
+            shape_box.setMaxVisibleItems(15)
             shape_box.setStyleSheet(f"font-size: 16px; color: {m.color};")
             for sh in MarkerShape:
                 shape_box.addItem(SHAPE_SYMBOLS.get(sh, sh.name), sh)
