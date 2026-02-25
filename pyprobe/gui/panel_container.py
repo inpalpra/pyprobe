@@ -13,6 +13,7 @@ from pyprobe.logging import get_logger
 logger = get_logger(__name__)
 
 from ..core.anchor import ProbeAnchor
+from ..core.window_id_manager import WindowIDManager
 from .probe_panel import ProbePanel
 
 
@@ -30,6 +31,7 @@ class ProbePanelContainer(QScrollArea):
         self._panels: Dict[ProbeAnchor, List[ProbePanel]] = {}
         self._panels_by_name: Dict[str, ProbePanel] = {}  # For legacy access
         self._parked_panels: set = set()  # Track parked panel anchors
+        self._wid_manager = WindowIDManager()
 
         # M2.5: Layout manager and focus manager
         from .layout_manager import LayoutManager
@@ -74,7 +76,8 @@ class ProbePanelContainer(QScrollArea):
         var_name: str,
         dtype: str,
         anchor: Optional[ProbeAnchor] = None,
-        color: Optional[QColor] = None
+        color: Optional[QColor] = None,
+        trace_id: str = ""
     ) -> ProbePanel:
         """
         Create a new probe panel for a variable.
@@ -84,6 +87,7 @@ class ProbePanelContainer(QScrollArea):
             dtype: Data type string
             anchor: ProbeAnchor for the probe location
             color: Assigned color for the probe
+            trace_id: Trace ID (e.g., tr0)
         """
         logger.debug(f"create_panel called: var_name={var_name}, anchor={anchor}")
         logger.debug(f"  _panels keys: {list(self._panels.keys())}")
@@ -112,8 +116,11 @@ class ProbePanelContainer(QScrollArea):
         # Hide placeholder
         self._placeholder.hide()
 
+        # Allocate window ID
+        window_id = self._wid_manager.allocate()
+
         # Create panel
-        panel = ProbePanel(anchor, color, dtype, self._content)
+        panel = ProbePanel(anchor, color, dtype, trace_id, window_id, self._content)
         if anchor not in self._panels:
             self._panels[anchor] = []
         self._panels[anchor].append(panel)
@@ -202,6 +209,10 @@ class ProbePanelContainer(QScrollArea):
 
         # M2.5: Unregister from focus manager
         self._focus_manager.unregister_panel(target_panel)
+
+        # Release window ID
+        if hasattr(target_panel, "window_id"):
+            self._wid_manager.release(target_panel.window_id)
 
         self._layout.removeWidget(target_panel)
         target_panel.deleteLater()
@@ -306,13 +317,14 @@ class ProbePanelContainer(QScrollArea):
 
     # === M1 CONVENIENCE METHODS ===
 
-    def create_probe_panel(self, anchor: ProbeAnchor, color: QColor) -> ProbePanel:
+    def create_probe_panel(self, anchor: ProbeAnchor, color: QColor, trace_id: str = "") -> ProbePanel:
         """Create a probe panel for an anchor (M1 API)."""
         return self.create_panel(
             var_name=anchor.symbol,
             dtype='unknown',
             anchor=anchor,
-            color=color
+            color=color,
+            trace_id=trace_id
         )
 
     def remove_probe_panel(self, anchor: ProbeAnchor = None, panel: ProbePanel = None):

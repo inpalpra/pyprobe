@@ -47,6 +47,7 @@ class ProbePanel(QFrame):
         color: QColor,
         dtype: str,
         trace_id: str = "",
+        window_id: str = "",
         parent: Optional[QWidget] = None
     ):
         super().__init__(parent)
@@ -55,6 +56,7 @@ class ProbePanel(QFrame):
         self._color = color
         self._dtype = dtype
         self._trace_id = trace_id
+        self._window_id = window_id
         self._plot: Optional[BasePlot] = None
         self._current_plugin: Optional['ProbePlugin'] = None
         self._removal_animation = None
@@ -100,6 +102,11 @@ class ProbePanel(QFrame):
         # State indicator (16x16 pulsing/solid circle)
         self._state_indicator = ProbeStateIndicator()
         header.addWidget(self._state_indicator)
+
+        # Window ID label (e.g., w0)
+        self._wid_label = QLabel(self._window_id)
+        self._wid_label.setStyleSheet("color: #ffa500; font-weight: bold; font-family: monospace; font-size: 11px;")
+        header.addWidget(self._wid_label)
 
         # Trace ID label (e.g., tr0)
         self._id_label = QLabel(self._trace_id)
@@ -866,6 +873,11 @@ class ProbePanel(QFrame):
     def anchor(self) -> ProbeAnchor:
         """Return the probe anchor."""
         return self._anchor
+
+    @property
+    def window_id(self) -> str:
+        """Return the window ID (e.g. w0)."""
+        return self._window_id
 
     @property
     def var_name(self) -> str:

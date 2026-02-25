@@ -11,7 +11,7 @@ Establish the underlying data structures to track windows and their trace depend
 ## Phase 2: Graph Window Lifecycle (Creation & Destruction)
 Integrate the new window management into the UI and implement the "Close" functionality.
 
-- [ ] Task: Update `LayoutManager` to assign `WindowID` to all new plot windows.
+- [~] Task: Update `LayoutManager` to assign `WindowID` to all new plot windows.
 - [ ] Task: Add a 'Close' button (X) to the `PlotWidget` header/container.
 - [ ] Task: Implement `PlotWidget.close_window()` which removes itself from the layout and notifies `TraceReferenceManager`.
 - [ ] Task: Write Tests: Verify that closing a window correctly removes it from the UI and reduces reference counts for all contained traces.

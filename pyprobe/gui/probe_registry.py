@@ -109,6 +109,8 @@ class ProbeRegistry(QObject):
         if anchor in self._probes:
             return self._trace_id_manager.allocate(anchor.identity_label())
         return None
+
+    def update_data_received(self, anchor: ProbeAnchor) -> None:
         """
         Update liveness when data is received.
 

@@ -36,7 +36,7 @@ def test_delete_equation(qapp):
     # Delete eq0 (it's at row 0)
     # Find delete button in row 0, column 2
     container = dialog.table.cellWidget(0, 2)
-    del_btn = container.layout().itemAt(1).widget()
+    del_btn = container.layout().itemAt(2).widget()
     del_btn.click()
     
     assert len(manager.equations) == 1
