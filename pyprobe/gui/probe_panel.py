@@ -38,6 +38,7 @@ class ProbePanel(QFrame):
     status_message_requested = pyqtSignal(str)
     color_changed = pyqtSignal(object, object)  # (ProbeAnchor, QColor)
     overlay_requested = pyqtSignal(object, object)  # (self/panel, ProbeAnchor)
+    equation_overlay_requested = pyqtSignal(object, str)  # (self/panel, eq_id)
     overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
 
     def __init__(
@@ -696,8 +697,9 @@ class ProbePanel(QFrame):
     # === M2.5: Drag-and-drop overlay ===
 
     def dragEnterEvent(self, event) -> None:
-        """Accept anchor drags for signal overlay."""
-        if event.mimeData() and has_anchor_mime(event.mimeData()):
+        """Accept anchor or equation drags for signal overlay."""
+        mime = event.mimeData()
+        if mime and (has_anchor_mime(mime) or mime.hasFormat("application/x-pyprobe-equation")):
             event.acceptProposedAction()
             self._show_drop_highlight(True)
         else:
@@ -709,10 +711,14 @@ class ProbePanel(QFrame):
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event) -> None:
-        """Handle drop of anchor data for overlay."""
+        """Handle drop of anchor or equation data for overlay."""
         self._show_drop_highlight(False)
-        if event.mimeData() and has_anchor_mime(event.mimeData()):
-            data = decode_anchor_mime(event.mimeData())
+        mime = event.mimeData()
+        if not mime:
+            return
+
+        if has_anchor_mime(mime):
+            data = decode_anchor_mime(mime)
             if data:
                 anchor = ProbeAnchor(
                     file=data['file'],
@@ -724,8 +730,10 @@ class ProbePanel(QFrame):
                 )
                 self.overlay_requested.emit(self, anchor)
                 event.acceptProposedAction()
-            else:
-                event.ignore()
+        elif mime.hasFormat("application/x-pyprobe-equation"):
+            eq_id = mime.data("application/x-pyprobe-equation").data().decode()
+            self.equation_overlay_requested.emit(self, eq_id)
+            event.acceptProposedAction()
         else:
             event.ignore()
 

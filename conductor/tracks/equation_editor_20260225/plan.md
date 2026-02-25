@@ -27,7 +27,7 @@ Build the modal dialog for managing equations.
 ## Phase 4: Plotting and Drag-and-Drop
 Enable plotting equation results and dragging them into windows.
 
-- [ ] Task: Implement `EquationPlotManager` to handle plotting `eq<n>` results.
-- [ ] Task: Enable drag-and-drop from the `EquationEditorDialog` to plot windows.
-- [ ] Task: Ensure real-time updates for equation plots.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Plotting and Drag-and-Drop' (Protocol in workflow.md)
+- [x] Task: Implement `EquationPlotManager` to handle plotting `eq<n>` results. 7a8b9c0
+- [x] Task: Enable drag-and-drop from the `EquationEditorDialog` to plot windows. 7a8b9c0
+- [x] Task: Ensure real-time updates for equation plots. 7a8b9c0
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Plotting and Drag-and-Drop' (Protocol in workflow.md)

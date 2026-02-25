@@ -13,6 +13,7 @@ class EquationEditorDialog(QDialog):
     Dialog for managing mathematical equations.
     """
     _instance = None
+    plot_requested = pyqtSignal(str) # eq_id
 
     @classmethod
     def show_instance(cls, manager: EquationManager, parent=None):
@@ -97,6 +98,12 @@ class EquationEditorDialog(QDialog):
         status_layout = QHBoxLayout()
         status_layout.setContentsMargins(4, 0, 4, 0)
         
+        plot_btn = QPushButton("Plot")
+        plot_btn.setFixedSize(40, 20)
+        plot_btn.setStyleSheet("font-size: 10px; padding: 0px;")
+        plot_btn.clicked.connect(lambda _, eid=eq.id: self.plot_requested.emit(eid))
+        status_layout.addWidget(plot_btn)
+
         status_lbl = QLabel("?")
         status_layout.addWidget(status_lbl)
         

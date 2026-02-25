@@ -37,6 +37,11 @@ class ProbeController(QObject):
     probe_removed = pyqtSignal(object)  # anchor
     status_message = pyqtSignal(str)
     
+    # Overlay signals (forwarded from panels)
+    overlay_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
+    equation_overlay_requested = pyqtSignal(object, str)  # (target_panel, eq_id)
+    overlay_remove_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
+    
     def __init__(
         self, 
         registry,
@@ -138,6 +143,11 @@ class ProbeController(QObject):
         
         # Connect hover coordinate signal
         panel.status_message_requested.connect(self.status_message.emit)
+        
+        # Connect overlay signals
+        panel.overlay_requested.connect(self.overlay_requested.emit)
+        panel.equation_overlay_requested.connect(self.equation_overlay_requested.emit)
+        panel.overlay_remove_requested.connect(self.overlay_remove_requested.emit)
         
         # Connect lens changed signal
         if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:

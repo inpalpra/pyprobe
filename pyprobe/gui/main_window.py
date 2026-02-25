@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor, QAction, QActionGroup
 import multiprocessing as mp
 import os
 import sys
+import numpy as np
 
 from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
@@ -469,10 +470,6 @@ class MainWindow(QMainWindow):
         self._theme_action_group = QActionGroup(self)
         self._theme_action_group.setExclusive(True)
 
-    def _show_equation_editor(self):
-        """Show the equation editor dialog."""
-        EquationEditorDialog.show_instance(self._equation_manager, self)
-
         manager = ThemeManager.instance()
         current_theme_id = manager.current.id
 
@@ -488,6 +485,49 @@ class MainWindow(QMainWindow):
             self._theme_actions[theme.id] = action
 
         manager.theme_changed.connect(self._on_theme_changed)
+
+    def _show_equation_editor(self):
+        """Show the equation editor dialog."""
+        dialog = EquationEditorDialog.show_instance(self._equation_manager, self)
+        dialog.plot_requested.connect(self._on_equation_plot_requested)
+
+    def _on_equation_plot_requested(self, eq_id: str):
+        """Handle 'Plot' click from Equation Editor."""
+        # Create a new panel for the equation
+        if not hasattr(self, "_equation_to_panels"):
+            self._equation_to_panels = {}
+            
+        eq = self._equation_manager.equations.get(eq_id)
+        if not eq:
+            return
+            
+        # Create a dummy anchor for the equation
+        dummy_anchor = ProbeAnchor(file="<equation>", line=0, col=0, symbol=eq_id)
+        
+        # Determine dtype
+        dtype = 'unknown'
+        if eq.result is not None:
+            dtype = 'array_1d' if not np.iscomplexobj(eq.result) else 'array_complex'
+            
+        # Add to registry (using a fake color)
+        color = QColor('#00ffff')
+        
+        # For now, let's create the panel directly in the container
+        panel = self._probe_container.create_panel(
+            var_name=eq_id,
+            dtype=dtype,
+            anchor=dummy_anchor,
+            color=color,
+            trace_id=eq_id
+        )
+        
+        if eq_id not in self._equation_to_panels:
+            self._equation_to_panels[eq_id] = []
+        self._equation_to_panels[eq_id].append(panel)
+        
+        # Trigger update if data available
+        if eq.result is not None:
+            self._update_equation_plots()
 
     def _on_theme_selected(self, theme_id: str, checked: bool) -> None:
         """Handle a user selecting a theme from the menu."""
@@ -662,6 +702,11 @@ class MainWindow(QMainWindow):
     def _setup_probe_controller(self):
         """Connect ProbeController signals to slots."""
         self._probe_controller.status_message.connect(self._on_probe_status_message)
+        
+        # M2.5 & M4: Overlay signals
+        self._probe_controller.overlay_requested.connect(self._on_overlay_requested)
+        self._probe_controller.equation_overlay_requested.connect(self._on_equation_overlay_requested)
+        self._probe_controller.overlay_remove_requested.connect(self._on_overlay_remove_requested)
 
     def _on_probe_status_message(self, msg: str):
         """Route coordinate messages to right-side label, others to status bar."""
@@ -732,7 +777,7 @@ class MainWindow(QMainWindow):
         if self._equation_manager.equations:
             self._equation_manager.evaluate_all(self._latest_trace_data)
             # Update any widgets currently plotting equations
-            # self._update_equation_plots() # To be implemented in Phase 4
+            self._update_equation_plots()
 
     def _update_fps(self):
         """Update FPS display."""
@@ -1457,6 +1502,69 @@ class MainWindow(QMainWindow):
     def _on_overlay_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
         """Handle overlay drop request - delegate to ProbeController."""
         self._probe_controller.handle_overlay_requested(target_panel, overlay_anchor)
+
+    def _on_equation_overlay_requested(self, target_panel: ProbePanel, eq_id: str) -> None:
+        """Handle equation drop request."""
+        if not hasattr(self, "_equation_to_panels"):
+            self._equation_to_panels = {}
+        
+        if eq_id not in self._equation_to_panels:
+            self._equation_to_panels[eq_id] = []
+        
+        if target_panel not in self._equation_to_panels[eq_id]:
+            self._equation_to_panels[eq_id].append(target_panel)
+            logger.info(f"Overlaid {eq_id} on panel {target_panel._anchor.symbol}")
+            
+            # Trigger update if data is available
+            eq = self._equation_manager.equations.get(eq_id)
+            if eq and eq.result is not None:
+                self._update_equation_plots()
+
+    def _update_equation_plots(self):
+        """Update all panels that have equation overlays."""
+        if not hasattr(self, "_equation_to_panels"):
+            return
+            
+        from pyprobe.plugins.builtins.waveform import WaveformWidget
+        from pyprobe.plugins.builtins.constellation import ConstellationWidget
+        
+        for eq_id, panels in self._equation_to_panels.items():
+            eq = self._equation_manager.equations.get(eq_id)
+            if not eq or eq.result is None:
+                continue
+                
+            # Ensure result is a numpy array
+            result = eq.result
+            if not isinstance(result, np.ndarray):
+                result = np.atleast_1d(result)
+                
+            for panel in list(panels):
+                # Check if panel still exists
+                try:
+                    panel.objectName()
+                except RuntimeError:
+                    panels.remove(panel)
+                    continue
+                    
+                plot = panel._plot
+                if plot is None:
+                    continue
+                
+                # Treat equation result as an 'anchor' for overlay logic purposes
+                # but with a special symbol eq_id
+                dummy_anchor = ProbeAnchor(file="", line=0, col=0, symbol=eq_id)
+                
+                if isinstance(plot, WaveformWidget):
+                    dtype = 'array_1d' if not np.iscomplexobj(result) else 'array_complex'
+                    self._probe_controller._add_overlay_to_waveform(
+                        plot, dummy_anchor, result, dtype, result.shape,
+                        primary_anchor=panel._anchor
+                    )
+                elif isinstance(plot, ConstellationWidget):
+                    self._probe_controller._add_overlay_to_constellation(
+                        plot, dummy_anchor, result, 'array_complex', result.shape,
+                        primary_anchor=panel._anchor
+                    )
 
     def _forward_overlay_data(self, anchor: ProbeAnchor, payload: dict) -> None:
         """Forward overlay probe data - delegate to ProbeController."""
