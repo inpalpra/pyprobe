@@ -386,6 +386,11 @@ class MarkerManager(QDialog):
                 if idx >= 0 and ref_box.currentIndex() != idx:
                     ref_box.setCurrentIndex(idx)
                 
+                # Update enabled state
+                is_rel = m.marker_type == MarkerType.RELATIVE
+                if ref_box.isEnabled() != is_rel:
+                    ref_box.setEnabled(is_rel)
+                
             shape_box = self.table.cellWidget(i, 8)
             if shape_box and hasattr(shape_box, '_child_widget'):
                 shape_box = shape_box._child_widget
@@ -410,6 +415,24 @@ class MarkerManager(QDialog):
             self._self_updating = True
             store.update_marker(marker_id, **kwargs)
             self._self_updating = False
+            
+            # Immediately synchronize UI for this specific update
+            # We don't want a full rebuild (deferred), but we do want existing widgets to reflect the new state.
+            stores = MarkerStore.all_stores()
+            all_rows = []
+            for s in stores:
+                label = _store_label(s)
+                for m in s.get_markers():
+                    all_rows.append((s, m, label))
+            
+            # Sort as in _populate_table
+            def safe_sort_key(row):
+                try:
+                    return int(row[1].id[1:])
+                except ValueError:
+                    return 999
+            all_rows.sort(key=safe_sort_key)
+            self._update_existing_rows(all_rows)
 
     def _centered_widget(self, widget, stretch=True):
         from PyQt6.QtWidgets import QWidget, QHBoxLayout
