@@ -13,21 +13,21 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
-      "col": 8,
-      "symbol": "received_symbols",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#ee2b2b",
-      "lens": null
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
       "col": 36,
       "symbol": "signal_q",
       "func": "main",
       "is_assignment": true,
       "color": "#eed52b",
+      "lens": null
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
+      "col": 8,
+      "symbol": "received_symbols",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
       "lens": null
     }
   ],

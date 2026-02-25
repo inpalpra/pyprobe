@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "pyprobe-plots"
-version = "0.1.21"
+version = "0.1.25"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
