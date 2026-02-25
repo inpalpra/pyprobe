@@ -1,0 +1,8 @@
+{
+  "track_id": "marker_persistence_20260225",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-02-25T14:30:00Z",
+  "updated_at": "2026-02-25T14:30:00Z",
+  "description": "if i create a bunch of markers on a waveform graph, then switch view to FFT mag and phase, and then switch back to waveform view, i lose all my markers and must set them up again. i don't want to lose my markers just because i switched views/lenses"
+}
