@@ -1,0 +1,8 @@
+{
+  "track_id": "complex_marker_snap_20260225",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-02-25T14:30:00Z",
+  "updated_at": "2026-02-25T14:30:00Z",
+  "description": "when dragging markers in waveform graph or fft mag/phase lens of waveform, markers stick to the trace smoothly. the same is not true for complex waveforms. there, markers are not moving smoothly, sticking to the trace. there, the marker is allowed to go away from trace as long as mouse button is down and i am dragging the marker. When i release the mouse button, the marker snaps to the nearest point on trace. fix this. Obviously, this should not apply for constellation lens. But for every other lens for complex data, fix it."
+}
