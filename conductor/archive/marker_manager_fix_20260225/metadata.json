@@ -1,0 +1,8 @@
+{
+  "track_id": "marker_manager_fix_20260225",
+  "type": "bug_fix",
+  "status": "new",
+  "created_at": "2026-02-25T14:30:00Z",
+  "updated_at": "2026-02-25T14:30:00Z",
+  "description": "In marker manager, after setting type as relative for a marker, i should be allowed to set another marker as reference. Fix bug where ref list stays disabled/empty and simplify type selection UI."
+}
