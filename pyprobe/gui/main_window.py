@@ -15,10 +15,15 @@ import multiprocessing as mp
 import os
 import sys
 import numpy as np
-import sip
+from PyQt6 import sip
 
 from pyprobe.logging import get_logger, trace_print
 logger = get_logger(__name__)
+
+
+def is_obj_deleted(obj):
+    """Safely check if a Qt object has been deleted."""
+    return obj is None or sip.isdeleted(obj)
 
 from .probe_panel import ProbePanel
 from .panel_container import ProbePanelContainer
@@ -44,6 +49,7 @@ from .dock_bar import DockBar
 from .script_runner import ScriptRunner
 from .message_handler import MessageHandler
 from .probe_controller import ProbeController
+from ..core.trace_reference_manager import TraceReferenceManager
 from .scalar_watch_window import ScalarWatchSidebar
 from .redraw_throttler import RedrawThrottler
 from .file_tree import FileTreePanel
@@ -613,6 +619,9 @@ class MainWindow(QMainWindow):
         # M3: Connect marker changes to save
         from ..plots.marker_model import MarkerStore
         MarkerStore.store_signals().marker_content_changed.connect(self._save_probe_settings)
+
+        # Phase 5: Global unprobing integration
+        TraceReferenceManager.instance().unprobe_signal.connect(self._on_unprobe_requested)
 
     def _setup_fps_timer(self):
         """Set up timer for FPS counter."""
@@ -1588,3 +1597,48 @@ class MainWindow(QMainWindow):
     def _on_overlay_remove_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
         """Handle overlay removal request - delegate to ProbeController."""
         self._probe_controller.remove_overlay(target_panel, overlay_anchor)
+
+    @pyqtSlot(str)
+    def _on_unprobe_requested(self, trace_id: str) -> None:
+        """
+        Handle a trace reaching zero references.
+        Global cleanup of registry, code viewer, and runner.
+        """
+        print(f"DEBUG: MainWindow._on_unprobe_requested: {trace_id}", file=sys.stderr)
+        
+        if trace_id.startswith("tr"):
+            anchor = self._probe_registry.get_anchor_by_trace_id(trace_id)
+            print(f"DEBUG:   Found anchor: {anchor}", file=sys.stderr)
+            if anchor:
+                # Check if any non-deleted, non-closing panels remain for this anchor
+                active_panels = [
+                    p for p in self._probe_panels.get(anchor, []) 
+                    if not is_obj_deleted(p) and not getattr(p, "is_closing", False)
+                ]
+                print(f"DEBUG:   Active panels: {len(active_panels)}", file=sys.stderr)
+                
+                if not active_panels:
+                    print(f"DEBUG:   Performing global cleanup for {anchor.symbol}", file=sys.stderr)
+                    # Global cleanup (copy from controller.complete_probe_removal logic)
+                    self._probe_registry.remove_probe(anchor)
+                    self._code_viewer.remove_probe(anchor)
+                    self._code_gutter.clear_probed_line(anchor.line)
+                    
+                    # Remove from metadata if present
+                    if anchor in self._probe_controller._probe_metadata:
+                        del self._probe_controller._probe_metadata[anchor]
+                    
+                    # Send to runner
+                    ipc = self._script_runner.ipc
+                    if ipc and self._script_runner.is_running:
+                        msg = make_remove_probe_cmd(anchor)
+                        ipc.send_command(msg)
+                    
+                    self._status_bar.showMessage(f"Probe removed globally: {anchor.symbol}", 3000)
+                else:
+                    logger.debug(f"Trace {trace_id} still has {len(active_panels)} active panels, skipping global cleanup")
+                    
+        elif trace_id.startswith("eq"):
+            self._equation_manager.remove_equation(trace_id)
+            if hasattr(self, "_equation_to_panels") and trace_id in self._equation_to_panels:
+                del self._equation_to_panels[trace_id]

@@ -9,7 +9,7 @@ from typing import Dict, Optional, List, Callable
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget
-import sip
+from PyQt6 import sip
 
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
@@ -240,26 +240,10 @@ class ProbeController(QObject):
             # Clean up container
             self._container.remove_probe_panel(panel=panel)
 
-            # Check if this was the last panel for this anchor
+            # If no more panels for this anchor, remove from internal list
             if not panel_list:
                 del self._probe_panels[anchor]
-                logger.debug("No more panels for this anchor, cleaning up")
-
-                # Remove from registry
-                self._registry.remove_probe(anchor)
-                logger.debug("Removed from registry")
-
-                # Update code viewer
-                self._code_viewer.remove_probe(anchor)
-
-                # Update gutter
-                self._gutter.clear_probed_line(anchor.line)
-
-                # Send to runner if running
-                ipc = self._get_ipc()
-                if ipc and self._get_is_running():
-                    msg = make_remove_probe_cmd(anchor)
-                    ipc.send_command(msg)
+                logger.debug("No more panels for this anchor in controller")
 
         self.status_message.emit(f"Probe removed: {anchor.identity_label()}")
         self.probe_removed.emit(anchor)

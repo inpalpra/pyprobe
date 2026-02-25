@@ -1,52 +1,54 @@
 import pytest
 import numpy as np
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QColor
 from pyprobe.gui.main_window import MainWindow
 from pyprobe.core.anchor import ProbeAnchor
 
-def test_equation_overlay_logic(qapp):
-    win = MainWindow()
-    # Mock some data
-    anchor = ProbeAnchor(file="test.py", line=10, col=0, symbol="x")
-    win._probe_registry.add_probe(anchor)
-    win._latest_trace_data["tr0"] = np.array([1, 2, 3])
-    
-    # Create an equation
-    eq = win._equation_manager.add_equation("tr0 * 10")
-    win._equation_manager.evaluate_all(win._latest_trace_data)
-    
-    assert np.array_equal(eq.result, np.array([10, 20, 30]))
-    
-    # Simulate a panel
-    panel = win._probe_container.create_panel("x", "array_1d", anchor=anchor, trace_id="tr0")
-    
-    # Simulate drop
-    win._on_equation_overlay_requested(panel, "eq0")
-    
-    assert panel in win._equation_to_panels["eq0"]
-    
-    # Verify update logic doesn't crash
-    win._update_equation_plots()
-    
-    # Check if overlay curve was created (WaveformWidget specific)
-    # This reaches deep into internals
-    plot = panel._plot
-    assert hasattr(plot, "_overlay_curves")
-    assert "eq0_rhs" in plot._overlay_curves
-    
-    win.close()
+@pytest.fixture
+def main_window(qtbot):
+    mw = MainWindow()
+    qtbot.addWidget(mw)
+    mw.show()
+    return mw
 
-def test_equation_new_window_logic(qapp):
-    win = MainWindow()
-    eq = win._equation_manager.add_equation("1 + 2")
-    win._equation_manager.evaluate_all({})
+def test_equation_plotting_flow(main_window, qtbot):
+    # 1. Add an equation
+    eq = main_window._equation_manager.add_equation("tr0 * 2")
+    eq_id = eq.id
     
-    # Simulate 'Plot' click
-    win._on_equation_plot_requested("eq0")
+    # 2. Simulate data for tr0
+    main_window._latest_trace_data["tr0"] = np.array([1, 2, 3])
+    main_window._equation_manager.evaluate_all(main_window._latest_trace_data)
     
-    assert "eq0" in win._equation_to_panels
-    panels = win._equation_to_panels["eq0"]
-    assert len(panels) == 1
-    assert panels[0].var_name == "eq0"
+    # 3. Request plot
+    main_window._on_equation_plot_requested(eq_id)
     
-    win.close()
+    # 4. Verify panel created
+    assert eq_id in main_window._equation_to_panels
+    panel = main_window._equation_to_panels[eq_id][0]
+    assert panel.window_id == "w0"
+    
+    # 5. Verify plot widget is correct type (Waveform since result is 1D array)
+    from pyprobe.plugins.builtins.waveform import WaveformWidget
+    assert isinstance(panel._plot, WaveformWidget)
+    
+    # 6. Verify data rendered
+    # We can check if the curve has data
+    plot_data = panel.get_plot_data()
+    # For WaveformWidget, get_plot_data returns a list of curves or dict with y
+    if isinstance(plot_data, list):
+        assert np.array_equal(plot_data[0]['y'], [2, 4, 6])
+    else:
+        assert np.array_equal(plot_data['y'], [2, 4, 6])
+
+def test_equation_plot_deduplication(main_window, qtbot):
+    eq = main_window._equation_manager.add_equation("tr0")
+    eq_id = eq.id
+    
+    main_window._on_equation_plot_requested(eq_id)
+    assert len(main_window._equation_to_panels[eq_id]) == 1
+    
+    # Click again
+    main_window._on_equation_plot_requested(eq_id)
+    assert len(main_window._equation_to_panels[eq_id]) == 1

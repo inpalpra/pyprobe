@@ -96,6 +96,7 @@ class ProbePanel(QFrame):
         self._saved_y_range = None
 
         self._marker_vault = {}  # lens_name -> list[MarkerData]
+        self._is_closing = False
 
         self._setup_ui()
 
@@ -937,6 +938,15 @@ class ProbePanel(QFrame):
     def window_id(self) -> str:
         """Return the window ID (e.g. w0)."""
         return self._window_id
+
+    @property
+    def is_closing(self) -> bool:
+        """Check if the panel is currently being closed/removed."""
+        return self._is_closing
+
+    @is_closing.setter
+    def is_closing(self, value: bool):
+        self._is_closing = value
 
     @property
     def var_name(self) -> str:

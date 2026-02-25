@@ -110,6 +110,16 @@ class ProbeRegistry(QObject):
             return self._trace_id_manager.allocate(anchor.identity_label())
         return None
 
+    def get_anchor_by_trace_id(self, trace_id: str) -> Optional[ProbeAnchor]:
+        """Get the anchor associated with a trace ID (tr<n>)."""
+        if not trace_id.startswith("tr"):
+            return None
+            
+        for anchor in self._probes:
+            if self.get_trace_id(anchor) == trace_id:
+                return anchor
+        return None
+
     def update_data_received(self, anchor: ProbeAnchor) -> None:
         """
         Update liveness when data is received.

@@ -10,32 +10,7 @@
       "color": "#eed52b",
       "lens": null,
       "markers": {
-        "Waveform": [
-          {
-            "id": "m1",
-            "x": 243.9904522143271,
-            "y": -0.44837852655924065,
-            "trace_key": 0,
-            "marker_type": "ABSOLUTE",
-            "ref_marker_id": null,
-            "label": "m1",
-            "shape": "TRIANGLE_UP",
-            "color": "#55ff55"
-          }
-        ],
-        "FFT Mag (dB) / Angle (deg)": [
-          {
-            "id": "m3",
-            "x": 584.0,
-            "y": -67.33329862015358,
-            "trace_key": 0,
-            "marker_type": "ABSOLUTE",
-            "ref_marker_id": null,
-            "label": "m3",
-            "shape": "CROSS",
-            "color": "#ffff55"
-          }
-        ]
+        "Waveform": []
       }
     },
     {
@@ -66,5 +41,30 @@
     }
   ],
   "watches": [],
-  "overlays": []
+  "overlays": [
+    {
+      "target": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 72,
+        "col": 26,
+        "symbol": "signal_i",
+        "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      },
+      "overlay": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 72,
+        "col": 36,
+        "symbol": "signal_q",
+        "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      }
+    }
+  ]
 }

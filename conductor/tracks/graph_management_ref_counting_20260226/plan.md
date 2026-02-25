@@ -36,7 +36,7 @@ Resolve the bugs related to empty plots and redundant windows in the Equation Ed
 ## Phase 5: Global Unprobing Integration
 Connect the reference manager to the rest of the application (Code Viewer, Probe Engine).
 
-- [ ] Task: Integrate `TraceReferenceManager` with the `CodeViewer` to remove highlights and "eye" icons when a trace is no longer referenced.
+- [~] Task: Integrate `TraceReferenceManager` with the `CodeViewer` to remove highlights and "eye" icons when a trace is no longer referenced.
 - [ ] Task: Ensure the `ProbeEngine` stops collecting data for traces with zero references.
 - [ ] Task: Write Tests: E2E test verifying that dragging a variable to a plot, then removing it, correctly cleans up the code viewer highlights.
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Global Unprobing Integration' (Protocol in workflow.md)

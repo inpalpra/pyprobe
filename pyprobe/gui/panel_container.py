@@ -211,6 +211,10 @@ class ProbePanelContainer(QScrollArea):
             logger.debug(f"  No panel found to remove")
             return
 
+        # Mark as closing to prevent redundant removal calls from signals
+        if hasattr(target_panel, "is_closing"):
+            target_panel.is_closing = True
+
         logger.debug(f"  After: _panels keys: {list(self._panels.keys())}")
         logger.debug(f"  After: _panels_by_name keys: {list(self._panels_by_name.keys())}")
 
@@ -218,13 +222,17 @@ class ProbePanelContainer(QScrollArea):
         self._focus_manager.unregister_panel(target_panel)
 
         # Release window ID
+        wid = None
         if hasattr(target_panel, "window_id"):
             wid = target_panel.window_id
             self._wid_manager.release(wid)
-            TraceReferenceManager.instance().cleanup_window(wid)
 
         self._layout.removeWidget(target_panel)
         target_panel.deleteLater()
+
+        # Notify reference manager AFTER deleteLater so sip.isdeleted(target_panel) is True
+        if wid:
+            TraceReferenceManager.instance().cleanup_window(wid)
 
         # Re-layout remaining panels
         self._relayout_panels()
