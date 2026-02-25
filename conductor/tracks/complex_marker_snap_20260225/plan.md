@@ -22,7 +22,7 @@ Ensure the fix works correctly for all complex-data lenses, including those with
 ## Phase 3: Final Verification and Cleanup
 Perform final checks and ensure no regressions.
 
-- [ ] Task: Write Tests: Verify that Constellation markers are still NOT constrained to a trace (as they are scatter points).
-- [ ] Task: Write Tests: Verify that real-valued Waveform markers still work correctly.
-- [ ] Task: Commit and finalize the track.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md)
+- [x] Task: Write Tests: Verify that Constellation markers are still NOT constrained to a trace (as they are scatter points).
+- [x] Task: Write Tests: Verify that real-valued Waveform markers still work correctly.
+- [x] Task: Commit and finalize the track.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md)

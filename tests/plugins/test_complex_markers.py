@@ -6,7 +6,56 @@ from PyQt6.QtCore import Qt, QPointF
 from pyprobe.plugins.builtins.complex_plots import (
     ComplexRIWidget, ComplexMAWidget, ComplexFftMagAngleWidget, SingleCurveWidget
 )
-from pyprobe.core.data_classifier import DTYPE_ARRAY_COMPLEX
+from pyprobe.plugins.builtins.constellation import ConstellationWidget
+from pyprobe.plugins.builtins.waveform import WaveformWidget
+from pyprobe.core.data_classifier import DTYPE_ARRAY_COMPLEX, DTYPE_ARRAY_1D
+
+# ... (rest of imports and tests) ...
+
+def test_constellation_no_continuous_snapping(qtbot):
+    """
+    Verify that Constellation markers DO NOT snap continuously (stay with mouse).
+    """
+    widget = ConstellationWidget("test_const", QColor("#ffffff"))
+    qtbot.addWidget(widget)
+    
+    # 10 points on a diagonal
+    data = np.arange(10, dtype=complex) + 1j * np.arange(10, dtype=complex)
+    widget.update_data(data, DTYPE_ARRAY_COMPLEX)
+    
+    # Add a marker to history_4 (the newest scatter item)
+    widget._marker_store.add_marker("history_4", 5.0, 5.0)
+    m_id = widget._marker_store.get_markers()[0].id
+    glyph = widget._marker_glyphs[m_id]
+    
+    # Drag to (6.1, 9.0)
+    glyph._on_drag_move(QPointF(6.1, 9.0))
+    
+    # Visual position should follow mouse exactly (no snap)
+    assert glyph.text.pos().x() == pytest.approx(6.1, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(9.0, abs=0.01)
+
+def test_waveform_continuous_snapping_regression(qtbot):
+    """
+    Verify real-valued Waveform markers still snap continuously.
+    """
+    widget = WaveformWidget("test_wave", QColor("#ffffff"))
+    qtbot.addWidget(widget)
+    
+    # 10 points: y = x
+    data = np.arange(10, dtype=float)
+    widget.update_data(data, DTYPE_ARRAY_1D)
+    
+    widget._marker_store.add_marker(0, 5.0, 5.0)
+    m_id = widget._marker_store.get_markers()[0].id
+    glyph = widget._marker_glyphs[m_id]
+    
+    # Drag to (6.1, 9.0)
+    glyph._on_drag_move(QPointF(6.1, 9.0))
+    
+    # Visual position should snap to trace (6.1, 6.1)
+    assert glyph.text.pos().x() == pytest.approx(6.1, abs=0.01)
+    assert glyph.text.pos().y() == pytest.approx(6.1, abs=0.01)
 
 # ... (rest of imports and tests) ...
 
