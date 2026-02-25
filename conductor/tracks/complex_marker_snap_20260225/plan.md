@@ -14,9 +14,9 @@ Create a reproduction test case and implement the missing marker interaction log
 ## Phase 2: Verification Across Complex Lenses
 Ensure the fix works correctly for all complex-data lenses, including those with secondary axes (Mag & Phase, FFT Mag & Angle).
 
-- [ ] Task: Write Tests: Add test cases for `ComplexMAWidget` (Mag & Phase) and `ComplexFftMagAngleWidget` to verify markers on both primary and secondary (phase) axes snap correctly while dragging.
-- [ ] Task: Implement (if needed): Ensure `_get_snapped_position` in `ComplexWidget` correctly handles curves on the secondary axis (using `self._p2` if necessary, though `curve.getData()` should already provide the correct view coordinates).
-- [ ] Task: Write Tests: Add test cases for `SingleCurveWidget` (used for Log Mag, Linear Mag, Phase (rad/deg)) to verify marker snapping.
+- [x] Task: Write Tests: Add test cases for `ComplexMAWidget` (Mag & Phase) and `ComplexFftMagAngleWidget` to verify markers on both primary and secondary (phase) axes snap correctly while dragging.
+- [x] Task: Implement (if needed): Ensure `_get_snapped_position` in `ComplexWidget` correctly handles curves on the secondary axis (using `self._p2` if necessary, though `curve.getData()` should already provide the correct view coordinates).
+- [x] Task: Write Tests: Add test cases for `SingleCurveWidget` (used for Log Mag, Linear Mag, Phase (rad/deg)) to verify marker snapping.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Verification Across Complex Lenses' (Protocol in workflow.md)
 
 ## Phase 3: Final Verification and Cleanup
