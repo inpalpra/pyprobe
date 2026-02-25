@@ -5,6 +5,7 @@
 
 ## Frontend UI / Visualization
 - **PyQt6:** The primary framework for building the desktop application GUI, providing native-like interfaces and robust window management.
+- **PyQt6.sip:** Used for low-level interaction with C++ objects and safe object validity checking (isdeleted).
 - **pyqtgraph:** The high-performance plotting library used for rendering real-time graphs, constellation diagrams, and waveforms. It provides the core visual engine capable of handling dense datasets efficiently.
 
 ## Data Processing & Mathematics
