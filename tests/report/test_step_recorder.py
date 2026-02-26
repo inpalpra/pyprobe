@@ -132,9 +132,9 @@ def test_connect_signal_with_formatter_callable(qtbot):
 
 # ── Signal lifecycle tests (critical) ─────────────────────────────────────────
 
-def test_stop_disconnects_signals(qtbot):
-    """After stop(), signals that were connected no longer produce steps,
-    even if those signals continue to fire."""
+def test_stop_does_not_disconnect_signals(qtbot):
+    """After stop(), signals remain connected but recording is inactive,
+    so emissions do not produce steps."""
     emitter = _Emitter()
     recorder = StepRecorder()
     recorder.connect_signal(emitter.fired, "ping")
@@ -143,8 +143,33 @@ def test_stop_disconnects_signals(qtbot):
     assert len(recorder.steps) == 1
 
     recorder.stop()
-    emitter.fired.emit()  # must not add to steps
-    assert len(recorder.steps) == 1  # unchanged
+    emitter.fired.emit()  # still connected but recorder is inactive
+    assert len(recorder.steps) == 1  # unchanged — record() is a no-op
+
+    # Restart recording — signal still connected, should record again
+    recorder.clear()
+    recorder.start()
+    emitter.fired.emit()
+    assert len(recorder.steps) == 1
+    assert recorder.steps[0].description == "ping"
+
+
+def test_disconnect_all_severs_connections(qtbot):
+    """disconnect_all() severs all signal connections so emissions after
+    restart are no longer captured."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    recorder.connect_signal(emitter.fired, "ping")
+    recorder.start()
+    emitter.fired.emit()
+    assert len(recorder.steps) == 1
+
+    recorder.stop()
+    recorder.disconnect_all()
+    recorder.clear()
+    recorder.start()
+    emitter.fired.emit()  # disconnected — should not record
+    assert len(recorder.steps) == 0
 
 
 def test_start_twice_does_not_duplicate_connections(qtbot):

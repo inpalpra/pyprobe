@@ -56,6 +56,13 @@ from .file_tree import FileTreePanel
 from .collapsible_pane import CollapsiblePane
 from .equation_editor import EquationEditorDialog
 from ..core.equation_manager import EquationManager
+from ..report.step_recorder import StepRecorder
+
+
+def _safe_anchor_label(panel) -> str:
+    """Return the identity label for a panel's anchor, or 'unknown' if unavailable."""
+    anchor = getattr(panel, 'anchor', None)
+    return anchor.identity_label() if anchor else "unknown"
 
 
 # === PERSISTENCE IMPORTS ===
@@ -119,6 +126,7 @@ class MainWindow(QMainWindow):
         self._auto_run = auto_run
         self._auto_quit = auto_quit
         self._auto_quit_timeout = auto_quit_timeout
+        self._report_bug_dialog = None  # ReportBugDialog | None
         self._runner_process: Optional[mp.Process] = None
         self._ipc: Optional[IPCChannel] = None
         self._is_running = False  # Flag to track if script is running
@@ -168,6 +176,10 @@ class MainWindow(QMainWindow):
             parent=self
         )
         self._setup_probe_controller()
+
+        # Step recorder for bug reports — owned by MainWindow, injected into dialog
+        self._step_recorder = StepRecorder()
+        self._connect_step_recorder()
 
         # Load script if provided
         if script_path:
@@ -484,14 +496,84 @@ class MainWindow(QMainWindow):
     def _show_report_bug_dialog(self) -> None:
         from pyprobe.gui.report_bug_dialog import ReportBugDialog
         from pyprobe.report.session_snapshot import SessionStateCollector
+
+        # Prevent duplicate dialogs — bring existing one to front.
+        if self._report_bug_dialog is not None:
+            self._report_bug_dialog.raise_()
+            self._report_bug_dialog.activateWindow()
+            return
+
         collector = SessionStateCollector(
             file_getter=lambda: self._code_viewer.open_file_entries(),
             probe_getter=lambda: self._probe_controller.probe_trace_entries(),
             equation_getter=lambda: self._equation_manager.equation_entries(),
             widget_getter=lambda: self._probe_container.graph_widget_entries(),
         )
-        dialog = ReportBugDialog(collector=collector, parent=self)
-        dialog.exec()
+        dialog = ReportBugDialog(collector=collector, recorder=self._step_recorder, parent=self)
+        dialog.finished.connect(self._on_report_bug_dialog_closed)
+        self._report_bug_dialog = dialog
+        dialog.show()
+
+    def _on_report_bug_dialog_closed(self, _result: int = 0) -> None:
+        self._report_bug_dialog = None
+
+    def _connect_step_recorder(self) -> None:
+        """Wire all domain signals to the step recorder.
+
+        Connections are permanent — the recorder ignores calls when not
+        recording (zero overhead).
+        """
+        r = self._step_recorder
+
+        # Probe lifecycle
+        r.connect_signal(
+            self._probe_controller.probe_added,
+            lambda anchor, panel: f"Added probe: {anchor.identity_label()}")
+        r.connect_signal(
+            self._probe_controller.probe_removed,
+            lambda anchor: f"Removed probe: {anchor.identity_label()}")
+
+        # Overlay addition
+        r.connect_signal(
+            self._probe_controller.overlay_requested,
+            lambda target_panel, overlay_anchor:
+                f"Overlaid {overlay_anchor.identity_label()} onto panel containing {_safe_anchor_label(target_panel)}")
+
+        # NOTE: overlay_remove_requested is NOT connected here — handled manually
+        # in _on_overlay_remove_requested() for ordering guarantees.
+
+        # Watch sidebar
+        r.connect_signal(
+            self._code_viewer.watch_probe_requested,
+            lambda anchor: f"Added watch: {anchor.identity_label()}")
+        r.connect_signal(
+            self._scalar_watch_sidebar.scalar_removed,
+            lambda anchor: f"Removed watch: {anchor.identity_label()}")
+
+        # Panel management
+        r.connect_signal(
+            self._probe_container.panel_closing,
+            lambda panel: f"Panel closed: {_safe_anchor_label(panel)}")
+
+        # Highlight transitions
+        r.connect_signal(
+            self._code_viewer.highlight_changed,
+            lambda anchor, is_highlighted:
+                f"Code viewer highlight {'added for' if is_highlighted else 'removed for'} {anchor.identity_label()}")
+
+        # Script execution
+        r.connect_signal(self._control_bar.action_clicked, "Clicked Run")
+        r.connect_signal(self._control_bar.stop_clicked, "Clicked Stop")
+        r.connect_signal(self._message_handler.script_ended, "Script finished")
+        r.connect_signal(
+            self._message_handler.exception_raised,
+            lambda payload: f"Exception raised: {payload.get('type', 'unknown')}")
+
+        # Equation overlay
+        r.connect_signal(
+            self._probe_controller.equation_overlay_requested,
+            lambda target_panel, eq_id:
+                f"Overlaid equation {eq_id} onto panel containing {_safe_anchor_label(target_panel)}")
 
     def _setup_theme_menu(self) -> None:
         """Create View -> Theme menu and wire runtime switching."""
@@ -1668,7 +1750,15 @@ class MainWindow(QMainWindow):
         self._probe_controller.forward_overlay_data(anchor, payload)
 
     def _on_overlay_remove_requested(self, target_panel: ProbePanel, overlay_anchor: ProbeAnchor) -> None:
-        """Handle overlay removal request - delegate to ProbeController."""
+        """Handle overlay removal request - delegate to ProbeController.
+
+        Records the step BEFORE calling remove_overlay so it precedes
+        the highlight_changed step that fires during handler execution.
+        """
+        target_label = _safe_anchor_label(target_panel)
+        self._step_recorder.record(
+            f"Removed overlay: {overlay_anchor.identity_label()} from panel containing {target_label}"
+        )
         self._probe_controller.remove_overlay(target_panel, overlay_anchor)
 
     def _on_panel_closing(self, panel) -> None:

@@ -47,15 +47,22 @@ class StepRecorder:
         self._is_recording = True
 
     def stop(self) -> tuple[RecordedStep, ...]:
-        """Deactivate recording, disconnect all signals, return frozen snapshot."""
+        """Deactivate recording and return frozen snapshot.
+
+        Signals remain connected — they are no-ops while ``_is_recording``
+        is False.  Use :meth:`disconnect_all` for explicit teardown.
+        """
         self._is_recording = False
+        return tuple(self._steps)
+
+    def disconnect_all(self) -> None:
+        """Disconnect all connected signals.  Called during teardown."""
         for signal, slot in self._connections:
             try:
                 signal.disconnect(slot)
             except Exception:
                 pass  # already disconnected or emitter deleted — safe to ignore
         self._connections.clear()
-        return tuple(self._steps)
 
     def clear(self) -> None:
         """Empty the step list and reset seq_num.  Recording state is unchanged."""

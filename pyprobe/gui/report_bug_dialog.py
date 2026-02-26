@@ -23,28 +23,24 @@ from pyprobe.gui.recording_indicator import RecordingIndicator
 class ReportBugDialog(QDialog):
     """Bug report dialog.
 
-    Accepts a SessionStateCollector at construction.  collector.collect()
-    is called at generate time (not at construction time) so the snapshot
-    always reflects the state at the moment the user clicks Generate.
-
-    Optional signal_sources is a list of (signal, description) tuples.
-    When recording starts, each signal is connected to the StepRecorder.
+    Accepts a SessionStateCollector and an externally-owned StepRecorder.
+    MainWindow handles all signal wiring; the dialog controls start/stop
+    and reads steps but does not own or wire the recorder.
     """
 
     def __init__(
         self,
         collector: SessionStateCollector,
+        recorder: StepRecorder,
         parent: QWidget | None = None,
-        signal_sources: list | None = None,
     ) -> None:
         super().__init__(parent)
         self._collector = collector
         self._report_text: str = ""
         self._formatter = ReportFormatter(max_file_bytes=50 * 1024)
-        self._signal_sources: list = signal_sources or []
 
-        # M7: recording state
-        self._recorder = StepRecorder()
+        # M7: recording state — recorder is injected by MainWindow
+        self._recorder = recorder
         self._indicator = RecordingIndicator()
         self._baseline: SessionState | None = None
         self._recorded_steps: tuple[RecordedStep, ...] = ()
@@ -56,6 +52,7 @@ class ReportBugDialog(QDialog):
     def _setup_ui(self) -> None:
         self.setWindowTitle("Report Bug")
         self.resize(700, 600)
+        self.setWindowFlag(Qt.WindowType.Window)
 
         layout = QVBoxLayout(self)
 
@@ -127,16 +124,8 @@ class ReportBugDialog(QDialog):
         if self._recorder.is_recording:
             return  # idempotent
 
-        # Clear previous session
         self._recorder.clear()
-
-        # Capture baseline state at the moment recording starts
         self._baseline = self._collector.collect()
-
-        # Connect application signals
-        for signal, description in self._signal_sources:
-            self._recorder.connect_signal(signal, description)
-
         self._recorder.start()
         self._indicator.show_indicator()
 
@@ -232,8 +221,8 @@ class ReportBugDialog(QDialog):
     # ── Qt event overrides ────────────────────────────────────────────────────
 
     def closeEvent(self, event) -> None:
-        if self._recorder.is_recording:
-            self._stop_recording()
+        # Recording continues even if the dialog is closed — MainWindow owns
+        # the recorder. Only hide the visual indicator and reset button state.
         self._indicator.hide_indicator()
         super().closeEvent(event)
 

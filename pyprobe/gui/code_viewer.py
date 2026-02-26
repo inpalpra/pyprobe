@@ -38,6 +38,7 @@ class CodeViewer(QPlainTextEdit):
     probe_removed = pyqtSignal(object)    # ProbeAnchor
     watch_probe_requested = pyqtSignal(object)  # ProbeAnchor (Alt+click for scalar watch)
     hover_changed = pyqtSignal(object)    # ProbeAnchor or None
+    highlight_changed = pyqtSignal(object, bool)  # (ProbeAnchor, is_highlighted)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -176,6 +177,7 @@ class CodeViewer(QPlainTextEdit):
             # New probe, start with ref count = 1
             self._active_probes[anchor] = (color, 1)
             logger.debug(f"Added new probe {anchor.symbol} with ref count 1")
+            self.highlight_changed.emit(anchor, True)
         
         logger.debug(f"After: _active_probes keys: {list(self._active_probes.keys())}")
         self._invalid_probes.discard(anchor)
@@ -218,6 +220,7 @@ class CodeViewer(QPlainTextEdit):
                 self._graphical_probes.pop(anchor, None)
                 self._invalid_probes.discard(anchor)
                 logger.debug(f"Removed last reference for {anchor.symbol}")
+                self.highlight_changed.emit(anchor, False)
         else:
             logger.debug(f"remove_probe called for unknown anchor: {anchor}")
         

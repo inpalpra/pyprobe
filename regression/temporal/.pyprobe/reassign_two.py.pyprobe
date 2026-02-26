@@ -3,22 +3,22 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/reassign_two.py",
       "line": 3,
-      "col": 8,
+      "col": 4,
       "symbol": "x",
       "func": "main",
-      "is_assignment": false,
-      "color": "#9d2bee",
+      "is_assignment": true,
+      "color": "#2bee64",
       "lens": null,
       "markers": {}
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/reassign_two.py",
       "line": 3,
-      "col": 4,
+      "col": 8,
       "symbol": "x",
       "func": "main",
-      "is_assignment": true,
-      "color": "#2bee64",
+      "is_assignment": false,
+      "color": "#9d2bee",
       "lens": null,
       "markers": {}
     },

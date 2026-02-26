@@ -2,9 +2,12 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, pyqtSignal
 from pyprobe.gui.main_window import MainWindow
 from pyprobe.gui.report_bug_dialog import ReportBugDialog
 from pyprobe.report.session_snapshot import SessionStateCollector
+from pyprobe.report.step_recorder import StepRecorder
+from pyprobe.core.anchor import ProbeAnchor
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -19,13 +22,27 @@ def make_null_collector():
     )
 
 
-def make_dialog(qtbot, collector=None):
+def make_dialog(qtbot, collector=None, recorder=None):
     """Construct and register a ReportBugDialog with qtbot."""
     if collector is None:
         collector = make_null_collector()
-    dialog = ReportBugDialog(collector=collector)
+    if recorder is None:
+        recorder = StepRecorder()
+    dialog = ReportBugDialog(collector=collector, recorder=recorder)
     qtbot.addWidget(dialog)
     return dialog
+
+
+def _make_anchor(symbol="signal_q", line=12, col=4):
+    return ProbeAnchor(
+        file="dsp_demo.py", line=line, col=col,
+        symbol=symbol, func="", is_assignment=False,
+    )
+
+
+class _Emitter(QObject):
+    probe_added = pyqtSignal(object, object)
+    highlight_changed = pyqtSignal(object, bool)
 
 
 # ── Menu integration tests ────────────────────────────────────────────────────
@@ -328,13 +345,16 @@ def test_step_recorded_when_probe_action_fires(qtbot):
 
 # ── Cleanup and session management tests ─────────────────────────────────────
 
-def test_recording_stops_cleanly_if_dialog_closed(qtbot):
-    """Closing the dialog while recording is active stops the recorder without error."""
+def test_recording_continues_after_dialog_closed(qtbot):
+    """Closing the dialog while recording is active does NOT stop the recorder.
+    Recording continues — MainWindow owns the recorder."""
     dialog = make_dialog(qtbot)
     dialog._trigger_start_recording()
     assert dialog._recorder_is_active()
     dialog.close()  # must not raise
-    assert not dialog._recorder_is_active()
+    assert dialog._recorder_is_active()  # recording persists
+    # Cleanup
+    dialog._recorder.stop()
 
 
 def test_generate_after_stop_includes_all_steps(qtbot):
@@ -518,3 +538,136 @@ def test_path_sanitization_end_to_end(qtbot):
     # Positive check: sanitization marker must appear
     assert "<USER_HOME>" in plaintext
     assert "<USER_HOME>" in json_output
+
+
+# ─── NON-MODAL REGRESSION TESTS ───────────────────────────────────────────────
+
+def test_main_window_remains_interactive_while_dialog_open(qtbot):
+    """MainWindow is not blocked when ReportBugDialog is open."""
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    win._show_report_bug_dialog()
+    dialog = win._report_bug_dialog
+    assert dialog is not None, "Dialog should be open"
+    assert win.isEnabled(), "MainWindow must remain enabled (non-modal)"
+    dialog.close()
+    assert win._report_bug_dialog is None, "Reference must be cleared on close"
+
+
+def test_second_report_bug_invocation_raises_existing_dialog(qtbot):
+    """Triggering Report Bug a second time raises the existing dialog, not a new one."""
+    win = MainWindow()
+    qtbot.addWidget(win)
+
+    win._show_report_bug_dialog()
+    first = win._report_bug_dialog
+
+    win._show_report_bug_dialog()  # second call
+    assert win._report_bug_dialog is first, "Must reuse the same dialog instance"
+
+    first.close()
+    assert win._report_bug_dialog is None
+
+
+# ─── DOMAIN EVENT COVERAGE TESTS ──────────────────────────────────────────────
+
+
+def test_probe_added_signal_records_step(qtbot):
+    """Start recording, emit probe_added, stop, generate — identity_label in step."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    anchor = _make_anchor("signal_q", line=12, col=4)
+    recorder.connect_signal(
+        emitter.probe_added,
+        lambda a, p: f"Added probe: {a.identity_label()}")
+
+    dialog = make_dialog(qtbot, recorder=recorder)
+    dialog._trigger_start_recording()
+    emitter.probe_added.emit(anchor, None)
+    dialog._trigger_stop_recording()
+    dialog._trigger_generate()
+
+    output = dialog._get_preview_text()
+    assert "signal_q @ dsp_demo.py:12:4" in output
+
+
+def test_highlight_changed_records_step(qtbot):
+    """Emit highlight_changed(anchor, False) during recording — verify message."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    anchor = _make_anchor("signal_q", line=12, col=4)
+    recorder.connect_signal(
+        emitter.highlight_changed,
+        lambda a, is_hl: f"Code viewer highlight {'added for' if is_hl else 'removed for'} {a.identity_label()}")
+
+    dialog = make_dialog(qtbot, recorder=recorder)
+    dialog._trigger_start_recording()
+    emitter.highlight_changed.emit(anchor, False)
+    dialog._trigger_stop_recording()
+    dialog._trigger_generate()
+
+    output = dialog._get_preview_text()
+    assert "removed for" in output
+    assert "signal_q @ dsp_demo.py:12:4" in output
+
+
+def test_no_steps_when_not_recording(qtbot):
+    """Emit signals without starting recording — verify zero steps."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    recorder.connect_signal(emitter.probe_added, lambda a, p: "should not appear")
+
+    dialog = make_dialog(qtbot, recorder=recorder)
+    emitter.probe_added.emit(_make_anchor(), None)
+    dialog._trigger_generate()
+
+    # No numbered steps should appear
+    output = dialog._get_preview_text()
+    assert "should not appear" not in output
+
+
+def test_overlay_signal_fires_once_per_action(qtbot):
+    """Single overlay event produces exactly one step."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    recorder.connect_signal(emitter.probe_added, lambda a, p: "overlay step")
+
+    dialog = make_dialog(qtbot, recorder=recorder)
+    dialog._trigger_start_recording()
+    emitter.probe_added.emit(_make_anchor(), None)
+    steps = recorder.stop()
+    assert len(steps) == 1
+
+
+def test_safe_anchor_label_handles_deleted_panel(qtbot):
+    """_safe_anchor_label returns 'unknown' for a panel without anchor attr."""
+    from pyprobe.gui.main_window import _safe_anchor_label
+    mock_panel = MagicMock(spec=[])  # no attributes at all
+    assert _safe_anchor_label(mock_panel) == "unknown"
+
+
+def test_recording_survives_dialog_close_reopen(qtbot):
+    """Start recording, close dialog, emit signals, reopen, stop — steps captured."""
+    emitter = _Emitter()
+    recorder = StepRecorder()
+    anchor = _make_anchor("signal_i", line=11, col=4)
+    recorder.connect_signal(
+        emitter.probe_added,
+        lambda a, p: f"Added probe: {a.identity_label()}")
+
+    # First dialog — start recording
+    dialog1 = make_dialog(qtbot, recorder=recorder)
+    dialog1._trigger_start_recording()
+    dialog1.close()
+
+    # Signal fires while dialog is closed
+    emitter.probe_added.emit(anchor, None)
+
+    # Reopen dialog — stop recording
+    dialog2 = make_dialog(qtbot, recorder=recorder)
+    dialog2._trigger_stop_recording()
+    dialog2._trigger_generate()
+
+    output = dialog2._get_preview_text()
+    assert "signal_i @ dsp_demo.py:11:4" in output
