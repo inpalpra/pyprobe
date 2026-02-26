@@ -578,3 +578,16 @@ class CodeViewer(QPlainTextEdit):
     def ast_locator(self) -> Optional[ASTLocator]:
         """Return the AST locator for the current file."""
         return self._ast_locator
+
+    def open_file_entries(self) -> list:
+        """Return a list of OpenFileEntry for the currently loaded file."""
+        if self._file_path is None:
+            return []
+        from pyprobe.report.report_model import OpenFileEntry
+        return [OpenFileEntry(
+            path=self._file_path,
+            is_probed=len(self._active_probes) > 0,
+            is_executed=False,
+            has_unsaved=self.document().isModified(),
+            contents=self.toPlainText(),
+        )]

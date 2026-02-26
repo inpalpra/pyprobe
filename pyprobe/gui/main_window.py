@@ -473,6 +473,25 @@ class MainWindow(QMainWindow):
         self._status_bar.addPermanentWidget(self._coord_label)
 
         self._setup_theme_menu()
+        self._setup_help_menu()
+
+    def _setup_help_menu(self) -> None:
+        help_menu = self.menuBar().addMenu("Help")
+        report_action = help_menu.addAction("Report Bug")
+        # Use a lambda so patch.object works in tests (re-resolves the method on each call).
+        report_action.triggered.connect(lambda: self._show_report_bug_dialog())
+
+    def _show_report_bug_dialog(self) -> None:
+        from pyprobe.gui.report_bug_dialog import ReportBugDialog
+        from pyprobe.report.session_snapshot import SessionStateCollector
+        collector = SessionStateCollector(
+            file_getter=lambda: self._code_viewer.open_file_entries(),
+            probe_getter=lambda: self._probe_controller.probe_trace_entries(),
+            equation_getter=lambda: self._equation_manager.equation_entries(),
+            widget_getter=lambda: self._probe_container.graph_widget_entries(),
+        )
+        dialog = ReportBugDialog(collector=collector, parent=self)
+        dialog.exec()
 
     def _setup_theme_menu(self) -> None:
         """Create View -> Theme menu and wire runtime switching."""

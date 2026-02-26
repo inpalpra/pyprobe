@@ -27,7 +27,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 
 # Subdirectories (relative to TESTS_DIR) that form named suites.
 # Order controls execution order.
-SUITE_DIRS = ["core", "ipc", "gui"]
+SUITE_DIRS = ["core", "ipc", "gui", "report"]
 
 # Files in TESTS_DIR itself that are not conftest / helpers.
 # Any file matching test_*.py at the top level forms the "top-level" suite.
@@ -121,7 +121,7 @@ def main() -> int:
     parser.add_argument(
         "--suite",
         metavar="NAME",
-        help="Run only the named suite (core | ipc | gui | top-level).",
+        help="Run only the named suite (core | ipc | gui | report | top-level).",
     )
     parser.add_argument(
         "--failfast",

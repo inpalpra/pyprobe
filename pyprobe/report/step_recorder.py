@@ -1,0 +1,104 @@
+"""
+StepRecorder — accumulates RecordedStep objects by recording method calls
+or Qt signal emissions.  Zero overhead when inactive.
+
+No PyQt6 import at module level (keeps this importable without a display).
+"""
+
+import time
+from typing import Callable
+
+from pyprobe.report.report_model import RecordedStep
+
+
+class StepRecorder:
+    """Records user-visible steps as RecordedStep objects.
+
+    Lifecycle:
+        recorder = StepRecorder()
+        recorder.connect_signal(some_signal, "description")
+        recorder.start()
+        # ... signals fire and/or recorder.record("manual step") is called
+        steps = recorder.stop()  # returns frozen tuple
+    """
+
+    def __init__(self) -> None:
+        self._is_recording: bool = False
+        self._steps: list[RecordedStep] = []
+        self._seq_num: int = 0
+        self._connections: list[tuple] = []  # (signal, slot) pairs for cleanup
+
+    # ── Properties ────────────────────────────────────────────────────────────
+
+    @property
+    def is_recording(self) -> bool:
+        return self._is_recording
+
+    @property
+    def steps(self) -> tuple[RecordedStep, ...]:
+        return tuple(self._steps)
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    def start(self) -> None:
+        """Activate recording.  Calling start() twice is a no-op (no duplicate connections)."""
+        if self._is_recording:
+            return
+        self._is_recording = True
+
+    def stop(self) -> tuple[RecordedStep, ...]:
+        """Deactivate recording, disconnect all signals, return frozen snapshot."""
+        self._is_recording = False
+        for signal, slot in self._connections:
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass  # already disconnected or emitter deleted — safe to ignore
+        self._connections.clear()
+        return tuple(self._steps)
+
+    def clear(self) -> None:
+        """Empty the step list and reset seq_num.  Recording state is unchanged."""
+        self._steps.clear()
+        self._seq_num = 0
+
+    # ── Recording ─────────────────────────────────────────────────────────────
+
+    def record(self, description: str) -> None:
+        """Append a RecordedStep if currently recording.  No-op otherwise."""
+        if not self._is_recording:
+            return
+        self._seq_num += 1
+        self._steps.append(
+            RecordedStep(
+                seq_num=self._seq_num,
+                description=description,
+                timestamp=time.time(),
+            )
+        )
+
+    # ── Signal connection ─────────────────────────────────────────────────────
+
+    def connect_signal(
+        self,
+        signal,
+        description: str | Callable[..., str],
+    ) -> None:
+        """Connect a Qt signal so that each emission records a step.
+
+        Args:
+            signal: Any Qt signal (duck-typed — no PyQt6 import required here).
+            description: Either a fixed string or a callable that receives the
+                signal's arguments and returns a description string.
+        """
+        if callable(description):
+            formatter = description
+            def slot(*args):  # noqa: E306
+                self.record(formatter(*args))
+        else:
+            fixed = description
+            def slot(*args):  # noqa: E306
+                self.record(fixed)
+
+        signal.connect(slot)
+        self._connections.append((signal, slot))

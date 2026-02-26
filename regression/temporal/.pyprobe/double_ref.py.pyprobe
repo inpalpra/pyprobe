@@ -3,22 +3,22 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/double_ref.py",
       "line": 3,
-      "col": 12,
+      "col": 8,
       "symbol": "x",
       "func": "main",
       "is_assignment": false,
-      "color": "#2bee64",
+      "color": "#ee2b2b",
       "lens": null,
       "markers": {}
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/double_ref.py",
       "line": 3,
-      "col": 8,
+      "col": 12,
       "symbol": "x",
       "func": "main",
       "is_assignment": false,
-      "color": "#ee2b2b",
+      "color": "#2bee64",
       "lens": null,
       "markers": {}
     },

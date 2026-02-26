@@ -75,3 +75,17 @@ class EquationManager:
             
             if not changed:
                 break
+
+    def equation_entries(self) -> list:
+        """Return a list of EquationEntry for each equation."""
+        from pyprobe.report.report_model import EquationEntry
+        entries = []
+        for eq in self.equations.values():
+            status = "error" if eq.error else "ok"
+            entries.append(EquationEntry(
+                eq_id=eq.id,
+                expression=eq.expression,
+                status=status,
+                is_plotted=False,
+            ))
+        return entries

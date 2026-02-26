@@ -3,11 +3,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/multi_probe.py",
       "line": 9,
-      "col": 12,
-      "symbol": "b",
+      "col": 8,
+      "symbol": "a",
       "func": "main",
       "is_assignment": false,
-      "color": "#2bee64",
+      "color": "#ee2b2b",
       "lens": null,
       "markers": {}
     },
@@ -25,11 +25,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/multi_probe.py",
       "line": 9,
-      "col": 8,
-      "symbol": "a",
+      "col": 12,
+      "symbol": "b",
       "func": "main",
       "is_assignment": false,
-      "color": "#ee2b2b",
+      "color": "#2bee64",
       "lens": null,
       "markers": {}
     }

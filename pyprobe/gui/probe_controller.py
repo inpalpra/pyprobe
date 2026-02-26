@@ -102,6 +102,21 @@ class ProbeController(QObject):
         """Access to probe metadata dict."""
         return self._probe_metadata
 
+    def probe_trace_entries(self) -> list:
+        """Return a list of ProbeTraceEntry for each active probe anchor."""
+        from pyprobe.report.report_model import ProbeTraceEntry
+        entries = []
+        for anchor, meta in self._probe_metadata.items():
+            raw_shape = meta.get('shape')
+            shape: tuple = tuple(raw_shape) if raw_shape else ()
+            entries.append(ProbeTraceEntry(
+                name=anchor.symbol,
+                source_file=anchor.file,
+                shape=shape,
+                dtype=meta.get('dtype') or 'unknown',
+            ))
+        return entries
+
     def is_used_as_overlay(self, anchor: ProbeAnchor) -> bool:
         """Check if anchor is currently used as an overlay on any active panel."""
         for panel_list in self._probe_panels.values():
