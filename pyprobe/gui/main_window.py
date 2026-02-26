@@ -1716,6 +1716,7 @@ class MainWindow(QMainWindow):
                     logger.debug(f"Trace {trace_id} still has {len(active_panels)} active panels, skipping global cleanup")
                     
         elif trace_id.startswith("eq"):
-            self._equation_manager.remove_equation(trace_id)
+            # Only clean up panel references — the equation itself persists
+            # in the EquationManager until explicitly deleted via the editor
             if hasattr(self, "_equation_to_panels") and trace_id in self._equation_to_panels:
                 del self._equation_to_panels[trace_id]

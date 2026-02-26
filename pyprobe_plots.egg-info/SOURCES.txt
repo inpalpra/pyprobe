@@ -83,6 +83,7 @@ pyprobe/ipc/channels.py
 pyprobe/ipc/messages.py
 pyprobe/ipc/socket_channel.py
 pyprobe/ipc/socket_transport.py
+pyprobe/ipc/wire_protocol.py
 pyprobe/plots/__init__.py
 pyprobe/plots/axis_controller.py
 pyprobe/plots/base_plot.py
@@ -111,6 +112,10 @@ pyprobe_plots.egg-info/dependency_links.txt
 pyprobe_plots.egg-info/entry_points.txt
 pyprobe_plots.egg-info/requires.txt
 pyprobe_plots.egg-info/top_level.txt
+pyprobe_tracer/__init__.py
+pyprobe_tracer/__main__.py
+pyprobe_tracer/engine/__init__.py
+pyprobe_tracer/ipc/__init__.py
 tests/test_axis_controller.py
 tests/test_axis_editor.py
 tests/test_capture_pipeline.py

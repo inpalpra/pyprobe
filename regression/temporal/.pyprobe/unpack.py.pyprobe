@@ -3,11 +3,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/unpack.py",
       "line": 2,
-      "col": 7,
-      "symbol": "b",
+      "col": 4,
+      "symbol": "a",
       "func": "main",
       "is_assignment": true,
-      "color": "#2bee64",
+      "color": "#ee2b2b",
       "lens": null,
       "markers": {}
     },
@@ -25,11 +25,11 @@
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/unpack.py",
       "line": 2,
-      "col": 4,
-      "symbol": "a",
+      "col": 7,
+      "symbol": "b",
       "func": "main",
       "is_assignment": true,
-      "color": "#ee2b2b",
+      "color": "#2bee64",
       "lens": null,
       "markers": {}
     }

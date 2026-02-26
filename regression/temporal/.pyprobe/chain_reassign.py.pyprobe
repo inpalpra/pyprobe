@@ -13,12 +13,12 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/chain_reassign.py",
-      "line": 3,
+      "line": 2,
       "col": 4,
       "symbol": "x",
       "func": "main",
       "is_assignment": true,
-      "color": "#2bee64",
+      "color": "#ee2b2b",
       "lens": null,
       "markers": {}
     },
@@ -35,12 +35,12 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/chain_reassign.py",
-      "line": 2,
+      "line": 3,
       "col": 4,
       "symbol": "x",
       "func": "main",
       "is_assignment": true,
-      "color": "#ee2b2b",
+      "color": "#2bee64",
       "lens": null,
       "markers": {}
     }

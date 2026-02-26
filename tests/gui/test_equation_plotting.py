@@ -42,6 +42,41 @@ def test_equation_plotting_flow(main_window, qtbot):
     else:
         assert np.array_equal(plot_data['y'], [2, 4, 6])
 
+def test_equation_replot_after_panel_close(main_window, qtbot):
+    """Closing a graph panel should not remove the equation from the manager.
+
+    Regression test: previously, _on_unprobe_requested called
+    _equation_manager.remove_equation() when an equation panel was closed,
+    making it impossible to re-plot the equation.
+    """
+    # 1. Add equation and provide trace data
+    eq = main_window._equation_manager.add_equation("tr0 + 1")
+    eq_id = eq.id
+    main_window._latest_trace_data["tr0"] = np.array([10, 20, 30])
+    main_window._equation_manager.evaluate_all(main_window._latest_trace_data)
+
+    # 2. Plot the equation — panel should be created
+    main_window._on_equation_plot_requested(eq_id)
+    assert eq_id in main_window._equation_to_panels
+    assert len(main_window._equation_to_panels[eq_id]) == 1
+
+    # 3. Simulate panel close (triggers _on_unprobe_requested with the eq trace_id)
+    main_window._on_unprobe_requested(eq_id)
+
+    # 4. Equation must still exist in the manager
+    assert eq_id in main_window._equation_manager.equations, (
+        "Equation was deleted from manager when panel closed"
+    )
+
+    # 5. Panel mapping should be cleaned up
+    assert eq_id not in main_window._equation_to_panels
+
+    # 6. Re-plot — should succeed and create a new panel
+    main_window._on_equation_plot_requested(eq_id)
+    assert eq_id in main_window._equation_to_panels
+    assert len(main_window._equation_to_panels[eq_id]) == 1
+
+
 def test_equation_plot_deduplication(main_window, qtbot):
     eq = main_window._equation_manager.add_equation("tr0")
     eq_id = eq.id
