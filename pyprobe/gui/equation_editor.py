@@ -13,7 +13,9 @@ class EquationEditorDialog(QDialog):
     Dialog for managing mathematical equations.
     """
     _instance = None
-    plot_requested = pyqtSignal(str) # eq_id
+    plot_requested = pyqtSignal(str)  # eq_id
+    equation_added = pyqtSignal(str)  # eq_id
+    equation_deleted = pyqtSignal(str)  # eq_id
 
     @classmethod
     def show_instance(cls, manager: EquationManager, parent=None):
@@ -120,10 +122,12 @@ class EquationEditorDialog(QDialog):
     def _on_add_clicked(self):
         eq = self._manager.add_equation()
         self._add_row(eq)
+        self.equation_added.emit(eq.id)
 
     def _on_delete_clicked(self, eq_id: str):
         self._manager.remove_equation(eq_id)
         self._populate_table()
+        self.equation_deleted.emit(eq_id)
 
     def _on_expression_changed(self, eq_id: str, text: str):
         self._manager.update_expression(eq_id, text)

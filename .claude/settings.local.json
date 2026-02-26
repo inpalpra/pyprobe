@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(./.venv/bin/python:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)"
     ]
   }
 }

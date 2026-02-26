@@ -42,6 +42,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
     """The actual plot widget created by WaveformPlugin."""
 
     status_message_requested = pyqtSignal(str)
+    row_visibility_changed = pyqtSignal(int, bool)  # (row_index, visible)
     
     MAX_DISPLAY_POINTS = 5000
     
@@ -373,6 +374,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         if row_index < len(self._curves):
             self._row_visible[row_index] = not self._row_visible[row_index]
             self._curves[row_index].setVisible(self._row_visible[row_index])
+            self.row_visibility_changed.emit(row_index, self._row_visible[row_index])
 
     def downsample(self, data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> Tuple[np.ndarray, np.ndarray]:
         """

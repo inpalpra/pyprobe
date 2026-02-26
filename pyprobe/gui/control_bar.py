@@ -18,7 +18,9 @@ class ControlBar(QToolBar):
     open_clicked = pyqtSignal()
     open_folder_clicked = pyqtSignal()
     action_clicked = pyqtSignal()
+    action_clicked_with_state = pyqtSignal(str)  # "Run" | "Pause" | "Resume"
     stop_clicked = pyqtSignal()
+    loop_toggled = pyqtSignal(bool)  # checked
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -62,7 +64,7 @@ class ControlBar(QToolBar):
         self._action_btn.setObjectName("runButton")
         self._action_btn.setToolTip("Run script (F5)")
         self._action_btn.setEnabled(False)
-        self._action_btn.clicked.connect(self.action_clicked.emit)
+        self._action_btn.clicked.connect(self._on_action_clicked)
         self.addWidget(self._action_btn)
 
         # Stop button
@@ -156,8 +158,15 @@ class ControlBar(QToolBar):
             self._action_btn.setText("Pause")
             self._action_btn.setToolTip("Pause execution (F5)")
 
+    def _on_action_clicked(self):
+        """Emit both generic and state-aware action signals."""
+        self.action_clicked.emit()
+        state = self._action_btn.text()  # "Run", "Pause", or "Resume"
+        self.action_clicked_with_state.emit(state)
+
     def _on_loop_toggled(self, checked: bool):
         """Handle loop button toggle."""
+        self.loop_toggled.emit(checked)
         if checked:
             self._pulse_value = 0.0
             self._pulse_direction = 1

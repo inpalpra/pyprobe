@@ -64,6 +64,8 @@ class ProbePanel(QFrame):
     overlay_requested = pyqtSignal(object, object)  # (self/panel, ProbeAnchor)
     equation_overlay_requested = pyqtSignal(object, str)  # (self/panel, eq_id)
     overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
+    draw_mode_changed = pyqtSignal(str, str)  # (series_key, mode_name)
+    markers_cleared = pyqtSignal()  # all markers cleared from panel
 
     def __init__(
         self,
@@ -430,7 +432,10 @@ class ProbePanel(QFrame):
                     action.setCheckable(True)
                     action.setChecked(current == mode)
                     action.triggered.connect(
-                        lambda checked, k=key, m=mode: self._plot.set_draw_mode(k, m)
+                        lambda checked, k=key, m=mode: (
+                            self._plot.set_draw_mode(k, m),
+                            self.draw_mode_changed.emit(str(k), m.name),
+                        )
                     )
             elif len(keys) > 1:
                 # Multi-series: nested per-series submenus
@@ -444,7 +449,10 @@ class ProbePanel(QFrame):
                         action.setCheckable(True)
                         action.setChecked(current == mode)
                         action.triggered.connect(
-                            lambda checked, k=key, m=mode: self._plot.set_draw_mode(k, m)
+                            lambda checked, k=key, m=mode: (
+                                self._plot.set_draw_mode(k, m),
+                                self.draw_mode_changed.emit(str(k), m.name),
+                            )
                         )
         
         # M2.5: Park to bar action
@@ -604,6 +612,7 @@ class ProbePanel(QFrame):
     def _clear_all_markers(self):
         if self._plot and hasattr(self._plot, '_marker_store'):
             self._plot._marker_store.clear_markers()
+            self.markers_cleared.emit()
 
     def show_throttle_indicator(self, active: bool):
         """Show or hide the throttle icon."""

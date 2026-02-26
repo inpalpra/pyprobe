@@ -48,6 +48,14 @@ class ProbeController(QObject):
     overlay_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
     equation_overlay_requested = pyqtSignal(object, str)  # (target_panel, eq_id)
     overlay_remove_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
+
+    # StepRecorder-forwarded panel signals
+    panel_lens_changed = pyqtSignal(object, str)  # (anchor, plugin_name)
+    panel_park_requested = pyqtSignal(object)  # anchor
+    panel_maximize_requested = pyqtSignal(object)  # anchor
+    panel_color_changed = pyqtSignal(object, object)  # (anchor, QColor)
+    panel_draw_mode_changed = pyqtSignal(object, str, str)  # (anchor, series_key, mode_name)
+    panel_markers_cleared = pyqtSignal(object)  # anchor
     
     def __init__(
         self,
@@ -266,7 +274,20 @@ class ProbeController(QObject):
         
         # Connect color changed signal
         panel.color_changed.connect(self._on_probe_color_changed)
-        
+
+        # Forward per-panel signals for StepRecorder
+        panel.park_requested.connect(lambda a=anchor: self.panel_park_requested.emit(a))
+        panel.maximize_requested.connect(lambda a=anchor: self.panel_maximize_requested.emit(a))
+        panel.color_changed.connect(lambda a, c: self.panel_color_changed.emit(a, c))
+        if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
+            panel._lens_dropdown.lens_changed.connect(
+                lambda name, a=anchor: self.panel_lens_changed.emit(a, name)
+            )
+        panel.draw_mode_changed.connect(
+            lambda key, mode, a=anchor: self.panel_draw_mode_changed.emit(a, key, mode)
+        )
+        panel.markers_cleared.connect(lambda a=anchor: self.panel_markers_cleared.emit(a))
+
         # Send to runner if running
         ipc = self._get_ipc()
         if ipc and self._get_is_running():

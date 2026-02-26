@@ -8,7 +8,7 @@ M7: also supports a "Record Steps" flow via StepRecorder.
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QPlainTextEdit, QCheckBox, QPushButton,
-    QFileDialog, QWidget,
+    QFileDialog, QWidget, QRadioButton,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
@@ -83,11 +83,28 @@ class ReportBugDialog(QDialog):
         self._logs_checkbox = QCheckBox("Include logs")
         self._sysinfo_checkbox = QCheckBox("Include system info")
         self._sysinfo_checkbox.setChecked(True)
+        self._llm_mode_checkbox = QCheckBox("Optimize report for LLM consumption")
         options_layout.addWidget(self._files_checkbox)
         options_layout.addWidget(self._logs_checkbox)
         options_layout.addWidget(self._sysinfo_checkbox)
+        options_layout.addWidget(self._llm_mode_checkbox)
         options_layout.addStretch()
         layout.addLayout(options_layout)
+
+        # File contents mode (sub-option of "Include file contents")
+        file_mode_layout = QHBoxLayout()
+        file_mode_layout.addSpacing(20)
+        self._snippets_radio = QRadioButton("Relevant snippets")
+        self._full_files_radio = QRadioButton("Full files")
+        self._snippets_radio.setChecked(True)
+        self._snippets_radio.setEnabled(False)
+        self._full_files_radio.setEnabled(False)
+        file_mode_layout.addWidget(self._snippets_radio)
+        file_mode_layout.addWidget(self._full_files_radio)
+        file_mode_layout.addStretch()
+        layout.addLayout(file_mode_layout)
+
+        self._files_checkbox.toggled.connect(self._on_files_toggled)
 
         # Generate button
         self._generate_btn = QPushButton("Generate Report")
@@ -142,15 +159,25 @@ class ReportBugDialog(QDialog):
         self._start_recording_btn.setEnabled(True)
         self._stop_recording_btn.setEnabled(False)
 
+    # ── UI callbacks ─────────────────────────────────────────────────────────
+
+    def _on_files_toggled(self, checked: bool) -> None:
+        self._snippets_radio.setEnabled(checked)
+        self._full_files_radio.setEnabled(checked)
+
     # ── Core logic ────────────────────────────────────────────────────────────
 
     def _trigger_generate(self) -> None:
         """Build and render the BugReport from current dialog state."""
         state = self._collector.collect()
+        llm_mode = self._llm_mode_checkbox.isChecked()
+        include_files = self._files_checkbox.isChecked()
+        include_full_file = include_files and self._full_files_radio.isChecked()
 
-        # Open files — strip contents when include-files is off
+        # Open files — keep contents when files are included, or when snippets
+        # might be needed (LLM mode extracts windows from contents)
         if state.open_files:
-            if self._files_checkbox.isChecked():
+            if include_files or llm_mode:
                 open_files: tuple[OpenFileEntry, ...] = state.open_files
             else:
                 open_files = tuple(
@@ -190,7 +217,9 @@ class ReportBugDialog(QDialog):
             logs=logs_text,
         )
 
-        self._report_text = self._formatter.render(report)
+        self._report_text = self._formatter.render(
+            report, llm_mode=llm_mode, include_full_file=include_full_file
+        )
         self._preview.setPlainText(self._report_text)
         self._copy_btn.setEnabled(True)
         self._save_btn.setEnabled(True)
@@ -279,3 +308,12 @@ class ReportBugDialog(QDialog):
     def _simulate_probe_added(self, symbol: str, line: int) -> None:
         """Injects a fake probe_added step into the recorder (test helper)."""
         self._recorder.record(f"Added probe: {symbol} at line {line}")
+
+    def _set_llm_mode_enabled(self, flag: bool) -> None:
+        self._llm_mode_checkbox.setChecked(flag)
+
+    def _set_full_files_mode(self, full: bool) -> None:
+        if full:
+            self._full_files_radio.setChecked(True)
+        else:
+            self._snippets_radio.setChecked(True)

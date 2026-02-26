@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
         """
         r = self._step_recorder
 
-        # Probe lifecycle
+        # ── Probe lifecycle ───────────────────────────────────────────────
         r.connect_signal(
             self._probe_controller.probe_added,
             lambda anchor, panel: f"Added probe: {anchor.identity_label()}")
@@ -533,16 +533,17 @@ class MainWindow(QMainWindow):
             self._probe_controller.probe_removed,
             lambda anchor: f"Removed probe: {anchor.identity_label()}")
 
-        # Overlay addition
+        # ── Overlay addition / removal ────────────────────────────────────
         r.connect_signal(
             self._probe_controller.overlay_requested,
             lambda target_panel, overlay_anchor:
                 f"Overlaid {overlay_anchor.identity_label()} onto panel containing {_safe_anchor_label(target_panel)}")
+        r.connect_signal(
+            self._probe_controller.overlay_remove_requested,
+            lambda target_panel, overlay_anchor:
+                f"Removed overlay {overlay_anchor.identity_label()} from {_safe_anchor_label(target_panel)}")
 
-        # NOTE: overlay_remove_requested is NOT connected here — handled manually
-        # in _on_overlay_remove_requested() for ordering guarantees.
-
-        # Watch sidebar
+        # ── Watch sidebar ─────────────────────────────────────────────────
         r.connect_signal(
             self._code_viewer.watch_probe_requested,
             lambda anchor: f"Added watch: {anchor.identity_label()}")
@@ -550,30 +551,77 @@ class MainWindow(QMainWindow):
             self._scalar_watch_sidebar.scalar_removed,
             lambda anchor: f"Removed watch: {anchor.identity_label()}")
 
-        # Panel management
+        # ── Panel management ──────────────────────────────────────────────
         r.connect_signal(
             self._probe_container.panel_closing,
             lambda panel: f"Panel closed: {_safe_anchor_label(panel)}")
+        r.connect_signal(
+            self._probe_controller.panel_park_requested,
+            lambda anchor: f"Parked panel: {anchor.identity_label()}")
+        r.connect_signal(
+            self._probe_controller.panel_maximize_requested,
+            lambda anchor: f"Maximized panel: {anchor.identity_label()}")
+        r.connect_signal(
+            self._dock_bar.panel_restore_requested,
+            lambda anchor_key: f"Restored parked panel: {anchor_key}")
 
-        # Highlight transitions
+        # ── Highlight transitions ─────────────────────────────────────────
         r.connect_signal(
             self._code_viewer.highlight_changed,
             lambda anchor, is_highlighted:
                 f"Code viewer highlight {'added for' if is_highlighted else 'removed for'} {anchor.identity_label()}")
 
-        # Script execution
-        r.connect_signal(self._control_bar.action_clicked, "Clicked Run")
+        # ── Script execution ──────────────────────────────────────────────
+        r.connect_signal(
+            self._control_bar.action_clicked_with_state,
+            lambda state: f"Clicked {state}")
         r.connect_signal(self._control_bar.stop_clicked, "Clicked Stop")
         r.connect_signal(self._message_handler.script_ended, "Script finished")
         r.connect_signal(
             self._message_handler.exception_raised,
             lambda payload: f"Exception raised: {payload.get('type', 'unknown')}")
 
-        # Equation overlay
+        # ── Control bar: open / loop ──────────────────────────────────────
+        r.connect_signal(
+            self._control_bar.open_clicked,
+            "Opened file dialog")
+        r.connect_signal(
+            self._control_bar.open_folder_clicked,
+            "Opened folder dialog")
+        r.connect_signal(
+            self._control_bar.loop_toggled,
+            lambda checked: f"Loop mode {'enabled' if checked else 'disabled'}")
+
+        # ── Equation overlay ──────────────────────────────────────────────
         r.connect_signal(
             self._probe_controller.equation_overlay_requested,
             lambda target_panel, eq_id:
                 f"Overlaid equation {eq_id} onto panel containing {_safe_anchor_label(target_panel)}")
+
+        # ── Per-panel signals (forwarded via probe_controller) ────────────
+        r.connect_signal(
+            self._probe_controller.panel_lens_changed,
+            lambda anchor, name: f"Changed lens to '{name}' on {anchor.identity_label()}")
+        r.connect_signal(
+            self._probe_controller.panel_color_changed,
+            lambda anchor, color: f"Changed color of {anchor.identity_label()} to {color.name()}")
+        r.connect_signal(
+            self._probe_controller.panel_draw_mode_changed,
+            lambda anchor, key, mode: f"Changed draw mode to '{mode}' for {key} on {anchor.identity_label()}")
+        r.connect_signal(
+            self._probe_controller.panel_markers_cleared,
+            lambda anchor: f"Cleared all markers on {anchor.identity_label()}")
+
+        # ── File tree ─────────────────────────────────────────────────────
+        r.connect_signal(
+            self._file_tree.file_selected,
+            lambda path: f"Selected file: {path}")
+
+        # ── Theme changes ─────────────────────────────────────────────────
+        from .theme.theme_manager import ThemeManager
+        r.connect_signal(
+            ThemeManager.instance().theme_changed,
+            lambda theme: f"Changed theme to '{theme.name}'")
 
     def _setup_theme_menu(self) -> None:
         """Create View -> Theme menu and wire runtime switching."""
@@ -610,6 +658,17 @@ class MainWindow(QMainWindow):
         """Show the equation editor dialog."""
         dialog = EquationEditorDialog.show_instance(self._equation_manager, self)
         dialog.plot_requested.connect(self._on_equation_plot_requested)
+        self._connect_equation_editor_recorder(dialog)
+
+    def _connect_equation_editor_recorder(self, dialog: EquationEditorDialog) -> None:
+        """Wire equation editor signals to step recorder (idempotent)."""
+        if getattr(dialog, '_recorder_connected', False):
+            return
+        dialog._recorder_connected = True
+        r = self._step_recorder
+        r.connect_signal(dialog.equation_added, lambda eq_id: f"Added equation: {eq_id}")
+        r.connect_signal(dialog.equation_deleted, lambda eq_id: f"Deleted equation: {eq_id}")
+        r.connect_signal(dialog.plot_requested, lambda eq_id: f"Plotted equation: {eq_id}")
 
     def _on_equation_plot_requested(self, eq_id: str):
         """Handle 'Plot' click from Equation Editor."""
@@ -1332,7 +1391,6 @@ class MainWindow(QMainWindow):
             # M2.5: Connect park and overlay signals
             panel.park_requested.connect(lambda a=anchor: self._on_panel_park_requested(a))
             panel.overlay_requested.connect(self._on_overlay_requested)
-            panel.overlay_remove_requested.connect(self._on_overlay_remove_requested)
 
     @pyqtSlot(object)
     def _on_watch_probe_requested(self, anchor: ProbeAnchor):
