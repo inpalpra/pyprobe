@@ -1,0 +1,93 @@
+# ==========================================================
+# proj2md Default Ignore Template
+# Designed for LLM Context Packaging
+# ==========================================================
+
+
+# ----------------------------
+# Virtual Environments
+# ----------------------------
+.venv/
+venv/
+env/
+
+
+# ----------------------------
+# Python Bytecode / Cache
+# ----------------------------
+*.pyc
+*.pyo
+__pycache__/
+
+
+# ----------------------------
+# Test / Coverage Artifacts
+# ----------------------------
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+
+# ----------------------------
+# Build / Distribution
+# ----------------------------
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+
+# ----------------------------
+# Logs
+# ----------------------------
+*.log
+
+
+# ----------------------------
+# Git
+# ----------------------------
+.git/
+.gitignore
+
+
+# ----------------------------
+# IDE / Editor
+# ----------------------------
+.vscode/
+.idea/
+
+
+# ----------------------------
+# OS Junk
+# ----------------------------
+.DS_Store
+Thumbs.db
+
+
+# ----------------------------
+# Node / Frontend (if present)
+# ----------------------------
+node_modules/
+
+
+# ----------------------------
+# proj2md Internal Artifacts
+# ----------------------------
+.proj2mdcache.json
+
+
+# ----------------------------
+# Generated Markdown Snapshots
+# (Avoid recursive packaging)
+# ----------------------------
+/conductor/
+*.md
+!/README.md
+!/CONSTITUTION.md
+
+
+# ----------------------------
+# AI Agents
+# ----------------------------
+.gemini/
