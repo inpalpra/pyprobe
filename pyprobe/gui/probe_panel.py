@@ -46,7 +46,7 @@ class RemovableLegendItem(pg.LegendItem):
                 sample = item  # In LegendItem, 'item' is usually the sample
                 
                 # Check label click
-                if label.contains(label.mapFromParent(pos)):
+                if label.contains(label.mapFromItem(self, pos)):
                     self._toggle_visibility(item)
                     ev.accept()
                     return
@@ -56,7 +56,7 @@ class RemovableLegendItem(pg.LegendItem):
                 # but we can try to find it by looking at the parent of the sample
                 # or just checking proximity.
                 # Actually, LegendItem.items is a list of (ItemSample, LabelItem)
-                if hasattr(sample, 'contains') and sample.contains(sample.mapFromParent(pos)):
+                if hasattr(sample, 'contains') and sample.contains(sample.mapFromItem(self, pos)):
                     self._toggle_visibility(item)
                     ev.accept()
                     return
@@ -83,7 +83,7 @@ class RemovableLegendItem(pg.LegendItem):
             # Check which label was clicked
             pos = ev.pos()
             for item, label in self.items:
-                if label.contains(label.mapFromParent(pos)):
+                if label.contains(label.mapFromItem(self, pos)):
                     self.trace_removal_requested.emit(item)
                     ev.accept()
                     return

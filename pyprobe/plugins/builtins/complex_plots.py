@@ -641,6 +641,10 @@ class ComplexRIWidget(ComplexWidget):
         self._real_curve = self._plot_widget.plot(pen=pg.mkPen('#00ffff', width=1.5), name="Real")
         self._imag_curve = self._plot_widget.plot(pen=pg.mkPen('#ff00ff', width=1.5), name="Imag")
         self._plot_widget.setLabel('left', 'Amplitude')
+        
+        self._plot_legend.addItem(self._real_curve, "Real")
+        self._plot_legend.addItem(self._imag_curve, "Imag")
+        
         self._register_series('Real', self._real_curve, '#00ffff')
         self._register_series('Imag', self._imag_curve, '#ff00ff')
 
@@ -878,6 +882,7 @@ class ComplexFftMagAngleWidget(ComplexWidget):
         self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
         self._p2.addItem(self._phase_curve)
         
+        self._plot_legend.addItem(self._mag_curve, "FFT Mag (dB)")
         self._plot_legend.addItem(self._phase_curve, "Angle (deg)")
         
         self._register_series('FFT Mag (dB)', self._mag_curve, '#ffff00')
