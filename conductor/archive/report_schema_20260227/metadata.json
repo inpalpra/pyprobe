@@ -1,0 +1,8 @@
+{
+  "track_id": "report_schema_20260227",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-27T00:00:00Z",
+  "updated_at": "2026-02-27T00:00:00Z",
+  "description": "improve recording report for better reproducibility and reducing ambiguity. come up with better nomenclature and schema and use those to make reporting unambiguous."
+}
