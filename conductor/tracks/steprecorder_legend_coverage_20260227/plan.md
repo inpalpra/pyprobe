@@ -28,3 +28,9 @@
 - [x] Task: Ensure `ComplexRIWidget` and `ComplexFftMagAngleWidget` add all curves to the legend.
 - [x] Task: Re-verify with mouse simulation test.
 - [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+
+## Phase 5: Fix Native pyqtgraph Event Bubbling for Legend Clicks
+- [x] Task: Diagnose that `ItemSample.mouseClickEvent` natively toggles visibility, thus bypassing `RemovableLegendItem.mouseClickEvent`.
+- [x] Task: Connect `LegendItem.sigSampleClicked` to a new `_on_sample_clicked` handler in `RemovableLegendItem` to correctly emit `trace_visibility_changed`.
+- [x] Task: Fix testing errors in `test_trace_removal.py` where mock coordinates triggered `TypeError`.
+- [x] Task: Verify no regressions in GUI tests.
