@@ -1,8 +1,8 @@
 {
   "track_id": "steprecorder_legend_coverage_20260227",
   "type": "bug",
-  "status": "new",
+  "status": "completed",
   "created_at": "2026-02-27T10:00:00Z",
-  "updated_at": "2026-02-27T10:00:00Z",
+  "updated_at": "2026-02-27T12:00:00Z",
   "description": "Claude — We have a missing StepRecorder coverage bug. Toggling trace visibility via plot legend clicks is NOT being recorded. When a user clicks a legend entry to toggle trace visibility, StepRecorder must record: Toggled visibility of <trace_name> in window <wN> (<anchor.identity_label()>)"
 }
