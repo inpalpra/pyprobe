@@ -72,9 +72,18 @@ class StepRecorder:
     # ── Recording ─────────────────────────────────────────────────────────────
 
     def record(self, description: str) -> None:
-        """Append a RecordedStep if currently recording.  No-op otherwise."""
+        """Append a RecordedStep if currently recording.  No-op otherwise.
+        
+        Duplicate consecutive steps with the same description are ignored to
+        reduce noise in the final report.
+        """
         if not self._is_recording:
             return
+            
+        # Skip duplicate consecutive steps
+        if self._steps and self._steps[-1].description == description:
+            return
+
         self._seq_num += 1
         self._steps.append(
             RecordedStep(
