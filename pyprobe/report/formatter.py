@@ -24,11 +24,6 @@ class ReportFormatter:
         parts.append("=== Bug Report ===")
         parts.append(report.description)
 
-        if report.steps is not None:
-            parts.append("\n--- Steps ---")
-            for step in report.steps:
-                parts.append(f"{step.seq_num}. {step.description}")
-
         if report.baseline_state is not None:
             parts.append("\n--- Baseline State ---")
             state = report.baseline_state
@@ -48,6 +43,11 @@ class ReportFormatter:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
                     parts.append(f"    {w.widget_id}: {w.what_plotted}")
+
+        if report.steps is not None:
+            parts.append("\n--- Steps ---")
+            for step in report.steps:
+                parts.append(f"{step.seq_num}. {step.description}")
 
         if report.open_files is not None:
             parts.append("\n--- Open Files ---")
@@ -87,13 +87,6 @@ class ReportFormatter:
         parts.append("=== Bug Report ===")
         parts.append(report.description)
 
-        if report.steps is not None:
-            parts.append("\n--- Steps ---")
-            for step in report.steps:
-                parts.append(f"{step.seq_num}. {step.description}")
-            parts.append("")
-            parts.append("Location format: <symbol> @ <file>:<line>:<column>")
-
         if report.baseline_state is not None:
             parts.append("\n--- Baseline State ---")
             state = report.baseline_state
@@ -113,6 +106,13 @@ class ReportFormatter:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
                     parts.append(f"    {w.widget_id}: {w.what_plotted}")
+
+        if report.steps is not None:
+            parts.append("\n--- Steps ---")
+            for step in report.steps:
+                parts.append(f"{step.seq_num}. {step.description}")
+            parts.append("")
+            parts.append("Location format: <symbol> @ <file>:<line>:<column>")
 
         if report.open_files is not None:
             parts.append("\n--- Open Files ---")
