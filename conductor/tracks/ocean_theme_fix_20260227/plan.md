@@ -1,9 +1,9 @@
 # Implementation Plan: Fix Symbol Highlighting in Ocean Theme
 
 ## Phase 1: Investigation and Automated Test Setup
-- [ ] Task: Isolate the root cause of the highlight misplacement in the Ocean theme (e.g., coordinate calculation, CSS, or PyQt style application).
-- [ ] Task: Write a failing unit or integration test that reproduces the offset highlight bounding box in the Ocean theme.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Investigation and Automated Test Setup' (Protocol in workflow.md)
+- [x] Task: Isolate the root cause of the highlight misplacement in the Ocean theme (e.g., coordinate calculation, CSS, or PyQt style application).
+- [x] Task: Write a failing unit or integration test that reproduces the offset highlight bounding box in the Ocean theme.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Investigation and Automated Test Setup' (Protocol in workflow.md) [checkpoint: b9d6026]
 
 ## Phase 2: Implementation of the Fix
 - [ ] Task: Implement the necessary fix to the coordinate calculations, layout engine, or style logic to correctly align the highlight rectangle.
