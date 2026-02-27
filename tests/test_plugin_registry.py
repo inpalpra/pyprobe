@@ -40,18 +40,20 @@ class TestPluginDiscovery:
 
 class TestDefaultPlugin:
     def test_default_array_1d(self):
-        """Default plugin for array_1d is Waveform."""
+        """Default plugin for array_1d is FFT Mag & Phase (highest priority)."""
         registry = PluginRegistry.instance()
+        from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
         plugin = registry.get_default_plugin(DTYPE_ARRAY_1D)
         assert plugin is not None
-        assert isinstance(plugin, WaveformPlugin)
+        assert isinstance(plugin, WaveformFftMagAnglePlugin)
 
     def test_default_complex(self):
-        """Default plugin for array_complex is Constellation."""
+        """Default plugin for array_complex is FFT Mag & Phase (highest priority)."""
         registry = PluginRegistry.instance()
+        from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
         plugin = registry.get_default_plugin(DTYPE_ARRAY_COMPLEX)
         assert plugin is not None
-        assert isinstance(plugin, ConstellationPlugin)
+        assert isinstance(plugin, WaveformFftMagAnglePlugin)
 
     def test_default_scalar(self):
         """Default plugin for scalar is History (higher priority)."""
@@ -103,13 +105,9 @@ class TestPluginByName:
         assert registry.get_plugin_by_name("FooBarPlugin", DTYPE_ARRAY_1D) is None
 
     def test_get_by_name_disambiguation(self):
-        """get_plugin_by_name disambiguates identical names using dtype."""
+        """get_plugin_by_name finds plugin by name and dtype."""
         registry = PluginRegistry.instance()
-        from pyprobe.plugins.builtins.complex_plots import ComplexFftMagAnglePlugin
         from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
-        
-        plugin_complex = registry.get_plugin_by_name("FFT Mag (dB) / Angle (deg)", DTYPE_ARRAY_COMPLEX)
-        plugin_real = registry.get_plugin_by_name("FFT Mag (dB) / Angle (deg)", DTYPE_ARRAY_1D)
-        
-        assert isinstance(plugin_complex, ComplexFftMagAnglePlugin)
+
+        plugin_real = registry.get_plugin_by_name("FFT Mag & Phase", DTYPE_ARRAY_1D)
         assert isinstance(plugin_real, WaveformFftMagAnglePlugin)

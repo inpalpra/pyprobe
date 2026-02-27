@@ -13,7 +13,7 @@ from pyprobe.gui.probe_panel import ProbePanel
 from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.data_classifier import DTYPE_ARRAY_1D, DTYPE_ARRAY_COMPLEX, DTYPE_SCALAR
 from pyprobe.plugins.builtins.complex_plots import (
-    ComplexMAWidget, ComplexRIWidget, ComplexFftMagAngleWidget, SingleCurveWidget
+    ComplexMAWidget, ComplexRIWidget, SingleCurveWidget
 )
 from pyprobe.plugins.builtins.waveform import WaveformWidget
 from pyprobe.plugins.builtins.constellation import ConstellationWidget
@@ -64,11 +64,11 @@ class TestComplexRIWidgetColor:
         assert hex_c == PINK.name()
 
 
-class TestComplexFftMagAngleWidgetColor:
-    def test_set_series_color_fft_mag(self, qapp, probe_color):
-        w = ComplexFftMagAngleWidget("x", probe_color)
-        w.set_series_color('FFT Mag (dB)', PINK)
-        _, hex_c = w._series_curves['FFT Mag (dB)']
+class TestSingleCurveWidgetColor:
+    def test_set_series_color_single_curve(self, qapp, probe_color):
+        w = SingleCurveWidget("x", probe_color, "Magnitude (dB)")
+        w.set_series_color('Magnitude (dB)', PINK)
+        _, hex_c = w._series_curves['Magnitude (dB)']
         assert hex_c == PINK.name()
 
 

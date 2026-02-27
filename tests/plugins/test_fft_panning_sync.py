@@ -5,7 +5,7 @@ import pyqtgraph as pg
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QColor
 from pyprobe.plugins.builtins.waveform import WaveformFftMagAngleWidget
-from pyprobe.plugins.builtins.complex_plots import ComplexFftMagAngleWidget, ComplexMAWidget
+from pyprobe.plugins.builtins.complex_plots import ComplexMAWidget
 
 @pytest.fixture
 def qapp():
@@ -19,32 +19,6 @@ def test_waveform_fft_panning_sync(qapp, qtbot):
     sig = np.sin(2 * np.pi * 10 * t)
     widget.update_data(sig, "array_1d")
     widget._p1.vb.autoRange()
-    
-    widget._axis_controller.set_pinned('y', False)
-    widget._p1.vb.setYRange(-50, 50, padding=0)
-    
-    mag_base = widget._p1.vb.viewRange()[1]
-    phase_base = widget._p2.viewRange()[1]
-    mag_h = mag_base[1] - mag_base[0]
-    phase_h = phase_base[1] - phase_base[0]
-    
-    widget._axis_controller.set_pinned('y', True)
-    widget._p1.vb.setYRange(mag_base[0] + 10, mag_base[1] + 10, padding=0)
-    
-    mag_new = widget._p1.vb.viewRange()[1]
-    phase_new = widget._p2.viewRange()[1]
-    
-    dy_mag = mag_new[0] - mag_base[0]
-    dy_phase = phase_new[0] - phase_base[0]
-    
-    assert pytest.approx(dy_phase / phase_h) == dy_mag / mag_h
-
-def test_complex_fft_panning_sync(qapp, qtbot):
-    widget = ComplexFftMagAngleWidget("test", QColor("cyan"))
-    qtbot.addWidget(widget)
-    
-    sig = np.exp(2j * np.pi * 10 * np.linspace(0, 1, 100))
-    widget.set_data(sig, "test")
     
     widget._axis_controller.set_pinned('y', False)
     widget._p1.vb.setYRange(-50, 50, padding=0)

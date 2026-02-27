@@ -4,7 +4,7 @@ import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt, QPointF
 from pyprobe.plugins.builtins.complex_plots import (
-    ComplexRIWidget, ComplexMAWidget, ComplexFftMagAngleWidget, SingleCurveWidget
+    ComplexRIWidget, ComplexMAWidget, SingleCurveWidget
 )
 from pyprobe.plugins.builtins.constellation import ConstellationWidget
 from pyprobe.plugins.builtins.waveform import WaveformWidget
@@ -141,38 +141,36 @@ def test_complex_ma_continuous_snapping(qtbot, monkeypatch):
     assert glyph_phase.text.pos().x() == pytest.approx(4.1, abs=0.01)
     assert glyph_phase.text.pos().y() == pytest.approx(expected_y, abs=0.01)
 
-def test_complex_fft_continuous_snapping(qtbot):
+def test_single_curve_log_mag_continuous_snapping(qtbot):
     """
-    Verify continuous snapping for FFT Mag & Angle widget.
+    Verify continuous snapping for SingleCurveWidget (Log Mag).
     """
-    widget = ComplexFftMagAngleWidget("test_fft", QColor("#ffffff"))
+    widget = SingleCurveWidget("test_logmag", QColor("#ffffff"), "Magnitude (dB)")
     qtbot.addWidget(widget)
-    
-    # Use 100 points of a complex sine wave to get some FFT peaks
+
+    # Use 100 points of log-mag data
     t = np.linspace(0, 1, 100)
-    z = np.exp(1j * 2 * np.pi * 10 * t) # 10 Hz
-    widget.set_data(z, "info")
-    
-    # FFT freqs and data are now populated
-    # Find a point on the mag curve
-    mag_curve, _ = widget._series_curves["FFT Mag (dB)"]
-    x_data, y_data = mag_curve.getData()
-    
+    z = np.exp(1j * 2 * np.pi * 10 * t)
+    mag_db = 20 * np.log10(np.abs(z) + 1e-12)
+    widget.set_data(mag_db, "info")
+
+    # Find a point on the curve
+    curve, _ = widget._series_curves["Magnitude (dB)"]
+    x_data, y_data = curve.getData()
+
     target_idx = len(x_data) // 2
     target_x = x_data[target_idx]
     target_y = y_data[target_idx]
-    
-    widget._marker_store.add_marker("FFT Mag (dB)", target_x, target_y)
+
+    widget._marker_store.add_marker("Magnitude (dB)", target_x, target_y)
     m_id = widget._marker_store.get_markers()[0].id
     glyph = widget._marker_glyphs[m_id]
-    
+
     # Drag slightly away
     test_x = target_x + (x_data[target_idx+1] - x_data[target_idx]) * 0.1
     glyph._on_drag_move(QPointF(test_x, target_y + 10.0))
-    
+
     # It should snap back to the curve
-    # Since it's interpolated, it should be very close to the trace
     assert glyph.text.pos().x() == pytest.approx(test_x, abs=0.01)
-    # y should be interpolated between target_y and y_data[target_idx+1]
     expected_y = np.interp(test_x, x_data, y_data)
     assert glyph.text.pos().y() == pytest.approx(expected_y, abs=0.01)

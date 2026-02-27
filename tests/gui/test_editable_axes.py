@@ -6,7 +6,7 @@ from PyQt6.QtGui import QColor
 
 from pyprobe.plugins.builtins.waveform import WaveformPlugin, WaveformFftMagAnglePlugin
 from pyprobe.plugins.builtins.complex_plots import (
-    ComplexRIPlugin, ComplexMAPlugin, ComplexFftMagAnglePlugin,
+    ComplexRIPlugin, ComplexMAPlugin,
     LogMagPlugin, LinearMagPlugin, PhaseRadPlugin, PhaseDegPlugin
 )
 from pyprobe.plugins.builtins.constellation import ConstellationPlugin
@@ -173,7 +173,6 @@ def test_editable_axis_interaction(qtbot, qapp, probe_color, plugin_class):
 
 @pytest.mark.parametrize("plugin_class", [
     ComplexMAPlugin,
-    ComplexFftMagAnglePlugin,
     WaveformFftMagAnglePlugin,
 ])
 def test_editable_secondary_axis_interaction(qtbot, qapp, probe_color, plugin_class):
@@ -193,8 +192,6 @@ def test_editable_secondary_axis_interaction(qtbot, qapp, probe_color, plugin_cl
     # Feed data to initialise the plot
     if plugin_class == ComplexMAPlugin:
         widget.update_data(data)
-    elif plugin_class == ComplexFftMagAnglePlugin:
-        widget.set_data(data, "[100]")
     elif plugin_class == WaveformFftMagAnglePlugin:
         widget.update_data(np.abs(data), dtype=DTYPE_ARRAY_1D)
     qapp.processEvents()

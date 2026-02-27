@@ -1,21 +1,21 @@
 {
   "probes": [
     {
-      "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/examples/dsp_demo.py",
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 60,
-      "col": 36,
-      "symbol": "signal_q",
+      "col": 26,
+      "symbol": "signal_i",
       "func": "main",
       "is_assignment": true,
-      "color": "#9d2bee",
-      "lens": null,
+      "color": "#ee2b2b",
+      "lens": "FFT Mag & Phase",
       "markers": {
         "Waveform": [],
         "FFT Mag & Phase": []
       }
     },
     {
-      "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/examples/dsp_demo.py",
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 60,
       "col": 8,
       "symbol": "received_symbols",
@@ -34,14 +34,14 @@
       }
     },
     {
-      "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/examples/dsp_demo.py",
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 60,
-      "col": 26,
-      "symbol": "signal_i",
+      "col": 36,
+      "symbol": "signal_q",
       "func": "main",
       "is_assignment": true,
-      "color": "#ee2b2b",
-      "lens": "FFT Mag & Phase",
+      "color": "#9d2bee",
+      "lens": null,
       "markers": {
         "Waveform": [],
         "FFT Mag & Phase": []
@@ -52,7 +52,7 @@
   "overlays": [
     {
       "target": {
-        "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/examples/dsp_demo.py",
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
         "line": 60,
         "col": 8,
         "symbol": "received_symbols",
@@ -63,7 +63,7 @@
         "markers": {}
       },
       "overlay": {
-        "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/examples/dsp_demo.py",
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
         "line": 46,
         "col": 4,
         "symbol": "signal_i",
