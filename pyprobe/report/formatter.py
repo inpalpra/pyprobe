@@ -34,7 +34,7 @@ class ReportFormatter:
             if state.probed_traces:
                 parts.append("  Probes:")
                 for t in state.probed_traces:
-                    parts.append(f"    {t.name} ({t.dtype}, shape={t.shape})")
+                    parts.append(f"    {t.symbol} ({t.dtype}, shape={t.shape})")
             if state.equations:
                 parts.append("  Equations:")
                 for eq in state.equations:
@@ -42,7 +42,7 @@ class ReportFormatter:
             if state.graph_widgets:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
-                    parts.append(f"    {w.widget_id}: {w.what_plotted}")
+                    parts.append(f"    {w.widget_id}: {w.lens}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -97,7 +97,7 @@ class ReportFormatter:
             if state.probed_traces:
                 parts.append("  Probes:")
                 for t in state.probed_traces:
-                    parts.append(f"    {t.name} ({t.dtype}, shape={t.shape})")
+                    parts.append(f"    {t.symbol} ({t.dtype}, shape={t.shape})")
             if state.equations:
                 parts.append("  Equations:")
                 for eq in state.equations:
@@ -105,7 +105,7 @@ class ReportFormatter:
             if state.graph_widgets:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
-                    parts.append(f"    {w.widget_id}: {w.what_plotted}")
+                    parts.append(f"    {w.widget_id}: {w.lens}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -283,8 +283,10 @@ class ReportFormatter:
                 ],
                 "probed_traces": [
                     {
-                        "name": t.name,
-                        "source_file": t.source_file,
+                        "symbol": t.symbol,
+                        "file": t.file,
+                        "line": t.line,
+                        "column": t.column,
                         "shape": t.shape,
                         "dtype": t.dtype,
                     }
@@ -302,7 +304,7 @@ class ReportFormatter:
                 "graph_widgets": [
                     {
                         "widget_id": w.widget_id,
-                        "what_plotted": w.what_plotted,
+                        "lens": w.lens,
                         "is_docked": w.is_docked,
                         "is_visible": w.is_visible,
                     }
