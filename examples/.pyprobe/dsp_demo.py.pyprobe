@@ -3,6 +3,20 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
+      "col": 26,
+      "symbol": "signal_i",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#ee2b2b",
+      "lens": "FFT Mag (dB) / Angle (deg)",
+      "markers": {
+        "Waveform": [],
+        "FFT Mag (dB) / Angle (deg)": []
+      }
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
       "col": 8,
       "symbol": "received_symbols",
       "func": "main",
@@ -10,12 +24,50 @@
       "color": "#2bee64",
       "lens": "Mag & Phase",
       "markers": {
-        "Constellation": [],
+        "Constellation": [
+          {
+            "id": "m1",
+            "x": -0.9797202759711974,
+            "y": -0.29297990352839137,
+            "trace_key": "history_4",
+            "marker_type": "ABSOLUTE",
+            "ref_marker_id": null,
+            "label": "m1",
+            "shape": "TRIANGLE_UP",
+            "color": "#55ff55"
+          }
+        ],
         "Real & Imag": [],
-        "Mag & Phase": []
+        "Mag & Phase": [],
+        "FFT Mag (dB) / Angle (deg)": []
       }
     }
   ],
   "watches": [],
-  "overlays": []
+  "overlays": [
+    {
+      "target": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 72,
+        "col": 26,
+        "symbol": "signal_i",
+        "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      },
+      "overlay": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 72,
+        "col": 36,
+        "symbol": "signal_q",
+        "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      }
+    }
+  ]
 }
