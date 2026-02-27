@@ -22,3 +22,9 @@
 - [x] Task: Verify code coverage for the new feature.
 - [x] Task: Final code review and documentation update (if any).
 - [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+
+## Phase 4: Post-Implementation Fixes (Re-verification)
+- [x] Task: Fix coordinate mapping bug in `RemovableLegendItem.mouseClickEvent` and `mouseDoubleClickEvent`.
+- [x] Task: Ensure `ComplexRIWidget` and `ComplexFftMagAngleWidget` add all curves to the legend.
+- [x] Task: Re-verify with mouse simulation test.
+- [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
