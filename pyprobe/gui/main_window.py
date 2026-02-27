@@ -614,6 +614,15 @@ class MainWindow(QMainWindow):
         r.connect_signal(
             self._probe_controller.panel_trace_visibility_changed,
             lambda anchor, wid, name, visible: f"Toggled visibility of {name} in window {wid} ({anchor.identity_label()})")
+        r.connect_signal(
+            self._probe_controller.panel_interaction_mode_changed,
+            lambda anchor, wid, mode: f"Changed tool to {mode} in window {wid} ({anchor.identity_label()})")
+        r.connect_signal(
+            self._probe_controller.panel_view_reset_triggered,
+            lambda anchor, wid: f"Reset view in window {wid} ({anchor.identity_label()})")
+        r.connect_signal(
+            self._probe_controller.panel_view_adjusted,
+            lambda anchor, wid: f"Adjusted view in window {wid} ({anchor.identity_label()})")
 
         # ── File tree ─────────────────────────────────────────────────────
         r.connect_signal(

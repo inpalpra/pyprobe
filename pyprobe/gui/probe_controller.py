@@ -57,6 +57,9 @@ class ProbeController(QObject):
     panel_draw_mode_changed = pyqtSignal(object, str, str)  # (anchor, series_key, mode_name)
     panel_markers_cleared = pyqtSignal(object)  # anchor
     panel_trace_visibility_changed = pyqtSignal(object, str, str, bool)  # (anchor, window_id, trace_name, visible)
+    panel_interaction_mode_changed = pyqtSignal(object, str, str)  # (anchor, window_id, mode_name)
+    panel_view_reset_triggered = pyqtSignal(object, str)  # (anchor, window_id)
+    panel_view_adjusted = pyqtSignal(object, str)  # (anchor, window_id)
     
     def __init__(
         self,
@@ -289,6 +292,17 @@ class ProbeController(QObject):
         # Forward legend toggle signal for StepRecorder
         panel.legend_trace_toggled.connect(
             lambda name, visible, a=anchor, p=panel: self.panel_trace_visibility_changed.emit(a, p.window_id, name, visible)
+        )
+
+        # Forward interaction mode and view signals for StepRecorder
+        panel.interaction_mode_changed.connect(
+            lambda mode, a=anchor, p=panel: self.panel_interaction_mode_changed.emit(a, p.window_id, mode)
+        )
+        panel.view_reset_triggered.connect(
+            lambda a=anchor, p=panel: self.panel_view_reset_triggered.emit(a, p.window_id)
+        )
+        panel.view_adjusted.connect(
+            lambda a=anchor, p=panel: self.panel_view_adjusted.emit(a, p.window_id)
         )
 
         # Send to runner if running

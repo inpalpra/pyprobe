@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QLabel, QMenu,
     QColorDialog
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor
 
 from pyprobe.logging import get_logger
@@ -101,6 +101,9 @@ class ProbePanel(QFrame):
     draw_mode_changed = pyqtSignal(str, str)  # (series_key, mode_name)
     markers_cleared = pyqtSignal()  # all markers cleared from panel
     legend_trace_toggled = pyqtSignal(str, bool)  # (trace_name, is_visible)
+    interaction_mode_changed = pyqtSignal(str)  # (mode_name)
+    view_reset_triggered = pyqtSignal()
+    view_adjusted = pyqtSignal()
 
     def __init__(
         self,
@@ -131,6 +134,12 @@ class ProbePanel(QFrame):
         self._current_interaction_mode = InteractionMode.POINTER
         self._saved_x_range = None
         self._saved_y_range = None
+
+        # Debounce timer for manual view adjustments (StepRecorder coverage)
+        self._view_adj_timer = QTimer(self)
+        self._view_adj_timer.setSingleShot(True)
+        self._view_adj_timer.setInterval(500)
+        self._view_adj_timer.timeout.connect(self.view_adjusted.emit)
 
         self._marker_vault = {}  # lens_name -> list[MarkerData]
         self._is_closing = False
@@ -235,6 +244,9 @@ class ProbePanel(QFrame):
 
         # Wire legend signals for StepRecorder
         self._wire_legend()
+
+        # M7: Wire ViewBox signals for StepRecorder
+        self._wire_view_box_signals()
 
         # Connect plot widget's hover coordinate signal if present
         if hasattr(self._plot, 'status_message_requested'):
@@ -399,6 +411,9 @@ class ProbePanel(QFrame):
 
         # Re-wire legend signals for new plot
         self._wire_legend()
+
+        # M7: Re-wire ViewBox signals for new plot
+        self._wire_view_box_signals()
 
         # Connect plot widget's hover coordinate signal if present
         if hasattr(self._plot, 'status_message_requested'):
@@ -709,6 +724,7 @@ class ProbePanel(QFrame):
         """Handle interaction mode change from toolbar."""
         self._current_interaction_mode = mode
         logger.debug(f"Toolbar mode changed to {mode.name}")
+        self.interaction_mode_changed.emit(mode.name)
         
         if self._plot and hasattr(self._plot, '_plot_widget'):
             vb = self._plot._plot_widget.getPlotItem().getViewBox()
@@ -795,6 +811,7 @@ class ProbePanel(QFrame):
 
     def _on_toolbar_reset(self) -> None:
         """Handle reset from toolbar."""
+        self.view_reset_triggered.emit()
         # Restore original setRange if axis-constrained zoom had patched it
         if self._plot and hasattr(self._plot, '_plot_widget'):
             vb = self._plot._plot_widget.getPlotItem().getViewBox()
@@ -1014,6 +1031,23 @@ class ProbePanel(QFrame):
             except (TypeError, RuntimeError):
                 pass
             legend.trace_visibility_changed.connect(self._on_legend_toggled)
+
+    def _wire_view_box_signals(self):
+        """Connect ViewBox manual range change signals to debounce timer."""
+        if not self._plot or not hasattr(self._plot, '_plot_widget'):
+            return
+
+        vb = self._plot._plot_widget.getPlotItem().getViewBox()
+        if hasattr(vb, 'sigRangeChangedManually'):
+            try:
+                vb.sigRangeChangedManually.disconnect(self._on_manual_view_change)
+            except (TypeError, RuntimeError):
+                pass
+            vb.sigRangeChangedManually.connect(self._on_manual_view_change)
+
+    def _on_manual_view_change(self, mask):
+        """Restart debounce timer when user manually adjusts view."""
+        self._view_adj_timer.start()
 
     @property
     def window_id(self) -> str:
