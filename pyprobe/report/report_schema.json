@@ -1,0 +1,108 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "PyProbe Bug Report",
+    "type": "object",
+    "properties": {
+        "description": { "type": "string" },
+        "environment": { "type": "object" },
+        "baseline_state": {
+            "type": "object",
+            "properties": {
+                "open_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string" },
+                            "is_probed": { "type": "boolean" },
+                            "is_executed": { "type": "boolean" },
+                            "has_unsaved": { "type": "boolean" },
+                            "contents": { "type": ["string", "null"] }
+                        },
+                        "required": ["path", "is_probed", "is_executed", "has_unsaved"]
+                    }
+                },
+                "probes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": { "type": "string" },
+                            "file": { "type": "string" },
+                            "line": { "type": "integer" },
+                            "column": { "type": "integer" },
+                            "shape": { "type": "array", "items": { "type": "integer" } },
+                            "dtype": { "type": "string" }
+                        },
+                        "required": ["symbol", "file", "line", "column", "shape", "dtype"]
+                    }
+                },
+                "equations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "eq_id": { "type": "string" },
+                            "expression": { "type": "string" },
+                            "status": { "type": "string" },
+                            "is_plotted": { "type": "boolean" }
+                        },
+                        "required": ["eq_id", "expression", "status", "is_plotted"]
+                    }
+                },
+                "graph_widgets": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "widget_id": { "type": "string" },
+                            "is_docked": { "type": "boolean" },
+                            "is_visible": { "type": "boolean" },
+                            "lens": { "type": "string" },
+                            "primary_trace": {
+                                "type": "object",
+                                "properties": {
+                                    "trace_id": { "type": "string" },
+                                    "components": { "type": "array", "items": { "type": "string" } }
+                                },
+                                "required": ["trace_id", "components"]
+                            },
+                            "overlay_traces": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "trace_id": { "type": "string" },
+                                        "components": { "type": "array", "items": { "type": "string" } }
+                                    },
+                                    "required": ["trace_id", "components"]
+                                }
+                            }
+                        },
+                        "required": ["widget_id", "is_docked", "is_visible", "primary_trace", "overlay_traces"]
+                    }
+                },
+                "captured_at": { "type": "number" }
+            },
+            "required": ["open_files", "probes", "equations", "graph_widgets", "captured_at"]
+        },
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "seq_num": { "type": "integer" },
+                    "timestamp": { "type": "number" },
+                    "action_type": { "type": "string" },
+                    "target_element": { "type": "string" },
+                    "modifiers": { "type": "array", "items": { "type": "string" } },
+                    "button": { "type": "string" },
+                    "description": { "type": "string" }
+                },
+                "required": ["seq_num", "timestamp", "action_type", "target_element", "description"]
+            }
+        },
+        "logs": { "type": ["string", "null"] }
+    },
+    "required": ["description", "baseline_state", "steps"]
+}
