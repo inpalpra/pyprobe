@@ -19,5 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: ocean theme renders symbol highlights in code view pane incorrectly. figure out why and fix the issues.**
+- [x] **Track: ocean theme renders symbol highlights in code view pane incorrectly. figure out why and fix the issues.**
 *Link: [./tracks/ocean_theme_fix_20260227/](./tracks/ocean_theme_fix_20260227/)*
