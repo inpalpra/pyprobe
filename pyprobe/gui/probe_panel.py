@@ -108,6 +108,7 @@ class ProbePanel(QFrame):
     overlay_remove_requested = pyqtSignal(object, object)  # (self/panel, overlay_anchor)
     draw_mode_changed = pyqtSignal(str, str)  # (series_key, mode_name)
     markers_cleared = pyqtSignal()  # all markers cleared from panel
+    legend_trace_toggled = pyqtSignal(str, bool)  # (trace_name, is_visible)
 
     def __init__(
         self,
@@ -240,6 +241,9 @@ class ProbePanel(QFrame):
 
         self._layout.addWidget(self._plot)
 
+        # Wire legend signals for StepRecorder
+        self._wire_legend()
+
         # Connect plot widget's hover coordinate signal if present
         if hasattr(self._plot, 'status_message_requested'):
             self._plot.status_message_requested.connect(self.status_message_requested)
@@ -332,6 +336,7 @@ class ProbePanel(QFrame):
             # Create new plot with correct type
             self._plot = create_plot(self._anchor.symbol, dtype, self)
             self._layout.addWidget(self._plot)
+            self._wire_legend()
 
         if self._plot:
             self._plot.update_data(value, dtype, shape, source_info)
@@ -399,6 +404,9 @@ class ProbePanel(QFrame):
         # Insert into layout (index 1, after header)
         self._layout.insertWidget(1, self._plot)
         self._plot.show()  # Ensure new widget is visible
+
+        # Re-wire legend signals for new plot
+        self._wire_legend()
 
         # Connect plot widget's hover coordinate signal if present
         if hasattr(self._plot, 'status_message_requested'):
@@ -984,6 +992,36 @@ class ProbePanel(QFrame):
     def anchor(self) -> ProbeAnchor:
         """Return the probe anchor."""
         return self._anchor
+
+    def _on_legend_toggled(self, item, visible):
+        """Map legend item toggle to domain-level signal with trace name."""
+        if not self._plot:
+            return
+        legend = getattr(self._plot, '_legend', None) or getattr(self._plot, '_plot_legend', None)
+        if not legend:
+            return
+
+        # Find label for this item
+        label_text = "Unknown"
+        for i, label in legend.items:
+            if i == item or (hasattr(i, 'item') and i.item == item):
+                label_text = label.text
+                break
+        self.legend_trace_toggled.emit(label_text, visible)
+
+    def _wire_legend(self):
+        """Connect plot legend signals to panel signals."""
+        if not self._plot:
+            return
+
+        legend = getattr(self._plot, '_legend', None) or getattr(self._plot, '_plot_legend', None)
+        if legend and hasattr(legend, 'trace_visibility_changed'):
+            # Avoid duplicate connections
+            try:
+                legend.trace_visibility_changed.disconnect(self._on_legend_toggled)
+            except (TypeError, RuntimeError):
+                pass
+            legend.trace_visibility_changed.connect(self._on_legend_toggled)
 
     @property
     def window_id(self) -> str:

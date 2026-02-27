@@ -152,7 +152,17 @@ class ComplexWidget(QWidget):
         self._plot_widget.setBackground('#0d0d0d')
         # Use a more visible default grid alpha (0.6) before theme override
         self._plot_widget.showGrid(x=True, y=True, alpha=0.6)
-        self._plot_legend = self._plot_widget.addLegend(offset=(10, 10))
+        
+        # Use RemovableLegendItem for StepRecorder compatibility
+        from pyprobe.gui.probe_panel import RemovableLegendItem
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme_colors = ThemeManager.instance().current.colors
+        self._plot_legend = RemovableLegendItem(
+            offset=(10, 10),
+            labelTextColor=theme_colors.get('text_primary', '#ffffff'),
+            brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
+        )
+        self._plot_legend.setParentItem(self._plot_widget.getPlotItem())
         
         # Setup editable axes
         self._setup_editable_axes()

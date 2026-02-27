@@ -613,7 +613,7 @@ class MainWindow(QMainWindow):
             lambda anchor: f"Cleared all markers on {anchor.identity_label()}")
         r.connect_signal(
             self._probe_controller.panel_trace_visibility_changed,
-            lambda anchor, wid, name, visible: f"Toggled visibility of {name} in window {wid}")
+            lambda anchor, wid, name, visible: f"Toggled visibility of {name} in window {wid} ({anchor.identity_label()})")
 
         # ── File tree ─────────────────────────────────────────────────────
         r.connect_signal(

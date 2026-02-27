@@ -286,6 +286,11 @@ class ProbeController(QObject):
         )
         panel.markers_cleared.connect(lambda a=anchor: self.panel_markers_cleared.emit(a))
 
+        # Forward legend toggle signal for StepRecorder
+        panel.legend_trace_toggled.connect(
+            lambda name, visible, a=anchor, p=panel: self.panel_trace_visibility_changed.emit(a, p.window_id, name, visible)
+        )
+
         # Send to runner if running
         ipc = self._get_ipc()
         if ipc and self._get_is_running():

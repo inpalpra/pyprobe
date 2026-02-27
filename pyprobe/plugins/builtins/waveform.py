@@ -994,7 +994,16 @@ class WaveformFftMagAngleWidget(WaveformWidget):
         # Replace right axis with editable one for double-click editing
         self._setup_editable_secondary_axis(self._phase_color, 'Angle (deg)')
         
-        self._legend = self._plot_widget.addLegend(offset=(10, 10))
+        # Use RemovableLegendItem for StepRecorder compatibility
+        from pyprobe.gui.probe_panel import RemovableLegendItem
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme_colors = ThemeManager.instance().current.colors
+        self._legend = RemovableLegendItem(
+            offset=(10, 10),
+            labelTextColor=theme_colors.get('text_primary', '#ffffff'),
+            brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
+        )
+        self._legend.setParentItem(self._plot_widget.getPlotItem())
         self._legend.addItem(self._curves[0], "FFT Mag (dB)")
         self._phase_legend_added = False
         
