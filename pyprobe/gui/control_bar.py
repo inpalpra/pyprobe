@@ -160,8 +160,8 @@ class ControlBar(QToolBar):
 
     def _on_action_clicked(self):
         """Emit both generic and state-aware action signals."""
-        self.action_clicked.emit()
         state = self._action_btn.text()  # "Run", "Pause", or "Resume"
+        self.action_clicked.emit()
         self.action_clicked_with_state.emit(state)
 
     def _on_loop_toggled(self, checked: bool):

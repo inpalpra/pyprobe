@@ -86,6 +86,8 @@ class LensDropdown(QComboBox):
         
         registry = PluginRegistry.instance()
         self._compatible_plugins = registry.get_compatible_plugins(dtype, shape)
+
+
         
         # Block signals during update to prevent triggering change events
         self.blockSignals(True)
@@ -101,6 +103,7 @@ class LensDropdown(QComboBox):
         
         self.blockSignals(False)
         logger.debug(f"Lens dropdown updated for {dtype}: {len(self._compatible_plugins)} compatible")
+
     
     def set_lens(self, plugin_name: str) -> bool:
         """Programmatically set the current lens.

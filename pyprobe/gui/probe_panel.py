@@ -28,13 +28,55 @@ import pyqtgraph as pg
 
 class RemovableLegendItem(pg.LegendItem):
     """
-    Subclass of pyqtgraph.LegendItem that emits a signal when a label is clicked.
-    Used for trace removal.
+    Subclass of pyqtgraph.LegendItem that emits a signal when a label or sample is clicked.
+    Handles visibility toggling (single click) and removal (double click).
     """
     trace_removal_requested = pyqtSignal(object)  # Emits the curve/item
+    trace_visibility_changed = pyqtSignal(object, bool)  # (item, visible)
 
     def __init__(self, size=None, offset=None, **kwargs):
         super().__init__(size, offset, **kwargs)
+
+    def mouseClickEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            pos = ev.pos()
+            for item, label in self.items:
+                # Check if click is on label or the sample (color swatch)
+                # self.items stores (sample, label) where sample is the icon/swatch
+                sample = item  # In LegendItem, 'item' is usually the sample
+                
+                # Check label click
+                if label.contains(label.mapFromParent(pos)):
+                    self._toggle_visibility(item)
+                    ev.accept()
+                    return
+                
+                # Check sample click (the color swatch)
+                # LegendItem doesn't provide easy access to sample geometry, 
+                # but we can try to find it by looking at the parent of the sample
+                # or just checking proximity.
+                # Actually, LegendItem.items is a list of (ItemSample, LabelItem)
+                if hasattr(sample, 'contains') and sample.contains(sample.mapFromParent(pos)):
+                    self._toggle_visibility(item)
+                    ev.accept()
+                    return
+                    
+        super().mouseClickEvent(ev)
+
+    def _toggle_visibility(self, item):
+        """Toggle visibility of the underlying data item."""
+        # Find the data item associated with this legend item
+        # If item is a pg.PlotDataItem, it has a setVisible method
+        if hasattr(item, 'item'):
+            # Some samples wrap the actual plot item
+            data_item = item.item
+        else:
+            data_item = item
+            
+        if hasattr(data_item, 'setVisible'):
+            new_visible = not data_item.isVisible()
+            data_item.setVisible(new_visible)
+            self.trace_visibility_changed.emit(data_item, new_visible)
 
     def mouseDoubleClickEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
@@ -256,7 +298,7 @@ class ProbePanel(QFrame):
         self._dtype = dtype
         self._shape = shape
         self._data = value
-
+        
         # Update dropdown if dtype changed
         if self._lens_dropdown is not None and (prev_dtype != dtype):
             self._lens_dropdown.update_for_dtype(dtype, shape)

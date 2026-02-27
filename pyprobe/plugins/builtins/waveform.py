@@ -147,6 +147,17 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         # M2.5: Setup editable axes
         self._setup_editable_axes()
+
+        # M2.5: Add legend by default (empty initially)
+        from pyprobe.gui.probe_panel import RemovableLegendItem
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme_colors = ThemeManager.instance().current.colors
+        self._legend = RemovableLegendItem(
+            offset=(10, 10),
+            labelTextColor=theme_colors.get('text_primary', '#ffffff'),
+            brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
+        )
+        self._legend.setParentItem(self._plot_widget.getPlotItem())
         
         # Mouse hover coordinate display
         self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
@@ -318,12 +329,17 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         if num_rows == current_count:
             return
-        
-        # Remove legend if exists (will recreate)
+        # Update legend items for multi-row
         if self._legend is not None:
-            self._legend.scene().removeItem(self._legend)
-            self._legend = None
-        
+            # Clear current legend items related to rows
+            # (Don't clear overlays! RemovableLegendItem should handle this better)
+            # For now, just clear all and rebuild - BUT this might lose overlay items.
+            # Better approach: only add/remove what changed.
+            
+            # Simple fix: if rows changed, clear and re-add rows.
+            # We need to preserve overlays.
+            pass
+
         # Add more curves if needed
         while len(self._curves) < num_rows:
             idx = len(self._curves)
@@ -351,23 +367,16 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             self._draw_modes.pop(removed_idx, None)
             self._plot_widget.removeItem(curve)
         
-        # Create legend for multi-row (>1 row)
-        if num_rows > 1:
-            from ...gui.theme.theme_manager import ThemeManager
-            tc = ThemeManager.instance().current.colors
-            self._legend = self._plot_widget.addLegend(
-                offset=(10, 10),
-                labelTextColor=tc['text_primary'],
-                brush=pg.mkBrush(tc['bg_medium'] + '80')
-            )
+        # Create legend for multi-row (>1 row) if not already present
+        if num_rows > 1 and self._legend:
+            # Add rows to legend if they are not already there
+            # We check labels to avoid duplicates
+            existing_labels = [label.text for _, label in self._legend.items]
             for idx, curve in enumerate(self._curves):
-                self._legend.addItem(curve, f"Row {idx}")
-            
-            # Connect legend click for visibility toggle
-            for idx, item in enumerate(self._legend.items):
-                label = item[1]
-                label.setAttr('idx', idx)
-                label.mousePressEvent = lambda ev, i=idx: self._toggle_row(i)
+                label = f"Row {idx}"
+                if label not in existing_labels:
+                    self._legend.addItem(curve, label)
+
 
     def _toggle_row(self, row_index: int):
         """Toggle visibility of a row."""

@@ -50,12 +50,13 @@ class ProbeController(QObject):
     overlay_remove_requested = pyqtSignal(object, object)  # (target_panel, overlay_anchor)
 
     # StepRecorder-forwarded panel signals
-    panel_lens_changed = pyqtSignal(object, str)  # (anchor, plugin_name)
+    panel_lens_changed = pyqtSignal(object, str, str)  # (anchor, window_id, plugin_name)
     panel_park_requested = pyqtSignal(object)  # anchor
     panel_maximize_requested = pyqtSignal(object)  # anchor
     panel_color_changed = pyqtSignal(object, object)  # (anchor, QColor)
     panel_draw_mode_changed = pyqtSignal(object, str, str)  # (anchor, series_key, mode_name)
     panel_markers_cleared = pyqtSignal(object)  # anchor
+    panel_trace_visibility_changed = pyqtSignal(object, str, str, bool)  # (anchor, window_id, trace_name, visible)
     
     def __init__(
         self,
@@ -248,6 +249,7 @@ class ProbeController(QObject):
 
         # Create probe panel
         panel = self._container.create_probe_panel(anchor, color, trace_id)
+        
         if anchor not in self._probe_panels:
             self._probe_panels[anchor] = []
         self._probe_panels[anchor].append(panel)
@@ -260,17 +262,17 @@ class ProbeController(QObject):
         panel.equation_overlay_requested.connect(self.equation_overlay_requested.emit)
         panel.overlay_remove_requested.connect(self.overlay_remove_requested.emit)
         
-        # Connect lens changed signal
-        if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
-            from functools import partial
-            panel._lens_dropdown.lens_changed.connect(
-                partial(self.handle_lens_changed, anchor)
+        # Unified Lens Change Handling
+        dropdown = getattr(panel, '_lens_dropdown', None)
+        if dropdown is not None:
+            dropdown.lens_changed.connect(
+                lambda name, p=panel, a=anchor: self._handle_lens_changed_internal(a, p, name)
             )
             
             # If we have a stored lens preference, apply it
             stored_lens = self._probe_metadata[anchor].get('lens')
             if stored_lens:
-                panel._lens_dropdown.set_lens(stored_lens)
+                dropdown.set_lens(stored_lens)
         
         # Connect color changed signal
         panel.color_changed.connect(self._on_probe_color_changed)
@@ -279,10 +281,6 @@ class ProbeController(QObject):
         panel.park_requested.connect(lambda a=anchor: self.panel_park_requested.emit(a))
         panel.maximize_requested.connect(lambda a=anchor: self.panel_maximize_requested.emit(a))
         panel.color_changed.connect(lambda a, c: self.panel_color_changed.emit(a, c))
-        if hasattr(panel, '_lens_dropdown') and panel._lens_dropdown:
-            panel._lens_dropdown.lens_changed.connect(
-                lambda name, a=anchor: self.panel_lens_changed.emit(a, name)
-            )
         panel.draw_mode_changed.connect(
             lambda key, mode, a=anchor: self.panel_draw_mode_changed.emit(a, key, mode)
         )
@@ -298,7 +296,16 @@ class ProbeController(QObject):
         self.probe_added.emit(anchor, panel)
         
         return panel
-    
+
+    def _handle_lens_changed_internal(self, anchor: ProbeAnchor, panel, lens_name: str):
+        """Unified internal handler for lens changes."""
+        # 1. Update metadata
+        if anchor in self._probe_metadata:
+            self._probe_metadata[anchor]['lens'] = lens_name
+        
+        # 2. Emit signal for StepRecorder
+        self.panel_lens_changed.emit(anchor, panel.window_id, lens_name)
+
     def _on_probe_color_changed(self, anchor: ProbeAnchor, color: QColor) -> None:
         """Handle color change from a probe panel — update code viewer and gutter."""
         self._code_viewer.update_probe_color(anchor, color)
@@ -779,8 +786,17 @@ class ProbeController(QObject):
                     return
 
         def ensure_legend():
-            """Create legend on-demand and add primary curve if needed."""
-            if not hasattr(plot, "_legend") or plot._legend is None:
+            """Create legend on-demand or upgrade existing one to RemovableLegendItem."""
+            existing = getattr(plot, "_legend", None)
+            
+            # If no legend or standard pg.LegendItem, (re)create as RemovableLegendItem
+            if existing is None or type(existing) == pg.LegendItem:
+                if existing is not None:
+                    try:
+                        existing.scene().removeItem(existing)
+                    except Exception:
+                        pass
+                
                 plot._legend = RemovableLegendItem(
                     offset=(10, 10),
                     labelTextColor=theme.colors.get("text_primary", "#ffffff"),
@@ -788,6 +804,19 @@ class ProbeController(QObject):
                 )
                 plot._legend.setParentItem(plot._plot_widget.getPlotItem())
                 plot._legend.trace_removal_requested.connect(on_legend_remove)
+                
+                # Forward visibility changes for StepRecorder
+                def on_visibility_changed(item, visible, p=target_panel):
+                    # Find label for this item
+                    label_text = "Unknown"
+                    for i, label in plot._legend.items:
+                        if i == item or (hasattr(i, 'item') and i.item == item):
+                            label_text = label.text
+                            break
+                    self.panel_trace_visibility_changed.emit(
+                        primary_anchor, p.window_id, label_text, visible
+                    )
+                plot._legend.trace_visibility_changed.connect(on_visibility_changed)
 
                 # Add primary curve(s) to legend
                 if hasattr(plot, "_curves") and plot._curves and primary_anchor:
@@ -960,7 +989,17 @@ class ProbeController(QObject):
                     return
 
         def ensure_legend():
-            if not hasattr(plot, "_legend") or plot._legend is None:
+            """Create legend on-demand or upgrade existing one to RemovableLegendItem."""
+            existing = getattr(plot, "_legend", None)
+            
+            # If no legend or standard pg.LegendItem, (re)create as RemovableLegendItem
+            if existing is None or type(existing) == pg.LegendItem:
+                if existing is not None:
+                    try:
+                        existing.scene().removeItem(existing)
+                    except Exception:
+                        pass
+                
                 plot._legend = RemovableLegendItem(
                     offset=(10, 10),
                     labelTextColor=theme.colors.get("text_primary", "#ffffff"),
@@ -968,6 +1007,19 @@ class ProbeController(QObject):
                 )
                 plot._legend.setParentItem(plot._plot_widget.getPlotItem())
                 plot._legend.trace_removal_requested.connect(on_legend_remove)
+                
+                # Forward visibility changes for StepRecorder
+                def on_visibility_changed(item, visible, p=target_panel):
+                    # Find label for this item
+                    label_text = "Unknown"
+                    for i, label in plot._legend.items:
+                        if i == item or (hasattr(i, 'item') and i.item == item):
+                            label_text = label.text
+                            break
+                    self.panel_trace_visibility_changed.emit(
+                        primary_anchor, p.window_id, label_text, visible
+                    )
+                plot._legend.trace_visibility_changed.connect(on_visibility_changed)
 
                 # Add primary scatter to legend
                 if hasattr(plot, "_scatter_items") and plot._scatter_items and primary_anchor:

@@ -15,6 +15,7 @@ class EquationEditorDialog(QDialog):
     _instance = None
     plot_requested = pyqtSignal(str)  # eq_id
     equation_added = pyqtSignal(str)  # eq_id
+    equation_edited = pyqtSignal(str)  # eq_id
     equation_deleted = pyqtSignal(str)  # eq_id
 
     @classmethod
@@ -131,6 +132,7 @@ class EquationEditorDialog(QDialog):
 
     def _on_expression_changed(self, eq_id: str, text: str):
         self._manager.update_expression(eq_id, text)
+        self.equation_edited.emit(eq_id)
 
 class DraggableLabel(QLabel):
     """

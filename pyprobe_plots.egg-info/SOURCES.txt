@@ -57,7 +57,9 @@ pyprobe/gui/probe_panel.py
 pyprobe/gui/probe_registry.py
 pyprobe/gui/probe_state.py
 pyprobe/gui/probe_state_indicator.py
+pyprobe/gui/recording_indicator.py
 pyprobe/gui/redraw_throttler.py
+pyprobe/gui/report_bug_dialog.py
 pyprobe/gui/scalar_watch_window.py
 pyprobe/gui/script_runner.py
 pyprobe/gui/watch_list.py
@@ -106,6 +108,14 @@ pyprobe/plugins/builtins/constellation.py
 pyprobe/plugins/builtins/scalar_display.py
 pyprobe/plugins/builtins/scalar_history.py
 pyprobe/plugins/builtins/waveform.py
+pyprobe/report/__init__.py
+pyprobe/report/environment.py
+pyprobe/report/formatter.py
+pyprobe/report/log_capture.py
+pyprobe/report/report_model.py
+pyprobe/report/sanitizer.py
+pyprobe/report/session_snapshot.py
+pyprobe/report/step_recorder.py
 pyprobe_plots.egg-info/PKG-INFO
 pyprobe_plots.egg-info/SOURCES.txt
 pyprobe_plots.egg-info/dependency_links.txt

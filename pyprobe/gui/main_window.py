@@ -601,7 +601,7 @@ class MainWindow(QMainWindow):
         # ── Per-panel signals (forwarded via probe_controller) ────────────
         r.connect_signal(
             self._probe_controller.panel_lens_changed,
-            lambda anchor, name: f"Changed lens to '{name}' on {anchor.identity_label()}")
+            lambda anchor, wid, name: f"Changed format on window {wid} to {name}")
         r.connect_signal(
             self._probe_controller.panel_color_changed,
             lambda anchor, color: f"Changed color of {anchor.identity_label()} to {color.name()}")
@@ -611,6 +611,9 @@ class MainWindow(QMainWindow):
         r.connect_signal(
             self._probe_controller.panel_markers_cleared,
             lambda anchor: f"Cleared all markers on {anchor.identity_label()}")
+        r.connect_signal(
+            self._probe_controller.panel_trace_visibility_changed,
+            lambda anchor, wid, name, visible: f"Toggled visibility of {name} in window {wid}")
 
         # ── File tree ─────────────────────────────────────────────────────
         r.connect_signal(
@@ -667,6 +670,7 @@ class MainWindow(QMainWindow):
         dialog._recorder_connected = True
         r = self._step_recorder
         r.connect_signal(dialog.equation_added, lambda eq_id: f"Added equation: {eq_id}")
+        r.connect_signal(dialog.equation_edited, lambda eq_id: f"Edited equation: {eq_id}")
         r.connect_signal(dialog.equation_deleted, lambda eq_id: f"Deleted equation: {eq_id}")
         r.connect_signal(dialog.plot_requested, lambda eq_id: f"Plotted equation: {eq_id}")
 
