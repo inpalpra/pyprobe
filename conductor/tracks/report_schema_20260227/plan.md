@@ -1,8 +1,8 @@
 # Implementation Plan: Unambiguous Recording Report Schema
 
 ## Phase 1: Interaction Discovery & Vocabulary Building
-- [ ] Task: Create a simple PyProbe graph with multiple traces (real and complex) specifically for interactive discovery.
-- [ ] Task: Conduct an interactive session (with the user) to trigger all possible mouse interactions on the graph widget components (Legends, Line plots, Axes, Graph Area).
+- [x] Task: Create a simple PyProbe graph with multiple traces (real and complex) specifically for interactive discovery. 94ce657
+- [~] Task: Conduct an interactive session (with the user) to trigger all possible mouse interactions on the graph widget components (Legends, Line plots, Axes, Graph Area).
 - [ ] Task: Document the observed interactions, agree upon the nomenclature for traces (e.g., `tr0.val`, `tr1.mag_db`) and interactions, and formalize the vocabulary.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Interaction Discovery & Vocabulary Building' (Protocol in workflow.md)
 
