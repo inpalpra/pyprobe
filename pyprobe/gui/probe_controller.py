@@ -122,8 +122,10 @@ class ProbeController(QObject):
             raw_shape = meta.get('shape')
             shape: tuple = tuple(raw_shape) if raw_shape else ()
             entries.append(ProbeTraceEntry(
-                name=anchor.symbol,
-                source_file=anchor.file,
+                symbol=anchor.symbol,
+                file=anchor.file,
+                line=anchor.line,
+                column=anchor.col,
                 shape=shape,
                 dtype=meta.get('dtype') or 'unknown',
             ))

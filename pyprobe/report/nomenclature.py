@@ -1,0 +1,22 @@
+"""
+Nomenclature and naming conventions for traces and their components.
+"""
+
+def get_trace_components(trace_id: str, lens_name: str) -> tuple[str, ...]:
+    """
+    Return the list of component names for a trace given its ID and the lens used.
+    
+    Examples:
+        tr0, Waveform -> (tr0.val,)
+        tr1, Real & Imag -> (tr1.real, tr1.imag)
+        tr2, Mag & Phase -> (tr2.mag_db, tr2.phase_deg)
+    """
+    if lens_name == "Real & Imag":
+        return (f"{trace_id}.real", f"{trace_id}.imag")
+    elif lens_name == "Mag & Phase":
+        return (f"{trace_id}.mag_db", f"{trace_id}.phase_deg")
+    elif lens_name == "Complex FFT":
+        return (f"{trace_id}.mag_db", f"{trace_id}.phase_deg")
+    else:
+        # Default for most plots (Waveform, Constellation, Scalar, etc.)
+        return (f"{trace_id}.val",)

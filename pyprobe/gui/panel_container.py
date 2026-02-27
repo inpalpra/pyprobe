@@ -378,17 +378,11 @@ class ProbePanelContainer(QScrollArea):
         """Access the focus manager."""
         return self._focus_manager
 
-    def graph_widget_entries(self) -> list:
+    def graph_widget_entries(self, registry) -> list:
         """Return a list of GraphWidgetEntry for each probe panel."""
-        from pyprobe.report.report_model import GraphWidgetEntry
         entries = []
         for anchor, panel_list in self._panels.items():
             for panel in panel_list:
                 is_docked = anchor not in self._parked_panels
-                entries.append(GraphWidgetEntry(
-                    widget_id=getattr(panel, '_window_id', None) or anchor.symbol,
-                    what_plotted=anchor.symbol,
-                    is_docked=is_docked,
-                    is_visible=panel.isVisible(),
-                ))
+                entries.append(panel.get_report_entry(registry, is_docked))
         return entries

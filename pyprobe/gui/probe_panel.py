@@ -1054,6 +1054,37 @@ class ProbePanel(QFrame):
         """Return the window ID (e.g. w0)."""
         return self._window_id
 
+    def get_report_entry(self, registry, is_docked: bool) -> 'GraphWidgetEntry':
+        """Return a GraphWidgetEntry for this panel, including nomenclature-aware traces."""
+        from pyprobe.report.report_model import GraphWidgetEntry, WidgetTraceEntry
+        from pyprobe.report.nomenclature import get_trace_components
+        
+        lens_name = self.current_lens
+        
+        primary_trace = WidgetTraceEntry(
+            trace_id=self._trace_id,
+            components=get_trace_components(self._trace_id, lens_name)
+        )
+        
+        overlay_entries = []
+        if hasattr(self, '_overlay_anchors'):
+            for anchor in self._overlay_anchors:
+                overlay_trace_id = registry.get_trace_id(anchor)
+                if overlay_trace_id:
+                    overlay_entries.append(WidgetTraceEntry(
+                        trace_id=overlay_trace_id,
+                        components=get_trace_components(overlay_trace_id, lens_name)
+                    ))
+        
+        return GraphWidgetEntry(
+            widget_id=self._window_id or self._anchor.symbol,
+            is_docked=is_docked,
+            is_visible=self.isVisible() and not self.is_closing,
+            lens=lens_name,
+            primary_trace=primary_trace,
+            overlay_traces=tuple(overlay_entries)
+        )
+
     @property
     def is_closing(self) -> bool:
         """Check if the panel is currently being closed/removed."""

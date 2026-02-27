@@ -115,6 +115,14 @@ class MainWindow(QMainWindow):
         auto_quit_timeout: Optional[float] = None
     ):
         super().__init__()
+        
+        try:
+            import sys, os
+            sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+            from examples.interaction_discovery_hook import inject_logger
+            inject_logger()
+        except Exception as e:
+            print(f"Failed to inject logger: {e}", flush=True)
 
         self._script_path: Optional[str] = script_path
         self._run_target_path: Optional[str] = None
@@ -507,7 +515,7 @@ class MainWindow(QMainWindow):
             file_getter=lambda: self._code_viewer.open_file_entries(),
             probe_getter=lambda: self._probe_controller.probe_trace_entries(),
             equation_getter=lambda: self._equation_manager.equation_entries(),
-            widget_getter=lambda: self._probe_container.graph_widget_entries(),
+            widget_getter=lambda: self._probe_container.graph_widget_entries(self._registry),
         )
         dialog = ReportBugDialog(collector=collector, recorder=self._step_recorder, parent=self)
         dialog.finished.connect(self._on_report_bug_dialog_closed)
