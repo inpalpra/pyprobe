@@ -6,7 +6,7 @@
 - [x] Task: Document the observed interactions, agree upon the nomenclature for traces (e.g., `tr0.val`, `tr1.mag_db`) and interactions, and formalize the vocabulary.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Interaction Discovery & Vocabulary Building' (Protocol in workflow.md) [checkpoint: 9ac9a21]
 
-## Phase 2: Core Schema & Nomenclature Definition
+## Phase 2: Core Schema & Nomenclature Definition [checkpoint: 5bff338]
 - [x] Task: Draft the formal JSON schema incorporating the newly agreed-upon interaction vocabulary and hierarchical trace structure. ef08f7a
     - [x] Write schema definition tests validating JSON structure.
     - [x] Implement schema validation using `jsonschema` or equivalent.
@@ -16,7 +16,7 @@
 - [x] Task: Implement exact probe location tracking (`<symbol> @ <file>:<line>:<column>`) for the baseline state. 92df57e
     - [x] Write unit tests verifying precise file/line/column extraction.
     - [x] Implement the location extraction logic in the tracer module.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Schema & Nomenclature Definition' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Core Schema & Nomenclature Definition' (Protocol in workflow.md) 5bff338
 
 ## Phase 3: Event Capture Integration
 - [ ] Task: Implement comprehensive interaction logging for all defined graph components.
