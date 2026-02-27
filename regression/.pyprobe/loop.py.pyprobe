@@ -1,7 +1,7 @@
 {
   "probes": [
     {
-      "file": "/Users/ppal/repos/pyprobe/regression/loop.py",
+      "file": "/Users/ppal/repos/pyprobe-gemini-fix-themes/regression/loop.py",
       "line": 4,
       "col": 8,
       "symbol": "x",

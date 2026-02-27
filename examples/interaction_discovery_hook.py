@@ -44,6 +44,3 @@ def inject_logger():
         app.installEventFilter(logger)
         # Keep a reference
         app._interaction_logger = logger
-        print("==========================================", flush=True)
-        print("INTERACTION DISCOVERY HOOK INSTALLED", flush=True)
-        print("==========================================", flush=True)
