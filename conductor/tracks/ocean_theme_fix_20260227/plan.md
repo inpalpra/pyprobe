@@ -6,9 +6,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Investigation and Automated Test Setup' (Protocol in workflow.md) [checkpoint: b9d6026]
 
 ## Phase 2: Implementation of the Fix
-- [ ] Task: Implement the necessary fix to the coordinate calculations, layout engine, or style logic to correctly align the highlight rectangle.
-- [ ] Task: Verify that the failing test written in Phase 1 now passes (Green Phase).
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Implementation of the Fix' (Protocol in workflow.md)
+- [x] Task: Implement the necessary fix to the coordinate calculations, layout engine, or style logic to correctly align the highlight rectangle.
+- [x] Task: Verify that the failing test written in Phase 1 now passes (Green Phase).
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Implementation of the Fix' (Protocol in workflow.md) [checkpoint: d425515]
 
 ## Phase 3: Regression Testing and Multi-Theme Verification
 - [ ] Task: Write or update tests to verify that the fix does not regress the "Cyberpunk" theme.
