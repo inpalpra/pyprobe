@@ -11,6 +11,6 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Implementation of the Fix' (Protocol in workflow.md) [checkpoint: d425515]
 
 ## Phase 3: Regression Testing and Multi-Theme Verification
-- [ ] Task: Write or update tests to verify that the fix does not regress the "Cyberpunk" theme.
-- [ ] Task: Ensure the fix applies gracefully to all affected themes, or document if it's strictly an Ocean theme issue.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Regression Testing and Multi-Theme Verification' (Protocol in workflow.md)
+- [x] Task: Write or update tests to verify that the fix does not regress the "Cyberpunk" theme.
+- [x] Task: Ensure the fix applies gracefully to all affected themes, or document if it's strictly an Ocean theme issue.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Regression Testing and Multi-Theme Verification' (Protocol in workflow.md) [checkpoint: e51e27c]
