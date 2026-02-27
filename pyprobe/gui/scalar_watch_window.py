@@ -122,7 +122,7 @@ class ScalarWatchSidebar(QWidget):
             QLabel#scalarLabel {
                 color: #888888;
                 font-size: 11px;
-                font-family: 'SF Pro Text', 'Segoe UI', sans-serif;
+                font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
             }
             QLabel#scalarValue {
                 color: #ffffff;

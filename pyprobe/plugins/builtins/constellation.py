@@ -23,10 +23,11 @@ class ConstellationWidget(QWidget):
     MAX_DISPLAY_POINTS = 10000
     HISTORY_LENGTH = 5  # Number of frames to show with fading
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(parent)
         self._var_name = var_name
         self._color = color
+        self._trace_id = trace_id
         self._data: Optional[np.ndarray] = None
         self._history: List[np.ndarray] = []
         
@@ -64,6 +65,21 @@ class ConstellationWidget(QWidget):
         self._plot_widget = pg.PlotWidget()
         self._configure_plot()
         layout.addWidget(self._plot_widget)
+
+        # M2.5: Add legend by default
+        from pyprobe.gui.probe_panel import RemovableLegendItem
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        theme_colors = ThemeManager.instance().current.colors
+        self._legend = RemovableLegendItem(
+            offset=(10, 10),
+            labelTextColor=theme_colors.get('text_primary', '#ffffff'),
+            brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
+        )
+        self._legend.setParentItem(self._plot_widget.getPlotItem())
+        # Add primary signal to legend if we have scatter items
+        if self._scatter_items:
+            label = f"{self._trace_id}: {self._var_name}" if self._trace_id else self._var_name
+            self._legend.addItem(self._scatter_items[-1], label)
 
         # Stats bar
         self._stats_label = QLabel("Power: -- dB | Symbols: --")
@@ -499,8 +515,8 @@ class ConstellationPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ConstellationWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return ConstellationWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str,
                shape: Optional[Tuple[int, ...]] = None,

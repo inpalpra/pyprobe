@@ -90,6 +90,7 @@ class ComplexWidget(QWidget):
     """Base widget for complex time-domain plots with zoom-responsive downsampling."""
 
     status_message_requested = pyqtSignal(str)
+    MAX_DISPLAY_POINTS = 5000
     
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -117,6 +118,10 @@ class ComplexWidget(QWidget):
         self._zoom_timer.timeout.connect(self._rerender_for_zoom)
         self._updating_curves = False
         
+        # M2.5: Overlay tracking
+        self._overlay_curves: Dict[str, pg.PlotDataItem] = {}
+        self._overlay_curves_by_anchor: Dict[ProbeAnchor, List[pg.PlotDataItem]] = {}
+        
         self._setup_ui()
         self._configure_plot()
 
@@ -124,6 +129,10 @@ class ComplexWidget(QWidget):
         tm = ThemeManager.instance()
         tm.theme_changed.connect(self._apply_theme)
         self._apply_theme(tm.current)
+
+    def downsample(self, data: np.ndarray, n_points: int = 5000, x_offset: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+        """Delegate to global downsample function."""
+        return downsample(data, n_points, x_offset)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -157,12 +166,12 @@ class ComplexWidget(QWidget):
         from pyprobe.gui.probe_panel import RemovableLegendItem
         from pyprobe.gui.theme.theme_manager import ThemeManager
         theme_colors = ThemeManager.instance().current.colors
-        self._plot_legend = RemovableLegendItem(
+        self._legend = RemovableLegendItem(
             offset=(10, 10),
             labelTextColor=theme_colors.get('text_primary', '#ffffff'),
             brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
         )
-        self._plot_legend.setParentItem(self._plot_widget.getPlotItem())
+        self._legend.setParentItem(self._plot_widget.getPlotItem())
         
         # Setup editable axes
         self._setup_editable_axes()
@@ -636,14 +645,15 @@ class ComplexWidget(QWidget):
 class ComplexRIWidget(ComplexWidget):
     """Real & Imaginary components."""
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(var_name, color, parent)
         self._real_curve = self._plot_widget.plot(pen=pg.mkPen('#00ffff', width=1.5), name="Real")
         self._imag_curve = self._plot_widget.plot(pen=pg.mkPen('#ff00ff', width=1.5), name="Imag")
         self._plot_widget.setLabel('left', 'Amplitude')
         
-        self._plot_legend.addItem(self._real_curve, "Real")
-        self._plot_legend.addItem(self._imag_curve, "Imag")
+        prefix = f"{trace_id}: {var_name} " if trace_id else ""
+        self._legend.addItem(self._real_curve, f"{prefix}(real)")
+        self._legend.addItem(self._imag_curve, f"{prefix}(imag)")
         
         self._register_series('Real', self._real_curve, '#00ffff')
         self._register_series('Imag', self._imag_curve, '#ff00ff')
@@ -680,7 +690,7 @@ class ComplexRIWidget(ComplexWidget):
 class ComplexMAWidget(ComplexWidget):
     """Magnitude (Log) & Phase."""
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(var_name, color, parent)
         
         # Mag on left axis
@@ -699,8 +709,9 @@ class ComplexMAWidget(ComplexWidget):
         self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
         self._p2.addItem(self._phase_curve)
         
-        self._plot_legend.addItem(self._mag_curve, "Log Mag")
-        self._plot_legend.addItem(self._phase_curve, "Phase")
+        prefix = f"{trace_id}: {var_name} " if trace_id else ""
+        self._legend.addItem(self._mag_curve, f"{prefix}(mag_db)")
+        self._legend.addItem(self._phase_curve, f"{prefix}(phase_rad)")
         
         self._register_series('Log Mag', self._mag_curve, '#ffff00')
         self._register_series('Phase', self._phase_curve, '#00ff7f')
@@ -713,6 +724,45 @@ class ComplexMAWidget(ComplexWidget):
 
         # Handle view resize
         self._p1.vb.sigResized.connect(self._update_views)
+        self._p1.vb.sigYRangeChanged.connect(self._sync_p2_y)
+        self._last_mag_range = None
+        self._syncing_y = False
+
+    def _sync_p2_y(self):
+        """Synchronize secondary Y axis proportionally when primary is panned/zoomed."""
+        if self._syncing_y:
+            return
+        
+        mag_range = self._p1.vb.viewRange()[1]
+        
+        # If auto-ranging or first run, just update baseline and exit
+        if self._last_mag_range is None or not self._axis_controller or not self._axis_controller.y_pinned:
+            self._last_mag_range = mag_range
+            return
+            
+        self._syncing_y = True
+        try:
+            mag_h = self._last_mag_range[1] - self._last_mag_range[0]
+            if mag_h != 0:
+                phase_range = self._p2.viewRange()[1]
+                phase_h = phase_range[1] - phase_range[0]
+                
+                # Proportional shift
+                dy_mag = mag_range[0] - self._last_mag_range[0]
+                dy_phase = dy_mag * (phase_h / mag_h)
+                
+                # Proportional zoom
+                zoom_ratio = (mag_range[1] - mag_range[0]) / mag_h
+                new_phase_h = phase_h * zoom_ratio
+                
+                new_phase_min = phase_range[0] + dy_phase
+                new_phase_max = new_phase_min + new_phase_h
+                
+                self._p2.setYRange(new_phase_min, new_phase_max, padding=0)
+            
+            self._last_mag_range = mag_range
+        finally:
+            self._syncing_y = False
 
     def _update_views(self):
         self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
@@ -765,11 +815,17 @@ class ComplexMAWidget(ComplexWidget):
 class SingleCurveWidget(ComplexWidget):
     """Generic single curve complex view."""
     
-    def __init__(self, var_name: str, color: QColor, title: str, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, title: str, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(var_name, color, parent)
         self._title = title
         self._curve = self._plot_widget.plot(pen=pg.mkPen(color.name(), width=1.5), name=title)
         self._plot_widget.setLabel('left', title)
+        
+        # M2.5: Ensure legend exists and add primary
+        if hasattr(self, '_legend') and self._legend:
+            label = f"{trace_id}: {var_name}" if trace_id else title
+            self._legend.addItem(self._curve, label)
+            
         self._register_series(title, self._curve, color.name())
         self._raw_real_data: Optional[np.ndarray] = None  # Pre-computed real array
 
@@ -834,8 +890,8 @@ class ComplexRIPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ComplexRIWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return ComplexRIWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, ComplexRIWidget):
@@ -851,187 +907,14 @@ class ComplexMAPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ComplexMAWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return ComplexMAWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, ComplexMAWidget):
             samples, t_vector = _extract_complex_waveform(value, dtype)
             widget._t_vector = t_vector
             widget.update_data(samples)
-
-class ComplexFftMagAngleWidget(ComplexWidget):
-    """FFT Magnitude (dB) & Angle (deg) with Kaiser Bessel window."""
-    
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
-        super().__init__(var_name, color, parent)
-        
-        self._mag_curve = self._plot_widget.plot(pen=pg.mkPen('#ffff00', width=1.5), name="FFT Mag (dB)")
-        self._plot_widget.setLabel('left', 'Magnitude (dB)', color='#ffff00')
-        self._plot_widget.setLabel('bottom', 'FFT Bin')
-        
-        self._p1 = self._plot_widget.plotItem
-        self._p2 = pg.ViewBox()
-        self._p1.showAxis('right')
-        self._p1.scene().addItem(self._p2)
-        self._p1.getAxis('right').linkToView(self._p2)
-        self._p2.setXLink(self._p1)
-        self._p1.getAxis('right').setLabel('Angle (deg)', color='#00ff00')
-        self._p1.getAxis('right').setZValue(10)
-        
-        self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
-        self._p2.addItem(self._phase_curve)
-        
-        self._plot_legend.addItem(self._mag_curve, "FFT Mag (dB)")
-        self._plot_legend.addItem(self._phase_curve, "Angle (deg)")
-        
-        self._register_series('FFT Mag (dB)', self._mag_curve, '#ffff00')
-        self._register_series('Angle (deg)', self._phase_curve, '#00ff7f')
-
-        # Keys whose curves live in the secondary ViewBox (_p2)
-        self._secondary_keys: set = {'Angle (deg)'}
-
-        # Replace right axis with editable one
-        self._setup_editable_secondary_axis('#00ff00', 'Angle (deg)')
-
-        self._p1.vb.sigResized.connect(self._update_views)
-        self._first_data = True
-        # FFT angle is bounded to [-180, 180], so keep a fixed phase axis
-        # instead of auto-ranging y on every update.
-        self._p2.enableAutoRange(axis='y', enable=False)
-        self._p2.setYRange(-180.0, 180.0, padding=0)
-        
-        self._fft_freqs = None
-        self._fft_mag = None
-        self._fft_phase = None
-
-    def _update_views(self):
-        self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
-        self._p2.linkedViewChanged(self._p1.vb, self._p2.XAxis)
-
-    def _on_pin_state_changed(self, axis: str, is_pinned: bool) -> None:
-        super()._on_pin_state_changed(axis, is_pinned)
-        if axis == 'y':
-            self._p2.enableAutoRange(axis='y', enable=False)
-            if not is_pinned:
-                self._p2.setYRange(-180.0, 180.0, padding=0)
-
-    def set_series_color(self, series_key: str, color: QColor) -> None:
-        """Override to also update axis label colors for dual-axis layout."""
-        super().set_series_color(series_key, color)
-        hex_color = color.name()
-        if series_key == 'FFT Mag (dB)':
-            self._plot_widget.setLabel('left', 'Magnitude (dB)', color=hex_color)
-        elif series_key == 'Angle (deg)':
-            self._p1.getAxis('right').setLabel('Angle (deg)', color=hex_color)
-
-    def set_data(self, data: np.ndarray, info: str, dx: float = None):
-        self._raw_data = data
-        self._updating_curves = True
-        
-        n = len(data)
-        
-        if n > 0:
-            import scipy.signal
-            window = scipy.signal.windows.kaiser(n, beta=9)
-            windowed = data * window
-            
-            nfft = max(8192, 2**int(np.ceil(np.log2(n))))
-            
-            fft_data = np.fft.fftshift(np.fft.fft(windowed, n=nfft))
-            self._fft_mag = 20 * np.log10(np.abs(fft_data) + 1e-12) - 20 * np.log10(nfft)
-            self._fft_phase = np.rad2deg(np.angle(fft_data))
-            
-            # Physical frequency axis when dx available, else bin indices
-            if dx is not None and dx > 0:
-                self._fft_freqs = np.fft.fftshift(np.fft.fftfreq(nfft, d=dx))
-                self._plot_widget.setLabel('bottom', 'Frequency (Hz)')
-            else:
-                self._fft_freqs = np.arange(-nfft//2, nfft - nfft//2, dtype=float)
-                self._plot_widget.setLabel('bottom', 'FFT Bin')
-            
-            x_m, y_m = downsample(self._fft_mag)
-            x_p, y_p = downsample(self._fft_phase)
-            self._mag_curve.setData(self._fft_freqs[x_m], y_m)
-            self._phase_curve.setData(self._fft_freqs[x_p], y_p)
-            
-            if self._first_data:
-                from PyQt6.QtCore import QTimer
-                QTimer.singleShot(50, self.reset_view)
-                self._first_data = False
-        
-        self._updating_curves = False
-        self.update_info(info)
-
-    def _render_slice(self, i_min: int, i_max: int):
-        if self._fft_freqs is None or self._fft_mag is None:
-            return
-        
-        x_min, x_max = self._plot_widget.getPlotItem().getViewBox().viewRange()[0]
-        
-        import bisect
-        idx_min = bisect.bisect_left(self._fft_freqs, x_min)
-        idx_max = bisect.bisect_right(self._fft_freqs, x_max)
-        
-        idx_min = max(0, idx_min)
-        idx_max = min(len(self._fft_freqs), idx_max)
-        
-        if idx_min >= idx_max:
-            return
-
-        mag_slice = self._fft_mag[idx_min:idx_max]
-        phase_slice = self._fft_phase[idx_min:idx_max]
-        
-        x_m, y_m = downsample(mag_slice, x_offset=idx_min)
-        x_p, y_p = downsample(phase_slice, x_offset=idx_min)
-        
-        self._mag_curve.setData(self._fft_freqs[x_m], y_m)
-        self._phase_curve.setData(self._fft_freqs[x_p], y_p)
-
-    def reset_view(self) -> None:
-        if self._axis_controller:
-            self._axis_controller.set_pinned('x', False)
-            self._axis_controller.set_pinned('y', False)
-        
-        if self._fft_freqs is not None and self._fft_mag is not None:
-            self._updating_curves = True
-            x_m, y_m = downsample(self._fft_mag)
-            x_p, y_p = downsample(self._fft_phase)
-            self._mag_curve.setData(self._fft_freqs[x_m], y_m)
-            self._phase_curve.setData(self._fft_freqs[x_p], y_p)
-            self._updating_curves = False
-        
-        vb = self._plot_widget.getPlotItem().getViewBox()
-        # autoRange y only — the x-range from downsampled data is truncated
-        # by min-max decimation, so we set x explicitly to the true freq bounds
-        vb.enableAutoRange(axis='y')
-        vb.autoRange(padding=0)
-        self._p2.enableAutoRange(axis='y', enable=False)
-        self._p2.setYRange(-180.0, 180.0, padding=0)
-        if self._fft_freqs is not None and len(self._fft_freqs) > 0:
-            self._plot_widget.getPlotItem().setXRange(
-                float(self._fft_freqs[0]), float(self._fft_freqs[-1]), padding=0
-            )
-
-class ComplexFftMagAnglePlugin(ProbePlugin):
-    name = "FFT Mag (dB) / Angle (deg)"
-    icon = "activity"
-    priority = 100
-    
-    def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
-    
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ComplexFftMagAngleWidget(var_name, color, parent)
-    
-    def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
-        if isinstance(widget, ComplexFftMagAngleWidget):
-            samples, t_vector = _extract_complex_waveform(value, dtype)
-            # Pass dx for Fs computation if t_vector available
-            dx = None
-            if t_vector is not None and len(t_vector) >= 2:
-                dx = t_vector[1] - t_vector[0]
-            widget.set_data(samples, f"[{samples.shape}]", dx=dx)
 
 class LogMagPlugin(ProbePlugin):
     name = "Log Mag (dB)"
@@ -1041,8 +924,8 @@ class LogMagPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return SingleCurveWidget(var_name, color, "Magnitude (dB)", parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return SingleCurveWidget(var_name, color, "Magnitude (dB)", parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
@@ -1059,8 +942,8 @@ class LinearMagPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return SingleCurveWidget(var_name, color, "Magnitude", parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return SingleCurveWidget(var_name, color, "Magnitude", parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
@@ -1076,8 +959,8 @@ class PhaseRadPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return SingleCurveWidget(var_name, color, "Phase (rad)", parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return SingleCurveWidget(var_name, color, "Phase (rad)", parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):
@@ -1093,8 +976,8 @@ class PhaseDegPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return SingleCurveWidget(var_name, color, "Phase (deg)", parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return SingleCurveWidget(var_name, color, "Phase (deg)", parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str, shape=None, source_info: str = "") -> None:
         if isinstance(widget, SingleCurveWidget):

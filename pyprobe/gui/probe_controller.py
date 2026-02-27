@@ -105,6 +105,9 @@ class ProbeController(QObject):
         # Pending overlay data: buffered when panel._plot is None
         # Key: id(panel), Value: list of (overlay_key, payload) tuples
         self._pending_overlays: Dict[int, list] = {}
+
+        # M2.5: Cache last known payload for every anchor to allow immediate re-render on lens change
+        self._last_payloads: Dict[ProbeAnchor, dict] = {}
     
     @property
     def probe_panels(self) -> Dict[ProbeAnchor, List[QWidget]]:
@@ -276,10 +279,10 @@ class ProbeController(QObject):
                 lambda name, p=panel, a=anchor: self._handle_lens_changed_internal(a, p, name)
             )
             
-            # If we have a stored lens preference, apply it
-            stored_lens = self._probe_metadata[anchor].get('lens')
-            if stored_lens:
-                dropdown.set_lens(stored_lens)
+            # Use explicit lens_name if provided, otherwise check stored metadata
+            lens_to_apply = lens_name or self._probe_metadata[anchor].get('lens')
+            if lens_to_apply:
+                dropdown.set_lens(lens_to_apply)
         
         # Connect color changed signal
         panel.color_changed.connect(self._on_probe_color_changed)
@@ -332,13 +335,45 @@ class ProbeController(QObject):
         if anchor in self._probe_metadata:
             self._probe_metadata[anchor]['lens'] = lens_name
         
-        # 2. Emit signal for StepRecorder
+        # 2. Re-apply cached overlay data immediately so secondary traces don't disappear
+        if hasattr(panel, '_overlay_anchors'):
+            from PyQt6.QtCore import QTimer
+            for ov_anchor in panel._overlay_anchors:
+                payload = self._last_payloads.get(ov_anchor)
+                if payload:
+                    # Delay slightly to ensure the new plot widget is fully initialized 
+                    # and its layout is settled (similar to primary trace re-apply)
+                    QTimer.singleShot(0, lambda a=ov_anchor, p=payload: self.forward_overlay_data(a, p))
+
+        # 3. Emit signal for StepRecorder
         self.panel_lens_changed.emit(anchor, panel.window_id, lens_name)
 
     def _on_probe_color_changed(self, anchor: ProbeAnchor, color: QColor) -> None:
-        """Handle color change from a probe panel — update code viewer and gutter."""
+        """Handle color change from a probe panel — update registry, code viewer and all other panels."""
+        # 1. Update central registry so any FUTURE panels/overlays use this color
+        self._registry.set_color(anchor, color)
+        
+        # 2. Update Code Viewer and Gutter
         self._code_viewer.update_probe_color(anchor, color)
         self._gutter.set_probed_line(anchor.line, color)
+        
+        # 3. Update ALL other panels for this anchor to maintain consistency
+        if anchor in self._probe_panels:
+            for panel in self._probe_panels[anchor]:
+                if is_obj_deleted(panel):
+                    continue
+                # Block signals to prevent infinite recursion loop
+                panel.blockSignals(True)
+                # This updates the panel identity label and its internal _plot widget
+                if hasattr(panel, '_color') and panel._color != color:
+                    panel._color = color
+                    # Duplicate logic from ProbePanel._change_probe_color but without emitting signal again
+                    hex_color = color.name()
+                    if hasattr(panel, '_identity_label'):
+                        panel._identity_label.setStyleSheet(f"QLabel {{ color: {hex_color}; font-size: 11px; font-weight: bold; }}")
+                    if panel._plot and hasattr(panel._plot, 'set_color'):
+                        panel._plot.set_color(color)
+                panel.blockSignals(False)
     
     def remove_probe(self, anchor: ProbeAnchor, on_animation_done: Callable = None):
         """
@@ -612,6 +647,9 @@ class ProbeController(QObject):
         When an overlay anchor's data arrives, we need to update the target panel's
         plot to show this data as an additional trace.
         """
+        # Cache for immediate re-rendering on lens change
+        self._last_payloads[anchor] = payload
+
         # Find all panels that have this anchor as an overlay
         for panel_list in self._probe_panels.values():
             for panel in panel_list:
@@ -637,9 +675,9 @@ class ProbeController(QObject):
 
                 # Add overlay data to the waveform or constellation plot
                 from pyprobe.plugins.builtins.waveform import WaveformWidget
-                from pyprobe.plugins.builtins.constellation import ConstellationWidget
+                from pyprobe.plugins.builtins.complex_plots import ComplexWidget
 
-                if plot is None or not isinstance(plot, (WaveformWidget, ConstellationWidget)):
+                if plot is None or not isinstance(plot, (WaveformWidget, ComplexWidget)):
                     # Buffer for later: plot widget not created yet or is still a
                     # placeholder type (e.g. ScalarHistoryChart) that will be replaced
                     # once the primary signal's data arrives and determines the final type.
@@ -659,7 +697,9 @@ class ProbeController(QObject):
                 # Use unique key that includes is_assignment to distinguish LHS/RHS
                 overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
-                if isinstance(plot, WaveformWidget):
+                from pyprobe.plugins.builtins.waveform import WaveformWidget
+                from pyprobe.plugins.builtins.complex_plots import ComplexWidget
+                if isinstance(plot, (WaveformWidget, ComplexWidget)):
                     self._add_overlay_to_waveform(
                         plot,
                         matching_overlay,
@@ -669,16 +709,10 @@ class ProbeController(QObject):
                         primary_anchor=panel._anchor,
                         target_panel=panel
                     )
-                elif isinstance(plot, ConstellationWidget):
-                    self._add_overlay_to_constellation(
-                        plot,
-                        matching_overlay,
-                        payload['value'],
-                        payload['dtype'],
-                        payload.get('shape'),
-                        primary_anchor=panel._anchor,
-                        target_panel=panel
-                    )
+                else:
+                    # Fallback for other types (e.g. pure ConstellationWidget if it existed separately)
+                    # currently ConstellationWidget IS a ComplexWidget.
+                    pass
     
     def flush_pending_overlays(self):
         """
@@ -690,7 +724,7 @@ class ProbeController(QObject):
             return
         
         from pyprobe.plugins.builtins.waveform import WaveformWidget
-        from pyprobe.plugins.builtins.constellation import ConstellationWidget
+        from pyprobe.plugins.builtins.complex_plots import ComplexWidget
         
         flushed_ids = []
         
@@ -707,7 +741,7 @@ class ProbeController(QObject):
                     continue  # Still not ready
                 
                 # Only flush if plot is now a supported overlay target type
-                if not isinstance(plot, (WaveformWidget, ConstellationWidget)):
+                if not isinstance(plot, (WaveformWidget, ComplexWidget)):
                     continue  # Plot still placeholder (e.g. ScalarHistoryChart), keep buffered
                 
                 # Apply all pending overlay data
@@ -724,18 +758,8 @@ class ProbeController(QObject):
                     if not match_anchor:
                         continue
 
-                    if isinstance(plot, WaveformWidget):
+                    if isinstance(plot, (WaveformWidget, ComplexWidget)):
                         self._add_overlay_to_waveform(
-                            plot,
-                            match_anchor,
-                            pending['value'],
-                            pending['dtype'],
-                            pending['shape'],
-                            primary_anchor=panel._anchor,
-                            target_panel=panel
-                        )
-                    elif isinstance(plot, ConstellationWidget):
-                        self._add_overlay_to_constellation(
                             plot,
                             match_anchor,
                             pending['value'],
@@ -794,6 +818,10 @@ class ProbeController(QObject):
         trace_id = self._registry.get_trace_id(anchor) or ""
         symbol = anchor.symbol
         
+        # Get consistent color from registry for this anchor
+        reg_color = self._registry.get_color(anchor)
+        reg_color_hex = reg_color.name() if reg_color else None
+
         def on_legend_remove(item):
             # item might be a pg.PlotCurveItem or a pg.LegendItem.ItemSample
             actual_item = item
@@ -849,29 +877,26 @@ class ProbeController(QObject):
                 if hasattr(plot._legend, 'legend_moved'):
                     plot._legend.legend_moved.connect(target_panel.legend_moved)
 
-                # Add primary curve(s) to legend
-                if hasattr(plot, "_curves") and plot._curves and primary_anchor:
-                    p_id = self._registry.get_trace_id(primary_anchor) or ""
-                    plot._legend.addItem(plot._curves[0], f"{p_id}: {plot._var_name}")
-
         # Track curves by anchor for removal lookup
         if not hasattr(plot, "_overlay_curves_by_anchor"):
             plot._overlay_curves_by_anchor = {}
+        
+        # Use trace_id in key to ensure uniqueness if multiple anchors have same symbol
+        symbol_key = f"{trace_id}_{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
         
         # Check if complex data
         is_complex = np.iscomplexobj(data) or dtype in ('complex_1d', 'array_complex')
         
         if is_complex:
             # Create real and imag curve keys
-            # Use symbol + is_assignment to match forward_overlay_data logic
-            symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
             real_key = f"{symbol_key}_real"
             imag_key = f"{symbol_key}_imag"
             
             # Create real curve if needed
             if real_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = overlay_palette[color_idx % len(overlay_palette)]
+                # Use registry color if available, fallback to palette
+                color = reg_color_hex if reg_color_hex else overlay_palette[color_idx % len(overlay_palette)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False
@@ -890,7 +915,8 @@ class ProbeController(QObject):
             # Create imag curve if needed
             if imag_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = overlay_palette[color_idx % len(overlay_palette)]
+                # Use registry color if available, fallback to palette
+                color = reg_color_hex if reg_color_hex else overlay_palette[color_idx % len(overlay_palette)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5, style=Qt.PenStyle.DashLine),
                     antialias=False
@@ -921,10 +947,10 @@ class ProbeController(QObject):
             plot._overlay_curves[imag_key].setData(x, imag_data)
         else:
             # Single real curve
-            symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
             if symbol_key not in plot._overlay_curves:
                 color_idx = len(plot._overlay_curves) + 1
-                color = overlay_palette[color_idx % len(overlay_palette)]
+                # Use registry color if available, fallback to palette
+                color = reg_color_hex if reg_color_hex else overlay_palette[color_idx % len(overlay_palette)]
                 curve = plot._plot_widget.plot(
                     pen=pg.mkPen(color=color, width=1.5),
                     antialias=False
@@ -1000,6 +1026,10 @@ class ProbeController(QObject):
         symbol = anchor.symbol
         symbol_key = f"{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
+        # Get consistent color from registry for this anchor
+        reg_color = self._registry.get_color(anchor)
+        reg_color_hex = reg_color.name() if reg_color else None
+
         def on_legend_remove(item):
             # item might be a pg.ScatterPlotItem or a pg.LegendItem.ItemSample
             actual_item = item
@@ -1054,16 +1084,13 @@ class ProbeController(QObject):
                 if hasattr(plot._legend, 'legend_moved'):
                     plot._legend.legend_moved.connect(target_panel.legend_moved)
 
-                # Add primary scatter to legend
-                if hasattr(plot, "_scatter_items") and plot._scatter_items and primary_anchor:
-                    p_id = self._registry.get_trace_id(primary_anchor) or ""
-                    plot._legend.addItem(
-                        plot._scatter_items[-1], f"{p_id}: {plot._var_name}"
-                    )
+        # Use trace_id in key to ensure uniqueness if multiple anchors have same symbol
+        symbol_key = f"{trace_id}_{symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
         if symbol_key not in plot._overlay_scatters:
             color_idx = len(plot._overlay_scatters) + 1
-            color = overlay_palette[color_idx % len(overlay_palette)]
+            # Use registry color if available, fallback to palette
+            color = reg_color_hex if reg_color_hex else overlay_palette[color_idx % len(overlay_palette)]
 
             # Create scatter for overlay
             scatter = pg.ScatterPlotItem(pen=None, brush=pg.mkBrush(color), size=5)
@@ -1074,6 +1101,9 @@ class ProbeController(QObject):
             if anchor not in plot._overlay_scatters_by_anchor:
                 plot._overlay_scatters_by_anchor[anchor] = []
             plot._overlay_scatters_by_anchor[anchor].append(scatter)
+
+            ensure_legend()
+            plot._legend.addItem(scatter, f"{trace_id}: {symbol}")
 
             ensure_legend()
             plot._legend.addItem(scatter, f"{trace_id}: {symbol}")

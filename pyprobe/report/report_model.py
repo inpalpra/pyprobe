@@ -37,6 +37,7 @@ class GraphWidgetEntry:
     lens: str
     primary_trace: WidgetTraceEntry
     overlay_traces: tuple[WidgetTraceEntry, ...]
+    legend_entries: tuple[str, ...] = ()
 
 @dataclass(frozen=True)
 class RecordedStep:

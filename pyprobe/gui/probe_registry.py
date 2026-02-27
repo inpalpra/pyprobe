@@ -160,6 +160,19 @@ class ProbeRegistry(QObject):
             return self._color_manager.get_color(anchor)
         return None
 
+    def set_color(self, anchor: ProbeAnchor, color: QColor) -> None:
+        """
+        Manually set/override the color for a probe anchor.
+        Emits probe_added signal to notify all listeners (including all panels for this anchor).
+        """
+        if anchor not in self._probes:
+            # If not in registry yet (e.g. from an overlay that was just colored), add it
+            self.add_probe(anchor)
+            
+        self._color_manager.update_color(anchor, color)
+        # Emit signal so all panels/widgets for this anchor update their color
+        self.probe_added.emit(anchor, color)
+
     def get_state(self, anchor: ProbeAnchor) -> Optional[ProbeState]:
         """Get probe state."""
         return self._probes.get(anchor)

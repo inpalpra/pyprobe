@@ -241,7 +241,7 @@ class ProbePanel(QFrame):
         
         if plugin:
             self._current_plugin = plugin
-            self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
+            self._plot = plugin.create_widget(self._anchor.symbol, self._color, self, trace_id=self._trace_id)
             if self._lens_dropdown:
                  # Update dropdown to match if possible, though update_for_dtype usually handles this
                  pass 
@@ -408,7 +408,7 @@ class ProbePanel(QFrame):
         
         # Create new widget from plugin
         self._current_plugin = plugin
-        self._plot = plugin.create_widget(self._anchor.symbol, self._color, self)
+        self._plot = plugin.create_widget(self._anchor.symbol, self._color, self, trace_id=self._trace_id)
         
         # Restore markers from vault if any
         if hasattr(self._plot, '_marker_store'):
@@ -1125,18 +1125,32 @@ class ProbePanel(QFrame):
             for anchor in self._overlay_anchors:
                 overlay_trace_id = registry.get_trace_id(anchor)
                 if overlay_trace_id:
+                    # Overlays are always rendered as basic waveforms (real/imag separate) 
+                    # regardless of parent lens.
                     overlay_entries.append(WidgetTraceEntry(
                         trace_id=overlay_trace_id,
-                        components=get_trace_components(overlay_trace_id, lens_name)
+                        components=get_trace_components(overlay_trace_id, "Waveform")
                     ))
         
+        legend_entries = []
+        if self._plot and hasattr(self._plot, '_legend') and self._plot._legend:
+            try:
+                # pg.LegendItem.items is a list of (item, label) tuples
+                for _, label in self._plot._legend.items:
+                    # label is often a LabelItem
+                    text = label.text if hasattr(label, 'text') else str(label)
+                    legend_entries.append(text)
+            except Exception:
+                pass
+
         return GraphWidgetEntry(
             widget_id=self._window_id or self._anchor.symbol,
             is_docked=is_docked,
             is_visible=self.isVisible() and not self.is_closing,
             lens=lens_name,
             primary_trace=primary_trace,
-            overlay_traces=tuple(overlay_entries)
+            overlay_traces=tuple(overlay_entries),
+            legend_entries=tuple(legend_entries)
         )
 
     @property

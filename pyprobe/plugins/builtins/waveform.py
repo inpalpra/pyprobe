@@ -13,7 +13,7 @@ from ...plots.draw_mode import DrawMode, apply_draw_mode
 from ..base import ProbePlugin
 from ...core.data_classifier import (
     DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_ARRAY_COMPLEX,
-    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION,
+    DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COMPLEX, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION,
     get_waveform_info, get_waveform_collection_info
 )
 from ...plots.axis_controller import AxisController
@@ -47,10 +47,11 @@ class WaveformWidget(PinLayoutMixin, QWidget):
     
     MAX_DISPLAY_POINTS = 5000
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(parent)
         self._var_name = var_name
         self._color = color
+        self._trace_id = trace_id
         self._data: Optional[np.ndarray] = None
         self._t_vector: Optional[np.ndarray] = None
         self._curves: List[pg.PlotDataItem] = []
@@ -159,6 +160,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
         )
         self._legend.setParentItem(self._plot_widget.getPlotItem())
+        if self._curves:
+            label = f"{self._trace_id}: {self._var_name}" if self._trace_id else self._var_name
+            self._legend.addItem(self._curves[0], label)
         
         # Mouse hover coordinate display
         self._plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
@@ -972,8 +976,8 @@ class WaveformWidget(PinLayoutMixin, QWidget):
 class WaveformFftMagAngleWidget(WaveformWidget):
     """FFT Magnitude (dB) & Angle (deg) with Kaiser Bessel window for 1D arrays."""
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
-        super().__init__(var_name, color, parent)
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
+        super().__init__(var_name, color, parent, trace_id=trace_id)
         self._plot_widget.setLabel('bottom', 'Frequency')
         self._plot_widget.setLabel('left', 'Magnitude (dB)')
         self._info_label.setText("FFT Mag (dB) / Angle (deg)")
@@ -1009,16 +1013,62 @@ class WaveformFftMagAngleWidget(WaveformWidget):
             brush=pg.mkBrush(theme_colors.get('bg_medium', '#1a1a1a') + '80')
         )
         self._legend.setParentItem(self._plot_widget.getPlotItem())
-        self._legend.addItem(self._curves[0], "FFT Mag (dB)")
-        self._phase_legend_added = False
         
-        self._phase_curves = []
+        self._phase_curves = [pg.PlotDataItem(pen=pg.mkPen(self._phase_color, width=1.5))]
+        self._p2.addItem(self._phase_curves[0])
+        
+        if self._curves:
+            label = f"{self._trace_id}: {self._var_name} " if self._trace_id else ""
+            self._legend.addItem(self._curves[0], f"{label}(fft_mag_db)")
+            self._legend.addItem(self._phase_curves[0], f"{label}(fft_angle_deg)")
+        
+        self._phase_legend_added = True
         self._current_phase_data = None
         self._p1.vb.sigResized.connect(self._update_views)
+        self._p1.vb.sigYRangeChanged.connect(self._sync_p2_y)
+        self._last_mag_range = None
+        self._syncing_y = False
+
         # FFT angle is naturally bounded to [-180, 180] and doesn't need
         # continuous y auto-ranging on every frame update.
         self._p2.enableAutoRange(axis='y', enable=False)
         self._p2.setYRange(-180.0, 180.0, padding=0)
+
+    def _sync_p2_y(self):
+        """Synchronize secondary Y axis (phase) proportionally when primary (magnitude) is panned/zoomed."""
+        if self._syncing_y:
+            return
+        
+        mag_range = self._p1.vb.viewRange()[1]
+        
+        # If auto-ranging or first run, just update baseline and exit
+        if self._last_mag_range is None or not self._axis_controller or not self._axis_controller.y_pinned:
+            self._last_mag_range = mag_range
+            return
+            
+        self._syncing_y = True
+        try:
+            mag_h = self._last_mag_range[1] - self._last_mag_range[0]
+            if mag_h != 0:
+                phase_range = self._p2.viewRange()[1]
+                phase_h = phase_range[1] - phase_range[0]
+                
+                # Proportional shift
+                dy_mag = mag_range[0] - self._last_mag_range[0]
+                dy_phase = dy_mag * (phase_h / mag_h)
+                
+                # Proportional zoom
+                zoom_ratio = (mag_range[1] - mag_range[0]) / mag_h
+                new_phase_h = phase_h * zoom_ratio
+                
+                new_phase_min = phase_range[0] + dy_phase
+                new_phase_max = new_phase_min + new_phase_h
+                
+                self._p2.setYRange(new_phase_min, new_phase_max, padding=0)
+            
+            self._last_mag_range = mag_range
+        finally:
+            self._syncing_y = False
 
     def _update_views(self):
         self._p2.setGeometry(self._p1.vb.sceneBoundingRect())
@@ -1093,7 +1143,8 @@ class WaveformFftMagAngleWidget(WaveformWidget):
             self._p2.addItem(curve)
             self._phase_curves.append(curve)
             if not self._phase_legend_added:
-                self._legend.addItem(curve, "Angle (deg)")
+                label = f"{self._trace_id}: {self._var_name} " if self._trace_id else ""
+                self._legend.addItem(curve, f"{label}(fft_angle_deg)")
                 self._phase_legend_added = True
         while len(self._phase_curves) > num_rows:
             curve = self._phase_curves.pop()
@@ -1351,15 +1402,15 @@ class WaveformFftMagAngleWidget(WaveformWidget):
 class WaveformFftMagAnglePlugin(ProbePlugin):
     """Plugin for FFT Magnitude of 1D arrays and waveforms."""
     
-    name = "FFT Mag (dB) / Angle (deg)"
+    name = "FFT Mag & Phase"
     icon = "activity"
-    priority = 90  # Just below Waveform
+    priority = 110  # Higher than Constellation (100) to ensure it can be default if requested
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION)
+        return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION, DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return WaveformFftMagAngleWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return WaveformFftMagAngleWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str,
                shape: Optional[Tuple[int, ...]] = None,
@@ -1375,11 +1426,10 @@ class WaveformPlugin(ProbePlugin):
     priority = 100  # High priority for 1D arrays
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
-        # User requested specific plugins for complex data
         return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION)
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return WaveformWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return WaveformWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str,
                shape: Optional[Tuple[int, ...]] = None,

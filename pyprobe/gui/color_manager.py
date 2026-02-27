@@ -67,6 +67,42 @@ class ColorManager:
         self._assignments[anchor] = color_index
         return self.PALETTE[color_index]
 
+    def update_color(self, anchor: ProbeAnchor, color: QColor) -> None:
+        """
+        Update or assign a specific color to an anchor.
+        This allows user-initiated overrides that should persist across all widgets.
+        """
+        # If it matches an existing palette color exactly, we try to use its index
+        color_hex = color.name().lower()
+        matched_index = -1
+        for i, p_color in enumerate(self.PALETTE):
+            if p_color.name().lower() == color_hex:
+                matched_index = i
+                break
+
+        if matched_index >= 0:
+            # If it's already assigned to this anchor, just move to end
+            if anchor in self._assignments and self._assignments[anchor] == matched_index:
+                self._assignments.move_to_end(anchor)
+                return
+            
+            # If it was assigned to someone else, we don't care, we'll just share the index
+            # for this user-specified override.
+            if anchor in self._assignments:
+                # If we were holding an index, we don't necessarily release it if it's 
+                # still being used by the palette (recycling logic is complex),
+                # but for simplicity we'll just update our pointer.
+                pass
+            
+            self._assignments[anchor] = matched_index
+            self._assignments.move_to_end(anchor)
+        else:
+            # Custom color not in palette - add it
+            new_idx = len(self.PALETTE)
+            self.PALETTE.append(color)
+            self._assignments[anchor] = new_idx
+            self._assignments.move_to_end(anchor)
+
     def reserve_color(self, anchor: ProbeAnchor, color: QColor) -> None:
         """
         Manually assign a specific color to an anchor, useful when loading saved presets.

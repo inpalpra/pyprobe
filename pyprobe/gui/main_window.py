@@ -515,7 +515,7 @@ class MainWindow(QMainWindow):
             file_getter=lambda: self._code_viewer.open_file_entries(),
             probe_getter=lambda: self._probe_controller.probe_trace_entries(),
             equation_getter=lambda: self._equation_manager.equation_entries(),
-            widget_getter=lambda: self._probe_container.graph_widget_entries(self._registry),
+            widget_getter=lambda: self._probe_container.graph_widget_entries(self._probe_registry),
         )
         dialog = ReportBugDialog(collector=collector, recorder=self._step_recorder, parent=self)
         dialog.finished.connect(self._on_report_bug_dialog_closed)
@@ -864,7 +864,6 @@ class MainWindow(QMainWindow):
     def _handle_probe_records(self, records: list) -> None:
         """Store records and schedule redraws from buffers."""
         for record in records:
-            print(f"DEBUG: MainWindow received data for {record.anchor.symbol}", file=sys.stderr)
             anchor = record.anchor
             self._probe_registry.update_data_received(anchor)
 
@@ -952,7 +951,6 @@ class MainWindow(QMainWindow):
         """Handle single probe value from MessageHandler."""
         anchor = ProbeAnchor.from_dict(payload['anchor'])
         logger.debug(f"Received data for {anchor.symbol}")
-        print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
         self._probe_registry.update_data_received(anchor)
 
         # Update all panels for this anchor
@@ -988,7 +986,6 @@ class MainWindow(QMainWindow):
             if trace_id:
                 self._latest_trace_data[trace_id] = probe_data['value']
 
-            print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
             self._probe_registry.update_data_received(anchor)
             if anchor in self._probe_metadata:
                 self._probe_metadata[anchor]['dtype'] = probe_data['dtype']

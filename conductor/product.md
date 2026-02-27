@@ -18,22 +18,25 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - Built-in support for waveforms (real/imag/mag/phase).
 - Constellation diagrams and scalar histories.
 - **Equation Editor:** Perform real-time mathematical operations on raw probed data (traces) using Python-based expressions (numpy/scipy).
-- **Unambiguous Trace Nomenclature:** Formal naming system for trace components (e.g., `tr0.real`, `tr1.mag_db`) that persists across view switches and provides forensic clarity in reports.
+- **Unambiguous Trace Nomenclature:** Formal naming system for trace components (e.g., `tr0.real`, `tr1.mag_db`) that persists across view switches and legend entries, providing absolute forensic clarity in reports and equations.
 - **Reference-Counted Graph Management:** Formal architecture for managing graph windows (w0, w1...) and their contained traces. Variables are automatically "unprobed" (highlights and icons removed) when no longer referenced in any active window.
+- **Synchronized Multi-Axis Interaction:** Dual-axis lenses (FFT, Mag/Phase) employ proportional vertical synchronization, ensuring that panning or zooming one axis updates the other relative to its own scale and units.
+- **Global Signal Color Consistency:** Automatic synchronization of probe colors across all windows and overlays, maintaining visual identity for every signal regardless of where it is plotted.
 - **Interactive Trace Control:** Easily remove specific traces via legend double-clicks or right-click context menus.
 - **Global Trace IDs:** Unique tr<n> IDs for all probed variables for easy reference in equations.
 - **Persistent Marker System:** Markers survive view/lens switches and application restarts.
 - **Decoupled Tracer Architecture:** The debugger logic is decoupled from the GUI, running as a lightweight `pyprobe-tracer` package in a separate process for maximum stability and performance.
-- Highly customizable themes (Cyberpunk, Monokai, Ocean).
+- **Technical Typography:** High-legibility monospaced interface (`JetBrains Mono`) across all themes, optimized for rapid parsing of numerical data, signal names, and source code.
+- Highly customizable themes (Cyberpunk, Monokai, Ocean, Anthropic).
 - Real-time performance.
 - **Structured Bug Reporting & Step Recording:** Built-in, non-blocking bug report system with optional step recording. Users can record all intentional UI interactions (probe lifecycle, overlays, lens changes, legend toggles, panel management, execution control, equation edits, etc.) and generate a structured report containing:
   - Ordered interaction history ("Steps to Reproduce") with unambiguous interaction vocabulary (e.g., "Panned Horizontal axis directly").
-  - Baseline session state snapshot including detailed trace hierarchies and active lens configurations.
+  - Baseline session state snapshot including detailed window hierarchies (docked/visible status), active lens configurations, and explicit legend entries.
   - Open file metadata (with optional content inclusion)
   - Environment details (Python, PyProbe version, Qt version, platform, plugins, git commit)
   - Deterministic, sanitized paths (`<USER_HOME>` replacement)
   - Optional LLM-optimized formatting mode with line-numbered code and relevant code window extraction
-  - The system is designed for forensic-grade reproducibility, tracking precise probe locations (`symbol @ file:line:col`), enabling both human developers and LLMs to reliably reconstruct UI state transitions and diagnose complex interaction bugs.
+  - The system is designed for forensic-grade reproducibility, tracking precise probe locations (`symbol @ file:line:col`) and providing a 1:1 mapping between visible legend items and report metadata.
  
 ## Engineering Philosophy
 - **Deterministic Behavior First:** All state transitions are explicitly modeled and reproducible. No hidden side-effects. No silent state mutation.

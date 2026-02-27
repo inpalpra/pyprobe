@@ -46,14 +46,24 @@ class ReportFormatter:
                 for eq in state.equations:
                     parts.append(f"    {eq.eq_id}: {eq.expression} [{eq.status}]")
             if state.graph_widgets:
-                parts.append("  Widgets:")
+                parts.append("  Windows:")
                 for w in state.graph_widgets:
-                    primary = f"[{w.primary_trace.trace_id}: {', '.join(w.primary_trace.components)}]"
-                    overlays = ""
+                    docked_str = "docked" if w.is_docked else "undocked"
+                    visible_str = "visible" if w.is_visible else "hidden"
+                    parts.append(f"    {w.widget_id} [{w.lens}, {docked_str}, {visible_str}]:")
+                    
+                    primary_comps = f"[{', '.join(w.primary_trace.components)}]"
+                    parts.append(f"      plotted:  {w.primary_trace.trace_id}  {primary_comps}")
+                    
                     if w.overlay_traces:
-                        ov_list = [f"{ot.trace_id}: {', '.join(ot.components)}" for ot in w.overlay_traces]
-                        overlays = f" (overlays: {'; '.join(ov_list)})"
-                    parts.append(f"    {w.widget_id}: {w.lens} {primary}{overlays}")
+                        for ot in w.overlay_traces:
+                            ot_comps = f"[{', '.join(ot.components)}]"
+                            parts.append(f"      overlaid: {ot.trace_id}  {ot_comps}")
+                    
+                    if w.legend_entries:
+                        parts.append("      legends:")
+                        for entry in w.legend_entries:
+                            parts.append(f"        - {entry}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -119,14 +129,24 @@ class ReportFormatter:
                 for eq in state.equations:
                     parts.append(f"    {eq.eq_id}: {eq.expression} [{eq.status}]")
             if state.graph_widgets:
-                parts.append("  Widgets:")
+                parts.append("  Windows:")
                 for w in state.graph_widgets:
-                    primary = f"[{w.primary_trace.trace_id}: {', '.join(w.primary_trace.components)}]"
-                    overlays = ""
+                    docked_str = "docked" if w.is_docked else "undocked"
+                    visible_str = "visible" if w.is_visible else "hidden"
+                    parts.append(f"    {w.widget_id} [{w.lens}, {docked_str}, {visible_str}]:")
+                    
+                    primary_comps = f"[{', '.join(w.primary_trace.components)}]"
+                    parts.append(f"      plotted:  {w.primary_trace.trace_id}  {primary_comps}")
+                    
                     if w.overlay_traces:
-                        ov_list = [f"{ot.trace_id}: {', '.join(ot.components)}" for ot in w.overlay_traces]
-                        overlays = f" (overlays: {'; '.join(ov_list)})"
-                    parts.append(f"    {w.widget_id}: {w.lens} {primary}{overlays}")
+                        for ot in w.overlay_traces:
+                            ot_comps = f"[{', '.join(ot.components)}]"
+                            parts.append(f"      overlaid: {ot.trace_id}  {ot_comps}")
+                    
+                    if w.legend_entries:
+                        parts.append("      legends:")
+                        for entry in w.legend_entries:
+                            parts.append(f"        - {entry}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -343,6 +363,7 @@ class ReportFormatter:
                             }
                             for ot in w.overlay_traces
                         ],
+                        "legend_entries": list(w.legend_entries),
                     }
                     for w in state.graph_widgets
                 ],

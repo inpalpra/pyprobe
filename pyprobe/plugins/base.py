@@ -51,13 +51,14 @@ class ProbePlugin(ABC):
         pass
     
     @abstractmethod
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
         """Create and return the visualization widget.
         
         Args:
             var_name: Variable name (for display)
             color: Assigned probe color (use for styling)
             parent: Optional parent widget
+            trace_id: Optional trace ID for consistent legend formatting (e.g. "tr1")
             
         Returns:
             QWidget that renders the data

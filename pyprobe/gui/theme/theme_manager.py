@@ -41,13 +41,17 @@ class ThemeManager(QObject):
             self._app = QApplication.instance()
 
         if self._app is not None:
+            # Global mandate: Monospaced font everywhere
+            mono_font = QFont("JetBrains Mono")
+            mono_font.setStyleHint(QFont.StyleHint.Monospace)
+            self._app.setFont(mono_font)
+
             if theme_id == "cyberpunk":
                 from .cyberpunk import _apply_font_and_palette
 
                 _apply_font_and_palette(self._app)
             else:
                 self._app.setPalette(self._app.style().standardPalette())
-                self._app.setFont(QFont())
             self._app.setStyleSheet(theme.stylesheet)
 
         self._current = theme

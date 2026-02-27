@@ -19,10 +19,11 @@ class ScalarHistoryWidget(QWidget):
     
     DEFAULT_HISTORY_LENGTH = 512
     
-    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None):
+    def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(parent)
         self._var_name = var_name
         self._color = color
+        self._trace_id = trace_id
         self._history: deque = deque(maxlen=self.DEFAULT_HISTORY_LENGTH)
         self._has_data = False
         
@@ -369,8 +370,8 @@ class ScalarHistoryPlugin(ProbePlugin):
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype == DTYPE_SCALAR
     
-    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None) -> QWidget:
-        return ScalarHistoryWidget(var_name, color, parent)
+    def create_widget(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = "") -> QWidget:
+        return ScalarHistoryWidget(var_name, color, parent, trace_id=trace_id)
     
     def update(self, widget: QWidget, value: Any, dtype: str,
                shape: Optional[Tuple[int, ...]] = None,

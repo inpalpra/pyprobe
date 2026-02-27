@@ -14,8 +14,7 @@ def get_builtin_plugins() -> List[ProbePlugin]:
     from .complex_plots import (
         ComplexRIPlugin, ComplexMAPlugin, 
         LogMagPlugin, LinearMagPlugin, 
-        PhaseRadPlugin, PhaseDegPlugin,
-        ComplexFftMagAnglePlugin
+        PhaseRadPlugin, PhaseDegPlugin
     )
     from .scalar_history import ScalarHistoryPlugin
     from .scalar_display import ScalarDisplayPlugin
@@ -30,7 +29,6 @@ def get_builtin_plugins() -> List[ProbePlugin]:
         LinearMagPlugin(),
         PhaseRadPlugin(),
         PhaseDegPlugin(),
-        ComplexFftMagAnglePlugin(),
         ScalarHistoryPlugin(),
         ScalarDisplayPlugin(),
     ]

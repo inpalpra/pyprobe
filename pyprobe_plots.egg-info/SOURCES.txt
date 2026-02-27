@@ -112,6 +112,7 @@ pyprobe/report/__init__.py
 pyprobe/report/environment.py
 pyprobe/report/formatter.py
 pyprobe/report/log_capture.py
+pyprobe/report/nomenclature.py
 pyprobe/report/report_model.py
 pyprobe/report/sanitizer.py
 pyprobe/report/session_snapshot.py
@@ -145,3 +146,4 @@ tests/test_packaging.py
 tests/test_plot_toolbar.py
 tests/test_plugin_registry.py
 tests/test_signal_overlay.py
+tests/test_theme_code_viewer_highlight.py

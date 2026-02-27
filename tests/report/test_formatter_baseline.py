@@ -20,13 +20,16 @@ def test_render_baseline_widgets():
     primary = WidgetTraceEntry(trace_id="tr0", components=("tr0.val",))
     widget = GraphWidgetEntry(
         widget_id="w0", is_docked=True, is_visible=True, lens="Waveform",
-        primary_trace=primary, overlay_traces=()
+        primary_trace=primary, overlay_traces=(), legend_entries=("Trace 0",)
     )
     state = SessionState(graph_widgets=(widget,))
     report = BugReport(description="Test widgets.", baseline_state=state)
     
     output = formatter.render(report)
-    assert "w0: Waveform [tr0: tr0.val]" in output
+    assert "w0 [Waveform, docked, visible]:" in output
+    assert "plotted:  tr0  [tr0.val]" in output
+    assert "legends:" in output
+    assert "- Trace 0" in output
 
 def test_render_json_baseline():
     formatter = ReportFormatter()
@@ -36,7 +39,7 @@ def test_render_json_baseline():
     primary = WidgetTraceEntry(trace_id="tr0", components=("tr0.val",))
     widget = GraphWidgetEntry(
         widget_id="w0", is_docked=True, is_visible=True, lens="Waveform",
-        primary_trace=primary, overlay_traces=()
+        primary_trace=primary, overlay_traces=(), legend_entries=("Trace 0",)
     )
     state = SessionState(probed_traces=(probe,), graph_widgets=(widget,))
     report = BugReport(description="Test json.", baseline_state=state)
@@ -56,3 +59,4 @@ def test_render_json_baseline():
     assert w["lens"] == "Waveform"
     assert w["primary_trace"]["trace_id"] == "tr0"
     assert w["primary_trace"]["components"] == ["tr0.val"]
+    assert w["legend_entries"] == ["Trace 0"]
