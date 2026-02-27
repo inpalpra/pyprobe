@@ -89,7 +89,7 @@ class EquationEditorDialog(QDialog):
         # ID label (Draggable)
         id_label = DraggableLabel(eq.id)
         id_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: monospace;")
+        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: 'Menlo', 'Consolas';")
         self.table.setCellWidget(row, 0, id_label)
         
         # Equation input

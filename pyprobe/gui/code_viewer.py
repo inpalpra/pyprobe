@@ -98,7 +98,7 @@ class CodeViewer(QPlainTextEdit):
         c = theme.colors
         mono_font = QFont()
         mono_font.setFamilies([
-            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace"
+            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco"
         ])
         mono_font.setPointSize(11)
         mono_font.setStyleHint(QFont.StyleHint.Monospace)
@@ -112,7 +112,7 @@ class CodeViewer(QPlainTextEdit):
             QPlainTextEdit {{
                 background-color: {c['bg_dark']};
                 color: {c['text_primary']};
-                font-family: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace";
+                font-family: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco";
                 border: none;
                 selection-background-color: {c['accent_primary']};
                 selection-color: {c['bg_darkest']};

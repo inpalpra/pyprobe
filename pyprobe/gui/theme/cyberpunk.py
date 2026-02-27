@@ -59,7 +59,7 @@ QMainWindow {{
 QWidget {{
     background-color: {c['bg_dark']};
     color: {c['text_primary']};
-    font-family: "Menlo", "Consolas", "Monaco", monospace;
+    font-family: "Menlo", "Consolas", "Monaco";
     font-size: 11px;
 }}
 
@@ -349,7 +349,7 @@ CYBERPUNK_THEME = Theme(
 def _apply_font_and_palette(app: QApplication) -> None:
     """Apply legacy font + palette behavior for compatibility."""
     font = QFont()
-    font.setFamilies(["Menlo", "Consolas", "Monaco", "monospace"])
+    font.setFamilies(["Menlo", "Consolas", "Monaco"])
     font.setPointSize(10)
     font.setStyleHint(QFont.StyleHint.Monospace)
     app.setFont(font)

@@ -127,7 +127,7 @@ class ScalarWatchSidebar(QWidget):
             QLabel#scalarValue {
                 color: #ffffff;
                 font-size: 20px;
-                font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+                font-family: 'JetBrains Mono', 'SF Mono', 'Consolas';
                 font-weight: 500;
             }
             QWidget#scalarCard {
@@ -171,7 +171,7 @@ class ScalarWatchSidebar(QWidget):
         
         # Trace ID label (e.g., tr0)
         id_label = QLabel(trace_id)
-        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: monospace; font-size: 10px;")
+        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: 'Menlo', 'Consolas'; font-size: 10px;")
         top_layout.addWidget(id_label)
 
         # Label with highlight background (like code viewer probes)

@@ -44,7 +44,7 @@ QMainWindow {{
 QWidget {{
     background-color: {c['bg_dark']};
     color: {c['text_primary']};
-    font-family: \"Inter\", \"SF Pro Text\", \"Segoe UI\", \"Noto Sans\", sans-serif;
+    font-family: \"SF Pro Text\", \"Segoe UI\", \"Noto Sans\", sans-serif;
     font-size: 12px;
 }}
 

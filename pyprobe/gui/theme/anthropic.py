@@ -49,7 +49,7 @@ QWidget {{
 }}
 
 QPlainTextEdit, QTextEdit, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
-    font-family: \"SF Mono\", \"JetBrains Mono\", \"Menlo\", \"Consolas\", \"Monaco\", monospace;
+    font-family: \"SF Mono\", \"JetBrains Mono\", \"Menlo\", \"Consolas\", \"Monaco\";
 }}
 
 QToolBar {{

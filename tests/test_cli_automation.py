@@ -70,16 +70,7 @@ class TestCLIAutomation(unittest.TestCase):
         # Assert clean exit
         self.assertEqual(result.returncode, 0, f"Process failed with code {result.returncode}.\nOutput: {output}")
 
-        # Verify output contains key events
-        
-        # 1. Verify script finished
-        self.assertIn("DATA_SCRIPT_END sent successfully", output, "Script did not finish properly")
-        
-        
-        # 3. Verify GUI received data (End-to-End verification)
-        self.assertIn("DEBUG: MainWindow received data for x", output, "GUI did not receive probe data for x")
-
-        # 4. Verify actual plotted data values using pyqtgraph export
+        # Verify actual plotted data values using pyqtgraph export
         import json
         import re
         

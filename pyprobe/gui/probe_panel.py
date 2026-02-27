@@ -186,12 +186,12 @@ class ProbePanel(QFrame):
 
         # Window ID label (e.g., w0)
         self._wid_label = QLabel(self._window_id)
-        self._wid_label.setStyleSheet("color: #ffa500; font-weight: bold; font-family: monospace; font-size: 11px;")
+        self._wid_label.setStyleSheet("color: #ffa500; font-weight: bold; font-family: 'Menlo', 'Consolas'; font-size: 11px;")
         header.addWidget(self._wid_label)
 
         # Trace ID label (e.g., tr0)
         self._id_label = QLabel(self._trace_id)
-        self._id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: monospace; font-size: 11px;")
+        self._id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: 'Menlo', 'Consolas'; font-size: 11px;")
         header.addWidget(self._id_label)
 
         # Identity label with colored styling

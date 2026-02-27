@@ -58,7 +58,7 @@ class CodeGutter(QWidget):
         c = theme.colors
         mono_font = QFont()
         mono_font.setFamilies([
-            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace"
+            "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco"
         ])
         mono_font.setPointSize(11)
         mono_font.setStyleHint(QFont.StyleHint.Monospace)
