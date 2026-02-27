@@ -335,3 +335,12 @@ A task is complete when:
 - Document lessons learned
 - Optimize for user happiness
 - Keep things simple and maintainable
+
+## AI Agent Problem Solving Strategies
+When confronting complex bugs, especially those involving opaque third-party GUI frameworks or event bubbling, you **MUST** apply the following workflow. Do not rely on assumptions or brute-force coordinate arithmetic when events aren't firing.
+
+1. **Isolation via Minimal Reproduction:** Never debug subtle event flow issues inside the massive main application. You MUST write a standalone script (e.g., `<20` lines) that isolates the component. This strips away state noise and proves whether your baseline assumption about the framework is true.
+2. **Runtime Introspection of Third-Party Code:** If an action isn't triggering your handlers, do not guess the internal logic. Use direct Python reflection to read the source. Run `python -c "import inspect; import module; print(inspect.getsource(module.ProblemClass.method))"` directly in your shell. You must read the vendor code to understand the native mechanics.
+3. **Respect GUI Event Bubbling (The Swallow Effect):** In Qt (and web DOM), events bubble up from child to parent. If a parent container isn't receiving a click event, assume a child component is intercepting it, handling it natively, and calling `.accept()`. Always look for child sub-components that might have their own event handlers.
+4. **Follow the Path of Least Resistance (Native Hooks):** If the framework provides a native implementation of an action (e.g., a native `sigClicked` or `sigSampleClicked` emitted when the component natively handles its own state), **DO NOT fight the framework.** Wire into the existing signal instead of trying to override the internal event handler.
+5. **Strict Typing in Mocks for C++ Frameworks:** When mocking objects passed to C++ extensions (like PyQt or PySide), generic `MagicMock` instances will frequently fail with `TypeError: arguments did not match any overloaded call`. You **MUST** instantiate the actual required C++ wrapper objects (e.g., `QPointF`, `QRectF`) for geometry, positions, or specific event metadata.
