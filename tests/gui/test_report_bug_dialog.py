@@ -504,6 +504,10 @@ def test_path_sanitization_end_to_end(qtbot):
                 seq_num=1,
                 description=f"Loaded file {home}/examples/demo.py",
                 timestamp=1.0,
+                action_type="LOAD",
+                target_element="FILE_TREE",
+                modifiers=(),
+                button="None"
             ),
         ),
         open_files=(

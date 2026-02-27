@@ -13,7 +13,7 @@ def test_render_baseline_probes():
     report = BugReport(description="Test baseline.", baseline_state=state)
     
     output = formatter.render(report)
-    assert "sig (float64, shape=(100,))" in output
+    assert "sig @ test.py:10:5 (float64, shape=(100,))" in output
 
 def test_render_baseline_widgets():
     formatter = ReportFormatter()
@@ -26,7 +26,7 @@ def test_render_baseline_widgets():
     report = BugReport(description="Test widgets.", baseline_state=state)
     
     output = formatter.render(report)
-    assert "w0: Waveform" in output
+    assert "w0: Waveform [tr0: tr0.val]" in output
 
 def test_render_json_baseline():
     formatter = ReportFormatter()
@@ -45,7 +45,7 @@ def test_render_json_baseline():
     output = formatter.render_json(report)
     parsed = json.loads(output)
     
-    p = parsed["baseline_state"]["probed_traces"][0]
+    p = parsed["baseline_state"]["probes"][0]
     assert p["symbol"] == "sig"
     assert p["file"] == "test.py"
     assert p["line"] == 10
@@ -54,3 +54,5 @@ def test_render_json_baseline():
     w = parsed["baseline_state"]["graph_widgets"][0]
     assert w["widget_id"] == "w0"
     assert w["lens"] == "Waveform"
+    assert w["primary_trace"]["trace_id"] == "tr0"
+    assert w["primary_trace"]["components"] == ["tr0.val"]

@@ -231,7 +231,10 @@ class ReportBugDialog(QDialog):
         )
 
         self._report_text = self._formatter.render(
-            report, llm_mode=llm_mode, include_full_file=include_full_file
+            report,
+            llm_mode=llm_mode,
+            include_code=include_files,
+            include_full_file=include_full_file,
         )
         self._preview.setPlainText(self._report_text)
         self._copy_btn.setEnabled(True)

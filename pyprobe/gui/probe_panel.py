@@ -113,6 +113,7 @@ class ProbePanel(QFrame):
     interaction_mode_changed = pyqtSignal(str)  # (mode_name)
     view_reset_triggered = pyqtSignal()
     view_adjusted = pyqtSignal()
+    view_interaction_triggered = pyqtSignal(str)  # (description)
 
     def __init__(
         self,
@@ -350,6 +351,7 @@ class ProbePanel(QFrame):
             self._plot = create_plot(self._anchor.symbol, dtype, self)
             self._layout.addWidget(self._plot)
             self._wire_legend()
+            self._wire_plot_signals()
 
         if self._plot:
             self._plot.update_data(value, dtype, shape, source_info)
@@ -424,9 +426,8 @@ class ProbePanel(QFrame):
         # M7: Re-wire ViewBox signals for new plot
         self._wire_view_box_signals()
 
-        # Connect plot widget's hover coordinate signal if present
-        if hasattr(self._plot, 'status_message_requested'):
-            self._plot.status_message_requested.connect(self.status_message_requested)
+        # Wire plot-specific signals (interaction, axis, coords)
+        self._wire_plot_signals()
         
         # Re-apply current toolbar mode to new plot widget
         if self._toolbar:
@@ -1058,9 +1059,49 @@ class ProbePanel(QFrame):
                 pass
             vb.sigRangeChangedManually.connect(self._on_manual_view_change)
 
+    def _wire_plot_signals(self):
+        """Connect plot-level signals (coords, axis interaction) to panel."""
+        if not self._plot:
+            return
+
+        # Status message (hover coords)
+        if hasattr(self._plot, 'status_message_requested'):
+            try:
+                self._plot.status_message_requested.disconnect(self.status_message_requested)
+            except (TypeError, RuntimeError):
+                pass
+            self._plot.status_message_requested.connect(self.status_message_requested)
+
+        # Direct axis interaction (drag/wheel on axis)
+        if hasattr(self._plot, 'axis_interaction_triggered'):
+            try:
+                self._plot.axis_interaction_triggered.disconnect(self._on_axis_interaction)
+            except (TypeError, RuntimeError):
+                pass
+            self._plot.axis_interaction_triggered.connect(self._on_axis_interaction)
+
     def _on_manual_view_change(self, mask):
         """Restart debounce timer when user manually adjusts view."""
         self._view_adj_timer.start()
+        
+        # Also emit a more descriptive immediate signal if it's tool-based
+        from .plot_toolbar import InteractionMode
+        if self._current_interaction_mode == InteractionMode.PAN:
+            self.view_interaction_triggered.emit("Panned view using tool")
+        elif self._current_interaction_mode == InteractionMode.ZOOM:
+            self.view_interaction_triggered.emit("Zoomed view using tool")
+
+    def _on_axis_interaction(self, interaction_type: str, orientation: str):
+        """Map direct axis interaction to description signal."""
+        action = "Panned" if interaction_type == "AXIS_DRAG" else "Scrolled"
+        pretty_orient = "Horizontal" if orientation == "bottom" else "Vertical"
+        desc = f"{action} {pretty_orient} axis directly"
+        
+        # New: Emit structured interaction info if we want to bypass simple connect_signal
+        # For now, we still rely on MainWindow's connect_signal(panel_view_interaction_triggered, lambda...)
+        # which only takes (anchor, window_id, desc).
+        # To populate RecordedStep fully, we might need a richer signal or direct recorder access.
+        self.view_interaction_triggered.emit(desc)
 
     @property
     def window_id(self) -> str:

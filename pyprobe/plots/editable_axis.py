@@ -20,6 +20,7 @@ class EditableAxisItem(pg.AxisItem):
     
     edit_min_requested = pyqtSignal(float)
     edit_max_requested = pyqtSignal(float)
+    manual_interaction = pyqtSignal(str, str)  # (interaction_type, axis_name)
     
     def __init__(self, orientation, **kwargs):
         super().__init__(orientation, **kwargs)
@@ -94,10 +95,13 @@ class EditableAxisItem(pg.AxisItem):
 
     def mouseDragEvent(self, event, **kwargs):
         """Allow dragging the axis to pan, even if the plot area is in POINTER mode."""
+        if event.isFinish():
+            self.manual_interaction.emit("AXIS_DRAG", self.orientation)
         self._temporarily_enable_axis_interaction(event, lambda e: super(EditableAxisItem, self).mouseDragEvent(e, **kwargs))
 
     def wheelEvent(self, event, **kwargs):
         """Allow scrolling the axis to zoom, even if the plot area is in POINTER mode."""
+        self.manual_interaction.emit("AXIS_WHEEL", self.orientation)
         def _handle_wheel(e):
             view_box = self.linkedView()
 

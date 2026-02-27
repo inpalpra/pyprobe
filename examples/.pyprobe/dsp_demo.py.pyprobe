@@ -3,19 +3,6 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 72,
-      "col": 8,
-      "symbol": "received_symbols",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#2bee64",
-      "lens": null,
-      "markers": {
-        "Constellation": []
-      }
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-      "line": 72,
       "col": 26,
       "symbol": "signal_i",
       "func": "main",
@@ -39,6 +26,19 @@
       "markers": {
         "Waveform": []
       }
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+      "line": 72,
+      "col": 8,
+      "symbol": "received_symbols",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#2bee64",
+      "lens": null,
+      "markers": {
+        "Constellation": []
+      }
     }
   ],
   "watches": [],
@@ -47,9 +47,33 @@
       "target": {
         "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
         "line": 72,
-        "col": 26,
-        "symbol": "signal_i",
+        "col": 8,
+        "symbol": "received_symbols",
         "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      },
+      "overlay": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 76,
+        "col": 8,
+        "symbol": "received_symbols",
+        "func": "main",
+        "is_assignment": true,
+        "color": null,
+        "lens": null,
+        "markers": {}
+      }
+    },
+    {
+      "target": {
+        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
+        "line": 46,
+        "col": 4,
+        "symbol": "signal_i",
+        "func": "generate_qam_signal",
         "is_assignment": true,
         "color": null,
         "lens": null,
@@ -70,10 +94,10 @@
     {
       "target": {
         "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-        "line": 72,
-        "col": 26,
+        "line": 46,
+        "col": 4,
         "symbol": "signal_i",
-        "func": "main",
+        "func": "generate_qam_signal",
         "is_assignment": true,
         "color": null,
         "lens": null,
@@ -85,30 +109,6 @@
         "col": 4,
         "symbol": "signal_q",
         "func": "generate_qam_signal",
-        "is_assignment": true,
-        "color": null,
-        "lens": null,
-        "markers": {}
-      }
-    },
-    {
-      "target": {
-        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-        "line": 72,
-        "col": 8,
-        "symbol": "received_symbols",
-        "func": "main",
-        "is_assignment": true,
-        "color": null,
-        "lens": null,
-        "markers": {}
-      },
-      "overlay": {
-        "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
-        "line": 76,
-        "col": 8,
-        "symbol": "received_symbols",
-        "func": "main",
         "is_assignment": true,
         "color": null,
         "lens": null,

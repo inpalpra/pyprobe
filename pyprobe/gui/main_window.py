@@ -634,6 +634,9 @@ class MainWindow(QMainWindow):
         r.connect_signal(
             self._probe_controller.panel_view_adjusted,
             lambda anchor, wid: f"Adjusted view in window {wid} ({anchor.identity_label()})")
+        r.connect_signal(
+            self._probe_controller.panel_view_interaction_triggered,
+            lambda anchor, wid, desc: f"{desc} in window {wid} ({anchor.identity_label()})")
 
         # ── File tree ─────────────────────────────────────────────────────
         r.connect_signal(

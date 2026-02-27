@@ -13,17 +13,6 @@
     },
     {
       "file": "/Users/ppal/repos/pyprobe/regression/temporal/exception.py",
-      "line": 8,
-      "col": 8,
-      "symbol": "x",
-      "func": "main",
-      "is_assignment": true,
-      "color": "#eed52b",
-      "lens": null,
-      "markers": {}
-    },
-    {
-      "file": "/Users/ppal/repos/pyprobe/regression/temporal/exception.py",
       "line": 2,
       "col": 4,
       "symbol": "x",
@@ -41,6 +30,17 @@
       "func": "main",
       "is_assignment": true,
       "color": "#2bee64",
+      "lens": null,
+      "markers": {}
+    },
+    {
+      "file": "/Users/ppal/repos/pyprobe/regression/temporal/exception.py",
+      "line": 8,
+      "col": 8,
+      "symbol": "x",
+      "func": "main",
+      "is_assignment": true,
+      "color": "#eed52b",
       "lens": null,
       "markers": {}
     }

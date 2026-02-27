@@ -12,13 +12,19 @@ class ReportFormatter:
         self,
         report: BugReport,
         llm_mode: bool = False,
+        include_code: bool = True,
         include_full_file: bool = True,
     ) -> str:
         if not llm_mode:
-            return self._render_default(report, include_full_file)
-        return self._render_llm(report, include_full_file)
+            return self._render_default(report, include_code, include_full_file)
+        return self._render_llm(report, include_code, include_full_file)
 
-    def _render_default(self, report: BugReport, include_full_file: bool = True) -> str:
+    def _render_default(
+        self,
+        report: BugReport,
+        include_code: bool = True,
+        include_full_file: bool = True,
+    ) -> str:
         parts: list[str] = []
 
         parts.append("=== Bug Report ===")
@@ -42,7 +48,12 @@ class ReportFormatter:
             if state.graph_widgets:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
-                    parts.append(f"    {w.widget_id}: {w.lens}")
+                    primary = f"[{w.primary_trace.trace_id}: {', '.join(w.primary_trace.components)}]"
+                    overlays = ""
+                    if w.overlay_traces:
+                        ov_list = [f"{ot.trace_id}: {', '.join(ot.components)}" for ot in w.overlay_traces]
+                        overlays = f" (overlays: {'; '.join(ov_list)})"
+                    parts.append(f"    {w.widget_id}: {w.lens} {primary}{overlays}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -61,7 +72,7 @@ class ReportFormatter:
                     flags.append("unsaved")
                 flag_str = ", ".join(flags) if flags else "none"
                 parts.append(f"  {entry.path} [{flag_str}]")
-                if entry.contents is not None:
+                if entry.contents is not None and include_code:
                     if include_full_file:
                         parts.append(self._render_contents(entry))
                     else:
@@ -81,7 +92,12 @@ class ReportFormatter:
         output = "\n".join(parts)
         return PathSanitizer.sanitize(output)
 
-    def _render_llm(self, report: BugReport, include_full_file: bool) -> str:
+    def _render_llm(
+        self,
+        report: BugReport,
+        include_code: bool = True,
+        include_full_file: bool = True,
+    ) -> str:
         parts: list[str] = []
 
         parts.append("=== Bug Report ===")
@@ -105,7 +121,12 @@ class ReportFormatter:
             if state.graph_widgets:
                 parts.append("  Widgets:")
                 for w in state.graph_widgets:
-                    parts.append(f"    {w.widget_id}: {w.lens}")
+                    primary = f"[{w.primary_trace.trace_id}: {', '.join(w.primary_trace.components)}]"
+                    overlays = ""
+                    if w.overlay_traces:
+                        ov_list = [f"{ot.trace_id}: {', '.join(ot.components)}" for ot in w.overlay_traces]
+                        overlays = f" (overlays: {'; '.join(ov_list)})"
+                    parts.append(f"    {w.widget_id}: {w.lens} {primary}{overlays}")
 
         if report.steps is not None:
             parts.append("\n--- Steps ---")
@@ -127,7 +148,7 @@ class ReportFormatter:
                 flag_str = ", ".join(flags) if flags else "none"
                 parts.append(f"  {entry.path} [{flag_str}]")
 
-                if entry.contents is not None:
+                if entry.contents is not None and include_code:
                     if include_full_file:
                         parts.append(self._render_numbered_contents(entry))
                     else:
@@ -263,8 +284,12 @@ class ReportFormatter:
             data["steps"] = [
                 {
                     "seq_num": s.seq_num,
-                    "description": s.description,
                     "timestamp": s.timestamp,
+                    "action_type": s.action_type,
+                    "target_element": s.target_element,
+                    "modifiers": list(s.modifiers),
+                    "button": s.button,
+                    "description": s.description,
                 }
                 for s in report.steps
             ]
@@ -281,13 +306,13 @@ class ReportFormatter:
                     }
                     for e in state.open_files
                 ],
-                "probed_traces": [
+                "probes": [
                     {
                         "symbol": t.symbol,
                         "file": t.file,
                         "line": t.line,
                         "column": t.column,
-                        "shape": t.shape,
+                        "shape": list(t.shape),
                         "dtype": t.dtype,
                     }
                     for t in state.probed_traces
@@ -307,6 +332,17 @@ class ReportFormatter:
                         "lens": w.lens,
                         "is_docked": w.is_docked,
                         "is_visible": w.is_visible,
+                        "primary_trace": {
+                            "trace_id": w.primary_trace.trace_id,
+                            "components": list(w.primary_trace.components),
+                        },
+                        "overlay_traces": [
+                            {
+                                "trace_id": ot.trace_id,
+                                "components": list(ot.components),
+                            }
+                            for ot in w.overlay_traces
+                        ],
                     }
                     for w in state.graph_widgets
                 ],

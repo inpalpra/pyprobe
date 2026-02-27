@@ -61,6 +61,7 @@ class ProbeController(QObject):
     panel_interaction_mode_changed = pyqtSignal(object, str, str)  # (anchor, window_id, mode_name)
     panel_view_reset_triggered = pyqtSignal(object, str)  # (anchor, window_id)
     panel_view_adjusted = pyqtSignal(object, str)  # (anchor, window_id)
+    panel_view_interaction_triggered = pyqtSignal(object, str, str)  # (anchor, window_id, description)
     
     def __init__(
         self,
@@ -309,6 +310,9 @@ class ProbeController(QObject):
         )
         panel.view_adjusted.connect(
             lambda a=anchor, p=panel: self.panel_view_adjusted.emit(a, p.window_id)
+        )
+        panel.view_interaction_triggered.connect(
+            lambda desc, a=anchor, p=panel: self.panel_view_interaction_triggered.emit(a, p.window_id, desc)
         )
 
         # Send to runner if running

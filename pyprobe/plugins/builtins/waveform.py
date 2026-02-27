@@ -43,6 +43,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
 
     status_message_requested = pyqtSignal(str)
     row_visibility_changed = pyqtSignal(int, bool)  # (row_index, visible)
+    axis_interaction_triggered = pyqtSignal(str, str)  # (type, orientation)
     
     MAX_DISPLAY_POINTS = 5000
     
@@ -221,6 +222,10 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         bottom_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('x', 'max', val))
         left_axis.edit_min_requested.connect(lambda val: self._start_axis_edit('y', 'min', val))
         left_axis.edit_max_requested.connect(lambda val: self._start_axis_edit('y', 'max', val))
+        
+        # Connect manual interaction signals
+        bottom_axis.manual_interaction.connect(self.axis_interaction_triggered.emit)
+        left_axis.manual_interaction.connect(self.axis_interaction_triggered.emit)
 
     def _start_axis_edit(self, axis: str, endpoint: str, current_value: float) -> None:
         """Start inline editing of an axis min/max value."""
