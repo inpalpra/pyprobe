@@ -2,9 +2,9 @@
 
 ## Phase 1: Interaction Discovery & Vocabulary Building
 - [x] Task: Create a simple PyProbe graph with multiple traces (real and complex) specifically for interactive discovery. 94ce657
-- [~] Task: Conduct an interactive session (with the user) to trigger all possible mouse interactions on the graph widget components (Legends, Line plots, Axes, Graph Area).
-- [ ] Task: Document the observed interactions, agree upon the nomenclature for traces (e.g., `tr0.val`, `tr1.mag_db`) and interactions, and formalize the vocabulary.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Interaction Discovery & Vocabulary Building' (Protocol in workflow.md)
+- [x] Task: Conduct an interactive session (with the user) to trigger all possible mouse interactions on the graph widget components (Legends, Line plots, Axes, Graph Area).
+- [x] Task: Document the observed interactions, agree upon the nomenclature for traces (e.g., `tr0.val`, `tr1.mag_db`) and interactions, and formalize the vocabulary.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Interaction Discovery & Vocabulary Building' (Protocol in workflow.md) [checkpoint: 9ac9a21]
 
 ## Phase 2: Core Schema & Nomenclature Definition
 - [ ] Task: Draft the formal JSON schema incorporating the newly agreed-upon interaction vocabulary and hierarchical trace structure.
