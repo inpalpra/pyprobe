@@ -51,16 +51,6 @@ def generate_qam_signal(num_symbols: int, snr_db: float) -> tuple:
 
 def main():
     """Main processing loop."""
-    print("=" * 50)
-    print("PyProbe DSP Demo (Single Frame)")
-    print("=" * 50)
-    print()
-    print("Variables for overlay test:")
-    print("  - signal_i (primary waveform)")
-    print("  - received_symbols (to overlay - will split to real/imag)")
-    print()
-    print("Starting signal generation...")
-    print()
 
     for frame in range(NUM_FRAMES):
         # Fixed SNR for reproducibility
@@ -78,13 +68,8 @@ def main():
         power_db = 10 * np.log10(np.mean(np.abs(received_symbols) ** 2))
         peak_to_avg = np.max(np.abs(received_symbols)) / np.mean(np.abs(received_symbols))
 
-        print(f"Frame {frame + 1}/{NUM_FRAMES}: SNR={snr_db:.1f} dB")
-
         # Short delay
         time.sleep(0.1)
-
-    print()
-    print("Demo complete!")
 
 
 if __name__ == "__main__":
