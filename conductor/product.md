@@ -18,6 +18,7 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - Built-in support for waveforms (real/imag/mag/phase).
 - Constellation diagrams and scalar histories.
 - **Equation Editor:** Perform real-time mathematical operations on raw probed data (traces) using Python-based expressions (numpy/scipy).
+- **Unambiguous Trace Nomenclature:** Formal naming system for trace components (e.g., `tr0.real`, `tr1.mag_db`) that persists across view switches and provides forensic clarity in reports.
 - **Reference-Counted Graph Management:** Formal architecture for managing graph windows (w0, w1...) and their contained traces. Variables are automatically "unprobed" (highlights and icons removed) when no longer referenced in any active window.
 - **Interactive Trace Control:** Easily remove specific traces via legend double-clicks or right-click context menus.
 - **Global Trace IDs:** Unique tr<n> IDs for all probed variables for easy reference in equations.
@@ -26,13 +27,13 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - Highly customizable themes (Cyberpunk, Monokai, Ocean).
 - Real-time performance.
 - **Structured Bug Reporting & Step Recording:** Built-in, non-blocking bug report system with optional step recording. Users can record all intentional UI interactions (probe lifecycle, overlays, lens changes, legend toggles, panel management, execution control, equation edits, etc.) and generate a structured report containing:
-  - Ordered interaction history ("Steps to Reproduce")
-  - Baseline session state snapshot
+  - Ordered interaction history ("Steps to Reproduce") with unambiguous interaction vocabulary (e.g., "Panned Horizontal axis directly").
+  - Baseline session state snapshot including detailed trace hierarchies and active lens configurations.
   - Open file metadata (with optional content inclusion)
   - Environment details (Python, PyProbe version, Qt version, platform, plugins, git commit)
   - Deterministic, sanitized paths (`<USER_HOME>` replacement)
   - Optional LLM-optimized formatting mode with line-numbered code and relevant code window extraction
-  - The system is designed for forensic-grade reproducibility, enabling both human developers and LLMs to reliably reconstruct UI state transitions and diagnose complex interaction bugs.
+  - The system is designed for forensic-grade reproducibility, tracking precise probe locations (`symbol @ file:line:col`), enabling both human developers and LLMs to reliably reconstruct UI state transitions and diagnose complex interaction bugs.
  
 ## Engineering Philosophy
 - **Deterministic Behavior First:** All state transitions are explicitly modeled and reproducible. No hidden side-effects. No silent state mutation.

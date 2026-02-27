@@ -22,3 +22,7 @@
 - **Socket-based IPC:** A custom bidirectional protocol using TCP sockets for reliable communication between the GUI and the tracer.
 - **Wire Protocol:** A high-performance serialization layer using JSON for structure and raw binary for numerical arrays (NumPy).
 - **pyprobe-tracer:** A lightweight, standalone package injected into the user's script process to capture variables without GUI dependencies.
+
+## Reporting & Serialization
+- **JSON Schema:** A formal schema definition (`report_schema.json`) for bug reports to ensure structural integrity and forensic compatibility.
+- **jsonschema:** Used for validating generated reports against the formal schema in regression tests.
