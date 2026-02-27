@@ -53,6 +53,7 @@ class ReportBugDialog(QDialog):
         self.setWindowTitle("Report Bug")
         self.resize(700, 600)
         self.setWindowFlag(Qt.WindowType.Window)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
         layout = QVBoxLayout(self)
 
