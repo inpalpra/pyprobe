@@ -14,5 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: I tried probing received_symbols in dsp_demo.py example. I changed lens to Mag and Phase. That was not recorded. Why? Also, many other user actions not getting recorded. Legend Toggles, Equation Edits, Toggling trace visibility is missing. Sometimes, clicked RUN is mistaken in the recording as clicked Pause.**
+- [x] **Track: I tried probing received_symbols in dsp_demo.py example. I changed lens to Mag and Phase. That was not recorded. Why? Also, many other user actions not getting recorded. Legend Toggles, Equation Edits, Toggling trace visibility is missing. Sometimes, clicked RUN is mistaken in the recording as clicked Pause.**
 *Link: [./tracks/interaction_recording_fix_20260227/](./tracks/interaction_recording_fix_20260227/)*
