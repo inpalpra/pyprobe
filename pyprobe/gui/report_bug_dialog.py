@@ -19,6 +19,8 @@ from pyprobe.report.report_model import BugReport, OpenFileEntry, SessionState, 
 from pyprobe.report.step_recorder import StepRecorder
 from pyprobe.gui.recording_indicator import RecordingIndicator
 
+MAX_AUTO_COPY_SIZE = 2 * 1024 * 1024  # 2MB
+
 
 class ReportBugDialog(QDialog):
     """Bug report dialog.
@@ -156,13 +158,16 @@ class ReportBugDialog(QDialog):
         self._stop_recording_btn.setEnabled(True)
 
     def _stop_recording(self) -> None:
-        """End the current recording session."""
+        """End the current recording session and generate report."""
         self._recorded_steps = self._recorder.stop()
         self._indicator.hide_indicator()
 
         # Toggle controls
         self._start_recording_btn.setEnabled(True)
         self._stop_recording_btn.setEnabled(False)
+
+        # Automatically generate report after stopping recording
+        self._trigger_generate()
 
     # ── UI callbacks ─────────────────────────────────────────────────────────
 
@@ -173,7 +178,10 @@ class ReportBugDialog(QDialog):
     # ── Core logic ────────────────────────────────────────────────────────────
 
     def _trigger_generate(self) -> None:
-        """Build and render the BugReport from current dialog state."""
+        """Build and render the BugReport from current dialog state.
+        
+        Automatically copies to clipboard if size < MAX_AUTO_COPY_SIZE.
+        """
         state = self._collector.collect()
         llm_mode = self._llm_mode_checkbox.isChecked()
         include_files = self._files_checkbox.isChecked()
@@ -229,6 +237,10 @@ class ReportBugDialog(QDialog):
         self._copy_btn.setEnabled(True)
         self._save_btn.setEnabled(True)
         self._github_btn.setEnabled(True)
+
+        # Automatically copy to clipboard if the size is small enough
+        if len(self._report_text.encode("utf-8")) < MAX_AUTO_COPY_SIZE:
+            self._trigger_copy()
 
     def _trigger_copy(self) -> None:
         QApplication.clipboard().setText(self._report_text)
