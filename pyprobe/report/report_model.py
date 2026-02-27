@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 @dataclass(frozen=True)
 class OpenFileEntry:
     path: str
@@ -9,14 +8,14 @@ class OpenFileEntry:
     has_unsaved: bool
     contents: str | None = None
 
-
 @dataclass(frozen=True)
 class ProbeTraceEntry:
-    name: str
-    source_file: str
+    symbol: str
+    file: str
+    line: int
+    column: int
     shape: tuple[int, ...]
     dtype: str
-
 
 @dataclass(frozen=True)
 class EquationEntry:
@@ -25,20 +24,29 @@ class EquationEntry:
     status: str
     is_plotted: bool
 
+@dataclass(frozen=True)
+class WidgetTraceEntry:
+    trace_id: str
+    components: tuple[str, ...]
 
 @dataclass(frozen=True)
 class GraphWidgetEntry:
     widget_id: str
-    what_plotted: str
     is_docked: bool
     is_visible: bool
-
+    lens: str
+    primary_trace: WidgetTraceEntry
+    overlay_traces: tuple[WidgetTraceEntry, ...]
 
 @dataclass(frozen=True)
 class RecordedStep:
     seq_num: int
-    description: str
     timestamp: float
+    action_type: str
+    target_element: str
+    modifiers: tuple[str, ...]
+    button: str
+    description: str
 
 
 @dataclass(frozen=True)

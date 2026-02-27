@@ -815,6 +815,10 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         self.status_message_requested.emit("")
 
     def _on_mouse_clicked(self, ev):
+        try:
+            print(f"INTERACTION DISCOVERY | Mouse Clicked at {ev.scenePos().x()}, {ev.scenePos().y()} | Button: {ev.button()} | Modifiers: {ev.modifiers()} | Items under cursor: {self._plot_widget.scene().items(ev.scenePos())}", flush=True)
+        except Exception as e:
+            print(f"INTERACTION DISCOVERY | Error logging click: {e}")
         if ev.modifiers() == Qt.KeyboardModifier.AltModifier and ev.button() == Qt.MouseButton.LeftButton:
             ev.accept()
             curve_dict = {i: c for i, c in enumerate(self._curves)}

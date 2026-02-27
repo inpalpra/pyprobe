@@ -623,6 +623,9 @@ class MainWindow(QMainWindow):
             self._probe_controller.panel_trace_visibility_changed,
             lambda anchor, wid, name, visible: f"Toggled visibility of {name} in window {wid} ({anchor.identity_label()})")
         r.connect_signal(
+            self._probe_controller.panel_legend_moved,
+            lambda anchor, wid: f"Moved legend in window {wid} ({anchor.identity_label()})")
+        r.connect_signal(
             self._probe_controller.panel_interaction_mode_changed,
             lambda anchor, wid, mode: f"Changed tool to {mode} in window {wid} ({anchor.identity_label()})")
         r.connect_signal(
@@ -864,6 +867,7 @@ class MainWindow(QMainWindow):
 
             if anchor in self._probe_metadata:
                 self._probe_metadata[anchor]['dtype'] = record.dtype
+                self._probe_metadata[anchor]['shape'] = record.shape
 
             self._redraw_throttler.receive(record)
 
@@ -953,6 +957,7 @@ class MainWindow(QMainWindow):
             # Update metadata dtype
             if anchor in self._probe_metadata:
                 self._probe_metadata[anchor]['dtype'] = payload['dtype']
+                self._probe_metadata[anchor]['shape'] = payload.get('shape')
 
             for panel in self._probe_panels[anchor]:
                 if not is_obj_deleted(panel) and not panel.is_closing:
@@ -982,6 +987,10 @@ class MainWindow(QMainWindow):
 
             print(f"DEBUG: MainWindow received data for {anchor.symbol}", file=sys.stderr)
             self._probe_registry.update_data_received(anchor)
+            if anchor in self._probe_metadata:
+                self._probe_metadata[anchor]['dtype'] = probe_data['dtype']
+                self._probe_metadata[anchor]['shape'] = probe_data.get('shape')
+
             if anchor in self._probe_panels:
                 for panel in self._probe_panels[anchor]:
                     panel.update_data(

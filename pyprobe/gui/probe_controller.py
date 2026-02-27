@@ -57,6 +57,7 @@ class ProbeController(QObject):
     panel_draw_mode_changed = pyqtSignal(object, str, str)  # (anchor, series_key, mode_name)
     panel_markers_cleared = pyqtSignal(object)  # anchor
     panel_trace_visibility_changed = pyqtSignal(object, str, str, bool)  # (anchor, window_id, trace_name, visible)
+    panel_legend_moved = pyqtSignal(object, str)  # (anchor, window_id)
     panel_interaction_mode_changed = pyqtSignal(object, str, str)  # (anchor, window_id, mode_name)
     panel_view_reset_triggered = pyqtSignal(object, str)  # (anchor, window_id)
     panel_view_adjusted = pyqtSignal(object, str)  # (anchor, window_id)
@@ -294,6 +295,9 @@ class ProbeController(QObject):
         # Forward legend toggle signal for StepRecorder
         panel.legend_trace_toggled.connect(
             lambda name, visible, a=anchor, p=panel: self.panel_trace_visibility_changed.emit(a, p.window_id, name, visible)
+        )
+        panel.legend_moved.connect(
+            lambda a=anchor, p=panel: self.panel_legend_moved.emit(a, p.window_id)
         )
 
         # Forward interaction mode and view signals for StepRecorder
@@ -838,6 +842,8 @@ class ProbeController(QObject):
                         primary_anchor, p.window_id, label_text, visible
                     )
                 plot._legend.trace_visibility_changed.connect(on_visibility_changed)
+                if hasattr(plot._legend, 'legend_moved'):
+                    plot._legend.legend_moved.connect(target_panel.legend_moved)
 
                 # Add primary curve(s) to legend
                 if hasattr(plot, "_curves") and plot._curves and primary_anchor:
@@ -1041,6 +1047,8 @@ class ProbeController(QObject):
                         primary_anchor, p.window_id, label_text, visible
                     )
                 plot._legend.trace_visibility_changed.connect(on_visibility_changed)
+                if hasattr(plot._legend, 'legend_moved'):
+                    plot._legend.legend_moved.connect(target_panel.legend_moved)
 
                 # Add primary scatter to legend
                 if hasattr(plot, "_scatter_items") and plot._scatter_items and primary_anchor:

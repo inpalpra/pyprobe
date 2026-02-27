@@ -33,10 +33,18 @@ class RemovableLegendItem(pg.LegendItem):
     """
     trace_removal_requested = pyqtSignal(object)  # Emits the curve/item
     trace_visibility_changed = pyqtSignal(object, bool)  # (item, visible)
+    legend_moved = pyqtSignal()
 
     def __init__(self, size=None, offset=None, **kwargs):
         super().__init__(size, offset, **kwargs)
         self.sigSampleClicked.connect(self._on_sample_clicked)
+
+    def mouseDragEvent(self, ev):
+        """Record legend movement and delegate to parent."""
+        if ev.button() == Qt.MouseButton.LeftButton:
+            super().mouseDragEvent(ev)
+            if ev.isFinish():
+                self.legend_moved.emit()
 
     def _on_sample_clicked(self, item):
         """Handle native pyqtgraph sample click (toggles visibility natively)."""
@@ -101,6 +109,7 @@ class ProbePanel(QFrame):
     draw_mode_changed = pyqtSignal(str, str)  # (series_key, mode_name)
     markers_cleared = pyqtSignal()  # all markers cleared from panel
     legend_trace_toggled = pyqtSignal(str, bool)  # (trace_name, is_visible)
+    legend_moved = pyqtSignal()
     interaction_mode_changed = pyqtSignal(str)  # (mode_name)
     view_reset_triggered = pyqtSignal()
     view_adjusted = pyqtSignal()
@@ -1028,9 +1037,13 @@ class ProbePanel(QFrame):
             # Avoid duplicate connections
             try:
                 legend.trace_visibility_changed.disconnect(self._on_legend_toggled)
+                if hasattr(legend, 'legend_moved'):
+                    legend.legend_moved.disconnect(self.legend_moved)
             except (TypeError, RuntimeError):
                 pass
             legend.trace_visibility_changed.connect(self._on_legend_toggled)
+            if hasattr(legend, 'legend_moved'):
+                legend.legend_moved.connect(self.legend_moved)
 
     def _wire_view_box_signals(self):
         """Connect ViewBox manual range change signals to debounce timer."""

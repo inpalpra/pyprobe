@@ -38,7 +38,7 @@ class SessionStateCollector:
         try:
             raw_probes = self._probe_getter() or ()
             probed_traces: tuple[ProbeTraceEntry, ...] = tuple(
-                dataclasses.replace(e, source_file=PathSanitizer.sanitize(e.source_file))
+                dataclasses.replace(e, file=PathSanitizer.sanitize(e.file))
                 for e in raw_probes
             )
         except Exception:

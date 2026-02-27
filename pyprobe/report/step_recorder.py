@@ -71,7 +71,7 @@ class StepRecorder:
 
     # ── Recording ─────────────────────────────────────────────────────────────
 
-    def record(self, description: str) -> None:
+    def record(self, description: str, action_type: str = "Unknown", target_element: str = "Unknown", modifiers: tuple[str, ...] = (), button: str = "None") -> None:
         """Append a RecordedStep if currently recording.  No-op otherwise.
         
         Duplicate consecutive steps with the same description are ignored to
@@ -88,8 +88,12 @@ class StepRecorder:
         self._steps.append(
             RecordedStep(
                 seq_num=self._seq_num,
-                description=description,
                 timestamp=time.time(),
+                action_type=action_type,
+                target_element=target_element,
+                modifiers=modifiers,
+                button=button,
+                description=description,
             )
         )
 

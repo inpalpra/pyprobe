@@ -38,12 +38,12 @@ def test_snapshot_contains_open_files_from_getter():
 def test_snapshot_contains_probed_traces_from_getter():
     """Snapshot.probed_traces matches what probe_getter returns."""
     entry = ProbeTraceEntry(
-        name="sig", source_file="/tmp/a.py", shape=(512,), dtype="float32"
+        symbol="sig", file="/tmp/a.py", line=1, column=1, shape=(512,), dtype="float32"
     )
     collector = make_collector(probe_getter=lambda: [entry])
     snapshot = collector.collect()
     assert len(snapshot.probed_traces) == 1
-    assert snapshot.probed_traces[0].name == "sig"
+    assert snapshot.probed_traces[0].symbol == "sig"
 
 
 def test_snapshot_contains_equations_from_getter():
@@ -59,8 +59,11 @@ def test_snapshot_contains_equations_from_getter():
 
 def test_snapshot_contains_graph_widgets_from_getter():
     """Snapshot.graph_widgets matches what widget_getter returns."""
+    from pyprobe.report.report_model import WidgetTraceEntry
     entry = GraphWidgetEntry(
-        widget_id="w0", what_plotted="eq0", is_docked=True, is_visible=True
+        widget_id="w0", is_docked=True, is_visible=True, lens="Waveform",
+        primary_trace=WidgetTraceEntry(trace_id="tr0", components=("tr0.val",)),
+        overlay_traces=()
     )
     collector = make_collector(widget_getter=lambda: [entry])
     snapshot = collector.collect()
@@ -100,10 +103,11 @@ def test_snapshot_is_immutable_after_capture():
 def test_baseline_state_is_snapshot_not_live_reference():
     """The snapshot holds a frozen copy. Mutating the original structure after
     collect() has no effect on any field of the snapshot."""
-    inner = {"name": "sig", "source_file": "/tmp/a.py", "shape": (128,), "dtype": "f32"}
+    inner = {"symbol": "sig", "file": "/tmp/a.py", "line": 1, "column": 1, "shape": (128,), "dtype": "f32"}
     entries = [
         ProbeTraceEntry(
-            name=inner["name"], source_file=inner["source_file"],
+            symbol=inner["symbol"], file=inner["file"],
+            line=inner["line"], column=inner["column"],
             shape=inner["shape"], dtype=inner["dtype"],
         )
     ]
@@ -113,7 +117,7 @@ def test_baseline_state_is_snapshot_not_live_reference():
     entries.clear()
     # Snapshot must still contain the original entry
     assert len(snapshot.probed_traces) == 1
-    assert snapshot.probed_traces[0].name == "sig"
+    assert snapshot.probed_traces[0].symbol == "sig"
 
 
 # ── Robustness tests ──────────────────────────────────────────────────────────
@@ -155,12 +159,12 @@ def test_snapshot_paths_in_probe_sources_are_sanitized():
     from pathlib import Path
     home = str(Path.home())
     entry = ProbeTraceEntry(
-        name="sig", source_file=f"{home}/repos/script.py",
+        symbol="sig", file=f"{home}/repos/script.py", line=1, column=1,
         shape=(64,), dtype="complex64",
     )
     snapshot = make_collector(probe_getter=lambda: [entry]).collect()
-    assert home not in snapshot.probed_traces[0].source_file
-    assert "<USER_HOME>" in snapshot.probed_traces[0].source_file
+    assert home not in snapshot.probed_traces[0].file
+    assert "<USER_HOME>" in snapshot.probed_traces[0].file
 
 
 # ── Performance test ──────────────────────────────────────────────────────────

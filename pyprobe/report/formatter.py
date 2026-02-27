@@ -34,7 +34,7 @@ class ReportFormatter:
             if state.probed_traces:
                 parts.append("  Probes:")
                 for t in state.probed_traces:
-                    parts.append(f"    {t.symbol} ({t.dtype}, shape={t.shape})")
+                    parts.append(f"    {t.symbol} @ {t.file}:{t.line}:{t.column} ({t.dtype}, shape={t.shape})")
             if state.equations:
                 parts.append("  Equations:")
                 for eq in state.equations:
@@ -97,7 +97,7 @@ class ReportFormatter:
             if state.probed_traces:
                 parts.append("  Probes:")
                 for t in state.probed_traces:
-                    parts.append(f"    {t.symbol} ({t.dtype}, shape={t.shape})")
+                    parts.append(f"    {t.symbol} @ {t.file}:{t.line}:{t.column} ({t.dtype}, shape={t.shape})")
             if state.equations:
                 parts.append("  Equations:")
                 for eq in state.equations:

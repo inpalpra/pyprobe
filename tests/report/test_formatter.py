@@ -20,14 +20,13 @@ def minimal_report():
 
 @pytest.fixture
 def full_report():
-    return BugReport(
-        description="Equation re-plot failed after closing graph.",
-        steps=(
-            RecordedStep(seq_num=1, description="Clicked Plot for eq0", timestamp=1.0),
-            RecordedStep(seq_num=2, description="Closed graph widget eq0", timestamp=2.0),
-            RecordedStep(seq_num=3, description="Clicked Plot for eq0 again", timestamp=3.0),
-        ),
-        open_files=(
+            return BugReport(
+                description="Equation re-plot failed after closing graph.",
+                steps=(
+                    RecordedStep(seq_num=1, timestamp=1.0, action_type="Click", target_element="PLOT__CANVAS", modifiers=(), button="Left", description="Clicked Plot for eq0"),
+                    RecordedStep(seq_num=2, timestamp=2.0, action_type="Click", target_element="W0__WINDOW_CLOSE_BTN", modifiers=(), button="Left", description="Closed graph widget eq0"),
+                    RecordedStep(seq_num=3, timestamp=3.0, action_type="Click", target_element="PLOT__CANVAS", modifiers=(), button="Left", description="Clicked Plot for eq0 again"),
+                ),        open_files=(
             OpenFileEntry(
                 path="/tmp/dsp_demo.py",
                 is_probed=True, is_executed=True, has_unsaved=False,
@@ -188,8 +187,8 @@ def test_render_json_contains_steps():
     report = BugReport(
         description="Steps test.",
         steps=(
-            RecordedStep(seq_num=1, description="Clicked Run", timestamp=1_000_000.0),
-            RecordedStep(seq_num=2, description="Closed widget", timestamp=1_000_001.0),
+            RecordedStep(seq_num=1, timestamp=1_000_000.0, action_type="Click", target_element="PLOT__CANVAS", modifiers=(), button="Left", description="Clicked Run"),
+            RecordedStep(seq_num=2, timestamp=1_000_001.0, action_type="Click", target_element="W0__WINDOW_CLOSE_BTN", modifiers=(), button="Left", description="Closed widget"),
         ),
     )
     parsed = json.loads(formatter.render_json(report))

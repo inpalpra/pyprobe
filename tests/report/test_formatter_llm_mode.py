@@ -40,18 +40,30 @@ def _make_report_with_location_steps(
     steps = (
         RecordedStep(
             seq_num=1,
-            description="Added probe: signal @ /tmp/dsp.py:5:4",
             timestamp=1.0,
+            action_type="Unknown",
+            target_element="Unknown",
+            modifiers=(),
+            button="None",
+            description="Added probe: signal @ /tmp/dsp.py:5:4",
         ),
         RecordedStep(
             seq_num=2,
-            description="Script finished",
             timestamp=2.0,
+            action_type="Unknown",
+            target_element="Unknown",
+            modifiers=(),
+            button="None",
+            description="Script finished",
         ),
         RecordedStep(
             seq_num=3,
-            description="Added probe: filtered @ /tmp/dsp.py:11:4",
             timestamp=3.0,
+            action_type="Unknown",
+            target_element="Unknown",
+            modifiers=(),
+            button="None",
+            description="Added probe: filtered @ /tmp/dsp.py:11:4",
         ),
     )
     open_files = (
@@ -92,7 +104,7 @@ def test_llm_mode_extracts_only_relevant_windows_when_full_file_unchecked(format
     # Use a file long enough that some lines fall outside ±5 of any reference
     long_code = "\n".join(f"line_{i} = {i}" for i in range(1, 31))  # 30 lines
     steps = (
-        RecordedStep(seq_num=1, description="Added probe: x @ /tmp/long.py:5:4", timestamp=1.0),
+        RecordedStep(seq_num=1, timestamp=1.0, action_type="Unknown", target_element="Unknown", modifiers=(), button="None", description="Added probe: x @ /tmp/long.py:5:4"),
     )
     open_files = (
         OpenFileEntry(
@@ -148,7 +160,7 @@ def test_default_mode_snippets_shows_windows(formatter):
     """Default mode with include_full_file=False shows snippet windows with line numbers."""
     long_code = "\n".join(f"line_{i} = {i}" for i in range(1, 31))
     steps = (
-        RecordedStep(seq_num=1, description="Added probe: x @ /tmp/snip.py:5:4", timestamp=1.0),
+        RecordedStep(seq_num=1, timestamp=1.0, action_type="Unknown", target_element="Unknown", modifiers=(), button="None", description="Added probe: x @ /tmp/snip.py:5:4"),
     )
     open_files = (
         OpenFileEntry(
@@ -171,8 +183,12 @@ def test_file_without_referenced_lines_falls_back_to_full_contents(formatter):
     steps = (
         RecordedStep(
             seq_num=1,
-            description="Added probe: x @ /tmp/other.py:10:4",
             timestamp=1.0,
+            action_type="Unknown",
+            target_element="Unknown",
+            modifiers=(),
+            button="None",
+            description="Added probe: x @ /tmp/other.py:10:4",
         ),
     )
     open_files = (
