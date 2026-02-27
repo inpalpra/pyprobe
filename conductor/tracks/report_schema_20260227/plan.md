@@ -7,9 +7,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Interaction Discovery & Vocabulary Building' (Protocol in workflow.md) [checkpoint: 9ac9a21]
 
 ## Phase 2: Core Schema & Nomenclature Definition
-- [ ] Task: Draft the formal JSON schema incorporating the newly agreed-upon interaction vocabulary and hierarchical trace structure.
-    - [ ] Write schema definition tests validating JSON structure.
-    - [ ] Implement schema validation using `jsonschema` or equivalent.
+- [x] Task: Draft the formal JSON schema incorporating the newly agreed-upon interaction vocabulary and hierarchical trace structure. ef08f7a
+    - [x] Write schema definition tests validating JSON structure.
+    - [x] Implement schema validation using `jsonschema` or equivalent.
 - [ ] Task: Implement the new trace nomenclature logic to distinguish primary vs overlay traces within `Widget` objects.
     - [ ] Write unit tests for trace naming and role assignments.
     - [ ] Update `Widget` and `Trace` models to reflect primary/overlay relationships and new naming (e.g. `tr1.real`, `tr1.imag`).
