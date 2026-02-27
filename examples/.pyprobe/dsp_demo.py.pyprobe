@@ -8,9 +8,11 @@
       "func": "main",
       "is_assignment": true,
       "color": "#2bee64",
-      "lens": null,
+      "lens": "Mag & Phase",
       "markers": {
-        "Constellation": []
+        "Constellation": [],
+        "Real & Imag": [],
+        "Mag & Phase": []
       }
     }
   ],
