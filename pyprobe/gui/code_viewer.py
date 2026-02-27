@@ -112,6 +112,7 @@ class CodeViewer(QPlainTextEdit):
             QPlainTextEdit {{
                 background-color: {c['bg_dark']};
                 color: {c['text_primary']};
+                font-family: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", "Monaco", "monospace";
                 border: none;
                 selection-background-color: {c['accent_primary']};
                 selection-color: {c['bg_darkest']};
