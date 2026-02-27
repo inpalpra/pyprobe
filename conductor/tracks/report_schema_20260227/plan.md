@@ -10,12 +10,12 @@
 - [x] Task: Draft the formal JSON schema incorporating the newly agreed-upon interaction vocabulary and hierarchical trace structure. ef08f7a
     - [x] Write schema definition tests validating JSON structure.
     - [x] Implement schema validation using `jsonschema` or equivalent.
-- [ ] Task: Implement the new trace nomenclature logic to distinguish primary vs overlay traces within `Widget` objects.
-    - [ ] Write unit tests for trace naming and role assignments.
-    - [ ] Update `Widget` and `Trace` models to reflect primary/overlay relationships and new naming (e.g. `tr1.real`, `tr1.imag`).
-- [ ] Task: Implement exact probe location tracking (`<symbol> @ <file>:<line>:<column>`) for the baseline state.
-    - [ ] Write unit tests verifying precise file/line/column extraction.
-    - [ ] Implement the location extraction logic in the tracer module.
+- [x] Task: Implement the new trace nomenclature logic to distinguish primary vs overlay traces within `Widget` objects. 92df57e
+    - [x] Write unit tests for trace naming and role assignments.
+    - [x] Update `Widget` and `Trace` models to reflect primary/overlay relationships and new naming (e.g. `tr1.real`, `tr1.imag`).
+- [x] Task: Implement exact probe location tracking (`<symbol> @ <file>:<line>:<column>`) for the baseline state. 92df57e
+    - [x] Write unit tests verifying precise file/line/column extraction.
+    - [x] Implement the location extraction logic in the tracer module.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Schema & Nomenclature Definition' (Protocol in workflow.md)
 
 ## Phase 3: Event Capture Integration
