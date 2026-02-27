@@ -4,21 +4,25 @@ import pytest
 from PyQt6.QtGui import QFontMetricsF
 from pyprobe.gui.code_viewer import CodeViewer
 from pyprobe.gui.theme.ocean import OCEAN_THEME
+from pyprobe.gui.theme.cyberpunk import CYBERPUNK_THEME
+from pyprobe.gui.theme.theme_manager import ThemeManager
 
-def test_code_viewer_maintains_monospace_in_ocean_theme(qapp):
+@pytest.mark.parametrize("theme_id, theme_obj", [
+    ('ocean', OCEAN_THEME),
+    ('cyberpunk', CYBERPUNK_THEME)
+])
+def test_code_viewer_maintains_monospace_in_themes(qapp, theme_id, theme_obj):
     """
-    Ensure the code viewer maintains a monospace font when the Ocean theme is applied.
-    Ocean theme uses a global variable-width font (Inter, etc.) on QWidget, which
-    can cascade into QPlainTextEdit and override the python setFont() call if not
-    properly protected by the stylesheet.
+    Ensure the code viewer maintains a monospace font when different themes are applied.
+    Some themes (like Ocean) use a global variable-width font on QWidget, which
+    could cascade into QPlainTextEdit and override the python setFont() call if not
+    properly protected by the CodeViewer stylesheet.
     """
-    # Apply the ocean theme globally, similar to how PyProbe does it
-    from pyprobe.gui.theme.theme_manager import ThemeManager
-    ThemeManager.instance().set_theme('ocean')
+    ThemeManager.instance().set_theme(theme_id)
 
     viewer = CodeViewer()
     # Trigger theme application on the widget
-    viewer._apply_theme(OCEAN_THEME)
+    viewer._apply_theme(theme_obj)
 
     # Check font metrics of the actual viewer
     fm = QFontMetricsF(viewer.font())
@@ -30,3 +34,4 @@ def test_code_viewer_maintains_monospace_in_ocean_theme(qapp):
 
     assert width_i == width_m, f"Not a monospace font! 'i' width: {width_i}, 'm' width: {width_m}"
     assert width_m == width_w, f"Not a monospace font! 'm' width: {width_m}, 'w' width: {width_w}"
+
