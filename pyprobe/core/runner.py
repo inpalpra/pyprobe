@@ -123,8 +123,6 @@ class ScriptRunner:
 
             # Start tracing (M1: use anchored tracer)
             self._tracer.start_anchored()
-            
-            print(f"[RUNNER] Compiling script path: {self._script_path}", file=sys.__stderr__)
 
             # Wait for START command from GUI to ensure initial probes are registered
             # This prevents race condition where script runs before probes are added
@@ -172,10 +170,8 @@ class ScriptRunner:
             for attempt in range(10):  # Try up to 10 times
                 success = self._ipc.send_data(end_msg, timeout=0.5)
                 if success:
-                    print(f"[RUNNER] DATA_SCRIPT_END sent successfully on attempt {attempt + 1}", file=sys.__stderr__)
                     break
                 else:
-                    print(f"[RUNNER] DATA_SCRIPT_END send failed (attempt {attempt + 1}), queue may be full", file=sys.__stderr__)
                     time.sleep(0.1)
             else:
                 print("[RUNNER] ERROR: Failed to send DATA_SCRIPT_END after 10 attempts!", file=sys.__stderr__)
