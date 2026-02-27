@@ -1,0 +1,8 @@
+{
+  "track_id": "interaction_recording_fix_20260227",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-02-27T14:15:00Z",
+  "updated_at": "2026-02-27T14:15:00Z",
+  "description": "I tried probing received_symbols in dsp_demo.py example. I changed lens to Mag and Phase. That was not recorded. Why? Also, many other user actions not getting recorded. Legend Toggles, Equation Edits, Toggling trace visibility is missing. Sometimes, clicked RUN is mistaken in the recording as clicked Pause."
+}
