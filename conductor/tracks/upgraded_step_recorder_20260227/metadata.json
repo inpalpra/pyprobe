@@ -1,0 +1,8 @@
+{
+  "track_id": "upgraded_step_recorder_20260227",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-27T12:00:00Z",
+  "updated_at": "2026-02-27T12:00:00Z",
+  "description": "Create a multi-milestone plan to implement an upgraded Step Recorder and Scene Graph."
+}
