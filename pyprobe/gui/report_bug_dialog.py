@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QPlainTextEdit, QCheckBox, QPushButton,
     QFileDialog, QWidget, QRadioButton,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtWidgets import QApplication
 
 from pyprobe.report.session_snapshot import SessionStateCollector
@@ -255,6 +255,15 @@ class ReportBugDialog(QDialog):
         # the recorder. Only hide the visual indicator and reset button state.
         self._indicator.hide_indicator()
         super().closeEvent(event)
+
+    def changeEvent(self, event) -> None:
+        """Handle window activation/deactivation to toggle opacity."""
+        if event.type() == QEvent.Type.ActivationChange:
+            if self.isActiveWindow():
+                self.setWindowOpacity(1.0)
+            else:
+                self.setWindowOpacity(0.5)
+        super().changeEvent(event)
 
     # ── Test helper API ───────────────────────────────────────────────────────
 
