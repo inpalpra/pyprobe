@@ -36,9 +36,11 @@ def test_legend_click_emits_signal(qtbot):
     
     # We need to manually trigger mouseClickEvent since full UI integration is complex
     from unittest.mock import MagicMock
+    from PyQt6.QtCore import QPointF
     event = MagicMock()
     event.button.return_value = Qt.MouseButton.LeftButton
-    
+    event.pos.return_value = QPointF(0, 0)
+
     # Mock label.contains to return True
     for item, label in legend.items:
         label.contains = MagicMock(return_value=True)

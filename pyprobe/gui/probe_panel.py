@@ -36,32 +36,24 @@ class RemovableLegendItem(pg.LegendItem):
 
     def __init__(self, size=None, offset=None, **kwargs):
         super().__init__(size, offset, **kwargs)
+        self.sigSampleClicked.connect(self._on_sample_clicked)
+
+    def _on_sample_clicked(self, item):
+        """Handle native pyqtgraph sample click (toggles visibility natively)."""
+        if hasattr(item, 'isVisible'):
+            self.trace_visibility_changed.emit(item, item.isVisible())
 
     def mouseClickEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
             pos = ev.pos()
             for item, label in self.items:
-                # Check if click is on label or the sample (color swatch)
-                # self.items stores (sample, label) where sample is the icon/swatch
-                sample = item  # In LegendItem, 'item' is usually the sample
-                
                 # Check label click
                 if label.contains(label.mapFromItem(self, pos)):
                     self._toggle_visibility(item)
                     ev.accept()
                     return
-                
-                # Check sample click (the color swatch)
-                # LegendItem doesn't provide easy access to sample geometry, 
-                # but we can try to find it by looking at the parent of the sample
-                # or just checking proximity.
-                # Actually, LegendItem.items is a list of (ItemSample, LabelItem)
-                if hasattr(sample, 'contains') and sample.contains(sample.mapFromItem(self, pos)):
-                    self._toggle_visibility(item)
-                    ev.accept()
-                    return
                     
-        super().mouseClickEvent(ev)
+        # Do not call super().mouseClickEvent(ev) because pg.GraphicsWidget doesn't have it
 
     def _toggle_visibility(self, item):
         """Toggle visibility of the underlying data item."""
