@@ -25,9 +25,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.resolve()
 TESTS_DIR = REPO_ROOT / "tests"
 
-# Subdirectories (relative to TESTS_DIR) that form named suites.
-# Order controls execution order.
-SUITE_DIRS = ["core", "ipc", "gui", "report"]
+# Auto-discover subdirectories containing test files.
+# Any subdir of tests/ with test_*.py files becomes a suite.
 
 # Files in TESTS_DIR itself that are not conftest / helpers.
 # Any file matching test_*.py at the top level forms the "top-level" suite.
@@ -42,17 +41,16 @@ def discover_suites(tests_dir: Path) -> dict[str, list[Path]]:
     """Return an ordered dict of {suite_name: [test_file, ...]}."""
     suites: dict[str, list[Path]] = {}
 
-    # Named sub-directory suites first (in declared order).
-    for sub in SUITE_DIRS:
-        sub_path = tests_dir / sub
-        if not sub_path.is_dir():
+    # Auto-discover any subdirectory containing test files (sorted for determinism).
+    for sub_path in sorted(tests_dir.iterdir()):
+        if not sub_path.is_dir() or sub_path.name.startswith(("_", ".")):
             continue
         files = sorted(
             p for p in sub_path.glob("test_*.py")
             if p.name not in EXCLUDE_FILES
         )
         if files:
-            suites[sub] = files
+            suites[sub_path.name] = files
 
     # Top-level test files last.
     top = sorted(
@@ -121,7 +119,7 @@ def main() -> int:
     parser.add_argument(
         "--suite",
         metavar="NAME",
-        help="Run only the named suite (core | ipc | gui | report | top-level).",
+        help="Run only the named suite (auto-discovered from tests/ subdirectories).",
     )
     parser.add_argument(
         "--failfast",
