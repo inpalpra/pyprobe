@@ -33,6 +33,10 @@ When launching the megascript subprocess:
 - **Load directly:** Pass the absolute path of this helper script to the framework or subprocess directly (`os.path.join(os.path.dirname(__file__), "data", "temporal_megascript.py")`).
 - **Use in-memory capture:** For extremely fast test runs, use `subprocess.run(..., capture_output=True, text=True)` to capture streams directly into memory instead of routing them through `tempfile.TemporaryFile`. This eliminates redundant disk I/O, file seeking, and buffering overhead.
 
+### 4. Watch for Hardcoded Delays
+When combining testing workflows:
+- **Reduce UI wait times:** Repeated arbitrary wait times in helper functions (like `QTest.qWait(500)`) will stack up significantly when testing scenarios sequentially. Check your delays and reduce them to the minimum required for the async framework to process the event loop context (e.g. from 500ms down to 10-20ms).
+
 ## Definition of Done
 
 A test suite optimization using this pattern is considered **Done** when:
