@@ -42,18 +42,28 @@ class TestComplexMAWidgetColor:
         w = ComplexMAWidget("x", probe_color)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_set_series_color_updates_mag_curve(self, qapp, probe_color):
         w = ComplexMAWidget("x", probe_color)
         w.set_series_color('Log Mag', PINK)
         curve, hex_c = w._series_curves['Log Mag']
         assert hex_c == PINK.name()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_set_series_color_phase_unchanged(self, qapp, probe_color):
         w = ComplexMAWidget("x", probe_color)
         w.set_series_color('Log Mag', PINK)
         _, phase_hex = w._series_curves['Phase']
         assert phase_hex == '#00ff7f'  # unchanged
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
+
 
 
 class TestComplexRIWidgetColor:
