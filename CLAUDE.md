@@ -74,22 +74,32 @@ PyProbe runs as two processes connected via IPC:
 
 Tests use `pytest` with `pytest-qt` for GUI tests. Test suites are in `tests/core/`, `tests/ipc/`, `tests/gui/`, and top-level integration tests in `tests/`. The `conftest.py` provides shared fixtures. GUI tests require a display (or virtual framebuffer).
 
+### ⚠️ Parallelism masks bugs
+
+Running tests with `-p 4` distributes files across workers, reducing accumulated deferred Qt events per process. This hides order-dependent crashes that appear at `-p 1`. **A test that only passes because it's isolated is still broken.** The pre-push hook (`.git/hooks/pre-push`) enforces a sequential GUI test pass before pushing to main.
+
 ### ⚠️ Qt widget lifecycle in tests
+
+> **RULE: If a test creates a `QWidget`, it MUST call `qtbot.addWidget(w)`. Always. No exceptions.**
 
 **General principle:** When a Qt/pyqtgraph widget is created in a test and not explicitly destroyed, Python's garbage collector will destroy it at an unpredictable time — often during pytest teardown. At that point, Qt's event loop may still have **deferred events** (layout recalculations, paint events, size hint queries) queued against the widget's internal objects. Those internal objects get partially destroyed in an undefined order, so Qt fires a callback on a half-dead object and crashes.
 
 This is invisible when it works, and baffling when it doesn't — the test assertions pass, but teardown explodes with inscrutable errors from deep inside pyqtgraph or Qt internals.
 
-**When creating or modifying any pyqtgraph-backed widget, guard against this:**
+**When creating or modifying any QWidget in a test, guard against this:**
 
-1. **In tests:** Always end with explicit cleanup. This forces synchronous destruction *before* pytest teardown runs:
+1. **In tests:** Always register widgets with `qtbot.addWidget(w)` **and** end with explicit cleanup. `qtbot.addWidget()` gives pytest-qt ownership of the C++ object's lifetime for deterministic cleanup; the manual teardown below is the belt-and-suspenders guarantee:
    ```python
+   qtbot.addWidget(w)   # register for lifecycle management
+   # ... test body ...
    w.close()
    w.deleteLater()
    qapp.processEvents()
    ```
 2. **In widget code:** Be aware that any method that internally creates/recreates Qt graphics objects (axis labels, legends, ViewBoxes) is adding deferred-event surface area. The more internal objects a widget creates post-construction, the more likely GC teardown will hit a race condition.
-3. **In code review:** If a new test creates a widget but has no cleanup, flag it. It may pass today and break tomorrow when someone adds a secondary axis or legend rebuild.
+3. **In code review:** If a new test creates a widget but has no cleanup or no `qtbot.addWidget()`, flag it. It may pass today and break tomorrow when someone adds a secondary axis or legend rebuild.
+4. **Never remove the `_flush_qt_events` autouse fixture** in `tests/gui/conftest.py`. It processes pending Qt events (`qapp.processEvents()`) after every test, preventing deferred callbacks (`QTimer.singleShot(0, ...)`, `deleteLater()`) from accumulating across tests and firing on already-freed C++ objects. This fixture is the project-wide safety net for the class of bugs described here.
+5. **The `_enforce_widget_cleanup` autouse fixture** will `pytest.fail()` if any test creates a `pyprobe.*` widget that is still visible after teardown. If a test fails with "Leaked N widget(s) without cleanup", add `qtbot.addWidget(w)` + `close()`/`deleteLater()`/`processEvents()` in fixture teardown.
 
 #### Past example: `ComplexMAWidget` `_sizeHint` teardown crash
 
@@ -98,12 +108,6 @@ Three tests in `test_probe_color_change.py::TestComplexMAWidgetColor` passed ass
 **Why only these 3?** `ComplexMAWidget` is used across many test files, but the other test files either (a) already had `deleteLater()` cleanup (e.g. `test_draw_mode_e2e.py`, `test_draw_mode.py`), or (b) never called methods that trigger internal `LabelItem` recreation. The color-change tests were unique because `set_series_color()` calls `setLabel('left', ...)`, which *recreates* pyqtgraph's `LabelItem` objects post-construction. Those recreated labels have cached `_sizeHint` dicts that become dangling references when GC runs during teardown.
 
 **Fix:** Added `w.close()` + `w.deleteLater()` + `qapp.processEvents()` to the three tests.
-
-### Pre-push hook
-
-A `.git/hooks/pre-push` hook blocks pushes to `origin/main` unless the release test suite passes locally. It runs the same pytest invocation as the CI `test-wheel` job in `.github/workflows/release.yml`.
-
-Both the hook and CI read the skip list from **`tests/release_skip.txt`** (single source of truth). To add or remove skipped tests, edit that file — both consumers pick it up automatically.
 
 ## Key constraints
 

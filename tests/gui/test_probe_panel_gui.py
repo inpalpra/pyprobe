@@ -24,13 +24,17 @@ def panel_anchor():
 
 
 @pytest.fixture
-def panel(qapp, panel_anchor, probe_color):
+def panel(qtbot, qapp, panel_anchor, probe_color):
     """Create a ProbePanel with array_1d dtype."""
     p = ProbePanel(panel_anchor, probe_color, DTYPE_ARRAY_1D)
+    qtbot.addWidget(p)
     p.resize(600, 400)
     p.show()
     qapp.processEvents()
-    return p
+    yield p
+    p.close()
+    p.deleteLater()
+    qapp.processEvents()
 
 
 class TestProbePanelCreation:

@@ -5,9 +5,10 @@ from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.data_classifier import DTYPE_ARRAY_1D
 from unittest.mock import MagicMock
 
-def test_view_adjusted_recording(qapp):
+def test_view_adjusted_recording(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_1D, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     spy = MagicMock()
     panel.view_adjusted.connect(spy)
@@ -23,10 +24,14 @@ def test_view_adjusted_recording(qapp):
     qapp.processEvents()
     
     assert spy.called
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()
 
-def test_view_reset_recording(qapp):
+def test_view_reset_recording(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_1D, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     spy = MagicMock()
     panel.view_reset_triggered.connect(spy)
@@ -34,3 +39,6 @@ def test_view_reset_recording(qapp):
     panel._on_toolbar_reset()
     
     assert spy.called
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()

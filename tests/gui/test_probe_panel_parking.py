@@ -9,13 +9,14 @@ import numpy as np
 
 
 @pytest.fixture
-def panel(qapp, probe_color):
+def panel(qtbot, qapp, probe_color):
     """Create a ProbePanel with data for keyboard testing."""
     anchor = ProbeAnchor(
         file="/tmp/test.py", line=1, col=0,
         symbol="sig", func="main",
     )
     p = ProbePanel(anchor, probe_color, DTYPE_ARRAY_1D)
+    qtbot.addWidget(p)
     p.resize(600, 400)
     p.show()
     qapp.processEvents()
@@ -25,7 +26,10 @@ def panel(qapp, probe_color):
     # Give focus
     p.setFocus()
     qapp.processEvents()
-    return p
+    yield p
+    p.close()
+    p.deleteLater()
+    qapp.processEvents()
 
 
 class TestPKeyPark:

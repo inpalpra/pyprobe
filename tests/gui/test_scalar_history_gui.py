@@ -12,13 +12,17 @@ from pyprobe.core.data_classifier import DTYPE_SCALAR
 
 
 @pytest.fixture
-def scalar_history(qapp, probe_color):
+def scalar_history(qtbot, qapp, probe_color):
     """Create a ScalarHistoryWidget for testing."""
     w = ScalarHistoryWidget("counter", probe_color)
+    qtbot.addWidget(w)
     w.resize(400, 300)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestScalarHistoryData:
@@ -111,6 +115,10 @@ class TestScalarHistoryPlugin:
     def test_cannot_handle_array(self):
         assert not ScalarHistoryPlugin().can_handle('array_1d', None)
 
-    def test_create_widget(self, qapp, probe_color):
+    def test_create_widget(self, qtbot, qapp, probe_color):
         w = ScalarHistoryPlugin().create_widget("x", probe_color)
+        qtbot.addWidget(w)
         assert isinstance(w, ScalarHistoryWidget)
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()

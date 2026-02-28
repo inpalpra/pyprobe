@@ -15,13 +15,17 @@ from pyprobe.core.data_classifier import (
 
 
 @pytest.fixture
-def waveform(qapp, probe_color):
+def waveform(qtbot, qapp, probe_color):
     """Create a WaveformWidget for testing."""
     w = WaveformWidget("test_signal", probe_color)
+    qtbot.addWidget(w)
     w.resize(600, 400)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestWaveform1DData:
@@ -160,10 +164,14 @@ class TestWaveformPlugin:
         plugin = WaveformPlugin()
         assert not plugin.can_handle('scalar', None)
 
-    def test_create_widget(self, qapp, probe_color):
+    def test_create_widget(self, qtbot, qapp, probe_color):
         plugin = WaveformPlugin()
         w = plugin.create_widget("var", probe_color)
+        qtbot.addWidget(w)
         assert isinstance(w, WaveformWidget)
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_update_delegates(self, waveform):
         plugin = WaveformPlugin()

@@ -12,13 +12,17 @@ from pyprobe.core.data_classifier import DTYPE_ARRAY_COMPLEX
 
 
 @pytest.fixture
-def constellation(qapp, probe_color):
+def constellation(qtbot, qapp, probe_color):
     """Create a ConstellationWidget for testing."""
     w = ConstellationWidget("iq_signal", probe_color)
+    qtbot.addWidget(w)
     w.resize(400, 400)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestConstellationData:
@@ -135,7 +139,11 @@ class TestConstellationPlugin:
         plugin = ConstellationPlugin()
         assert not plugin.can_handle('scalar', None)
 
-    def test_create_widget(self, qapp, probe_color):
+    def test_create_widget(self, qtbot, qapp, probe_color):
         plugin = ConstellationPlugin()
         w = plugin.create_widget("z", probe_color)
+        qtbot.addWidget(w)
         assert isinstance(w, ConstellationWidget)
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()

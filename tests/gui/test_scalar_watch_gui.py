@@ -17,13 +17,17 @@ def _make_anchor(symbol="counter", line=10):
 
 
 @pytest.fixture
-def sidebar(qapp):
+def sidebar(qtbot, qapp):
     """Create a ScalarWatchSidebar."""
     s = ScalarWatchSidebar()
+    qtbot.addWidget(s)
     s.resize(250, 400)
     s.show()
     qapp.processEvents()
-    return s
+    yield s
+    s.close()
+    s.deleteLater()
+    qapp.processEvents()
 
 
 class TestScalarWatchAdd:

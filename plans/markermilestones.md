@@ -127,7 +127,7 @@ Keysight PXA-style markers for PyProbe graphs. Markers snap to traces, display v
 
 **Verification:**
 ```bash
-./.venv/bin/python -m pytest tests/gui/test_markers_gui.py -v
+QT_QPA_PLATFORM=offscreen ./.venv/bin/python -m pytest tests/gui/test_markers_gui.py -v
 ```
 - Create WaveformWidget, feed data, call `add_marker()`, verify glyph count
 - Verify overlay text updates

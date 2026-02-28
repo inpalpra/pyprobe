@@ -12,15 +12,19 @@ from pyprobe.core.data_classifier import DTYPE_ARRAY_1D
 
 
 @pytest.fixture
-def waveform(qapp, probe_color):
+def waveform(qtbot, qapp, probe_color):
     """Create a WaveformWidget with initial data."""
     w = WaveformWidget("primary", probe_color)
+    qtbot.addWidget(w)
     w.resize(600, 400)
     w.show()
     qapp.processEvents()
     w.update_data(np.array([1, 2, 3, 4, 5], dtype=float), DTYPE_ARRAY_1D)
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestOverlayAdd:

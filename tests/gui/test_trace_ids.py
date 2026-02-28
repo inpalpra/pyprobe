@@ -25,14 +25,18 @@ def test_registry_assigns_ids(qapp):
     
     assert registry.get_trace_id(anchor2) == "tr0" # Reused
 
-def test_panel_header_shows_id(qapp):
+def test_panel_header_shows_id(qtbot, qapp):
     anchor = ProbeAnchor(file="f1.py", line=10, col=0, symbol="x")
     panel = ProbePanel(anchor, QColor("red"), "real_1d", trace_id="tr42")
+    qtbot.addWidget(panel)
     
     assert panel._id_label.text() == "tr42"
-
-def test_watch_sidebar_shows_id(qapp):
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()
+def test_watch_sidebar_shows_id(qtbot, qapp):
     sidebar = ScalarWatchSidebar()
+    qtbot.addWidget(sidebar)
     anchor = ProbeAnchor(file="f1.py", line=10, col=0, symbol="x")
     sidebar.add_scalar(anchor, QColor("red"), "tr7")
     
@@ -53,3 +57,6 @@ def test_watch_sidebar_shows_id(qapp):
     texts = [l.text() for l in labels]
     print(f"Labels found: {texts}")
     assert "tr7" in texts
+    sidebar.close()
+    sidebar.deleteLater()
+    qapp.processEvents()

@@ -1,9 +1,67 @@
 import gc
 
 import pytest
+from PyQt6 import sip
 from PyQt6.QtWidgets import QApplication
 
 from pyprobe.plots.marker_model import MarkerStore
+
+
+@pytest.fixture(autouse=True)
+def _enforce_widget_cleanup():
+    """Error if a test leaks pyprobe.* widgets without cleanup.
+
+    Defined first in conftest.py so it tears down last (LIFO), after
+    _flush_qt_events has already processed deferred events and GC'd.
+    Only flags top-level widgets (parent=None) from pyprobe.* modules,
+    ignoring transient Qt/pyqtgraph internals (QMenu, QToolTip, etc.).
+    """
+    app = QApplication.instance()
+    if app is None:
+        yield
+        return
+
+    before = set(id(w) for w in app.allWidgets())
+    yield
+
+    # Finalize any deleteLater()/close() calls from fixture teardowns.
+    # gc.collect() releases Python refs so Qt C++ destructors can run,
+    # then processEvents() processes the deferred delete events.
+    gc.collect()
+    app.processEvents()
+    app.processEvents()
+
+    # Only flag widgets that:
+    # - Were created during this test (not in before set)
+    # - Have no parent (top-level)
+    # - Are not yet deleted (C++ side alive)
+    # - Come from pyprobe.* modules (ignore Qt/pyqtgraph internals)
+    # - Are still visible (close() was never called = real leak)
+    #   Widgets that were close()d + deleteLater()d but whose Python ref
+    #   hasn't been GC'd yet will be isVisible()=False — that's fine.
+    leaked = [
+        w for w in app.allWidgets()
+        if id(w) not in before
+        and w.parent() is None
+        and not sip.isdeleted(w)
+        and type(w).__module__.startswith("pyprobe.")
+        and w.isVisible()
+    ]
+    if leaked:
+        names = [type(w).__name__ for w in leaked]
+        for w in leaked:
+            try:
+                w.close()
+                w.deleteLater()
+            except RuntimeError:
+                pass
+        app.processEvents()
+        pytest.fail(
+            f"Leaked {len(leaked)} widget(s) without cleanup: {names}. "
+            "Add qtbot.addWidget(w) and close/deleteLater/processEvents "
+            "in fixture teardown.",
+            pytrace=False,
+        )
 
 
 @pytest.fixture(autouse=True)

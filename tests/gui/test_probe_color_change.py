@@ -38,16 +38,18 @@ def probe_color():
 
 
 class TestComplexMAWidgetColor:
-    def test_set_color_updates_name_label(self, qapp, probe_color):
+    def test_set_color_updates_name_label(self, qtbot, qapp, probe_color):
         w = ComplexMAWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
         w.close()
         w.deleteLater()
         qapp.processEvents()
 
-    def test_set_series_color_updates_mag_curve(self, qapp, probe_color):
+    def test_set_series_color_updates_mag_curve(self, qtbot, qapp, probe_color):
         w = ComplexMAWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_series_color('Log Mag', PINK)
         curve, hex_c = w._series_curves['Log Mag']
         assert hex_c == PINK.name()
@@ -55,8 +57,9 @@ class TestComplexMAWidgetColor:
         w.deleteLater()
         qapp.processEvents()
 
-    def test_set_series_color_phase_unchanged(self, qapp, probe_color):
+    def test_set_series_color_phase_unchanged(self, qtbot, qapp, probe_color):
         w = ComplexMAWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_series_color('Log Mag', PINK)
         _, phase_hex = w._series_curves['Phase']
         assert phase_hex == '#00ff7f'  # unchanged
@@ -67,42 +70,63 @@ class TestComplexMAWidgetColor:
 
 
 class TestComplexRIWidgetColor:
-    def test_set_series_color_real(self, qapp, probe_color):
+    def test_set_series_color_real(self, qtbot, qapp, probe_color):
         w = ComplexRIWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_series_color('Real', PINK)
         _, hex_c = w._series_curves['Real']
         assert hex_c == PINK.name()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestSingleCurveWidgetColor:
-    def test_set_series_color_single_curve(self, qapp, probe_color):
+    def test_set_series_color_single_curve(self, qtbot, qapp, probe_color):
         w = SingleCurveWidget("x", probe_color, "Magnitude (dB)")
+        qtbot.addWidget(w)
         w.set_series_color('Magnitude (dB)', PINK)
         _, hex_c = w._series_curves['Magnitude (dB)']
         assert hex_c == PINK.name()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestWaveformWidgetColor:
-    def test_set_color_updates_label(self, qapp, probe_color):
+    def test_set_color_updates_label(self, qtbot, qapp, probe_color):
         w = WaveformWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
-    def test_set_color_updates_primary_curve(self, qapp, probe_color):
+    def test_set_color_updates_primary_curve(self, qtbot, qapp, probe_color):
         w = WaveformWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         pen = w._curves[0].opts['pen']
         assert pen.color().name() == PINK.name()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestConstellationWidgetColor:
-    def test_set_color_updates_label(self, qapp, probe_color):
+    def test_set_color_updates_label(self, qtbot, qapp, probe_color):
         w = ConstellationWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
-    def test_set_color_updates_scatter_brush(self, qapp, probe_color):
+    def test_set_color_updates_scatter_brush(self, qtbot, qapp, probe_color):
         w = ConstellationWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         # Latest (brightest) scatter should have pink RGB
         latest = w._scatter_items[-1]
@@ -111,31 +135,47 @@ class TestConstellationWidgetColor:
         assert brush.color().red() == r
         assert brush.color().green() == g
         assert brush.color().blue() == b
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestScalarHistoryWidgetColor:
-    def test_set_color_updates_label(self, qapp, probe_color):
+    def test_set_color_updates_label(self, qtbot, qapp, probe_color):
         w = ScalarHistoryWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
-    def test_set_color_updates_curve_pen(self, qapp, probe_color):
+    def test_set_color_updates_curve_pen(self, qtbot, qapp, probe_color):
         w = ScalarHistoryWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         pen = w._curve.opts['pen']
         assert pen.color().name() == PINK.name()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestScalarDisplayWidgetColor:
-    def test_set_color_updates_label(self, qapp, probe_color):
+    def test_set_color_updates_label(self, qtbot, qapp, probe_color):
         w = ScalarDisplayWidget("x", probe_color)
+        qtbot.addWidget(w)
         w.set_color(PINK)
         assert PINK.name() in w._name_label.styleSheet()
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
 
 class TestProbePanelColorSignal:
-    def test_color_changed_signal_emitted(self, qapp, panel_anchor, probe_color):
+    def test_color_changed_signal_emitted(self, qtbot, qapp, panel_anchor, probe_color):
         panel = ProbePanel(panel_anchor, probe_color, DTYPE_ARRAY_1D)
+        qtbot.addWidget(panel)
         panel.resize(600, 400)
         panel.show()
         qapp.processEvents()
@@ -160,3 +200,6 @@ class TestProbePanelColorSignal:
         assert received[0][0] == panel_anchor
         assert received[0][1].name() == PINK.name()
         assert PINK.name() in panel._identity_label.styleSheet()
+        panel.close()
+        panel.deleteLater()
+        qapp.processEvents()

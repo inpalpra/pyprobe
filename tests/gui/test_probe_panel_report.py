@@ -5,9 +5,10 @@ from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.data_classifier import DTYPE_ARRAY_1D, DTYPE_ARRAY_COMPLEX
 from unittest.mock import MagicMock
 
-def test_get_report_entry_primary_only(qapp):
+def test_get_report_entry_primary_only(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_1D, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     registry = MagicMock()
     entry = panel.get_report_entry(registry, is_docked=True)
@@ -17,10 +18,14 @@ def test_get_report_entry_primary_only(qapp):
     assert entry.primary_trace.trace_id == "tr0"
     assert entry.primary_trace.components == ("tr0.val",)
     assert len(entry.overlay_traces) == 0
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()
 
-def test_get_report_entry_with_overlays(qapp):
+def test_get_report_entry_with_overlays(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_1D, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     overlay_anchor = ProbeAnchor(file="test.py", line=2, col=1, symbol="ovl")
     panel._overlay_anchors = [overlay_anchor]
@@ -35,11 +40,15 @@ def test_get_report_entry_with_overlays(qapp):
     assert len(entry.overlay_traces) == 1
     assert entry.overlay_traces[0].trace_id == "tr1"
     assert entry.overlay_traces[0].components == ("tr1.val",)
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()
 
-def test_get_report_entry_complex_lens(qapp):
+def test_get_report_entry_complex_lens(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     # Using complex data to get complex lenses
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_COMPLEX, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     # Force "Real & Imag" lens
     panel._lens_dropdown.set_lens("Real & Imag")
@@ -49,10 +58,14 @@ def test_get_report_entry_complex_lens(qapp):
     
     assert entry.lens == "Real & Imag"
     assert entry.primary_trace.components == ("tr0.real", "tr0.imag")
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()
 
-def test_get_report_entry_mag_phase_lens(qapp):
+def test_get_report_entry_mag_phase_lens(qtbot, qapp):
     anchor = ProbeAnchor(file="test.py", line=1, col=1, symbol="sig")
     panel = ProbePanel(anchor, QColor("red"), DTYPE_ARRAY_COMPLEX, trace_id="tr0", window_id="w0")
+    qtbot.addWidget(panel)
     
     # Force "Mag & Phase" lens
     panel._lens_dropdown.set_lens("Mag & Phase")
@@ -62,3 +75,6 @@ def test_get_report_entry_mag_phase_lens(qapp):
     
     assert entry.lens == "Mag & Phase"
     assert entry.primary_trace.components == ("tr0.mag_db", "tr0.phase_deg")
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()

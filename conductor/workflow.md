@@ -82,7 +82,7 @@ All tasks follow a strict lifecycle:
 
 3.  **Execute Automated Tests with Proactive Debugging:**
     -   Before execution, you **must** announce the exact shell command you will use to run the tests.
-    -   **Example Announcement:** "I will now run the automated test suite to verify the phase. **Command:** `uv run pytest`"
+    -   **Example Announcement:** "I will now run the automated test suite to verify the phase. **Command:** `./.venv/bin/python -m pytest`"
     -   Execute the announced command.
     -   If tests fail, you **must** inform the user and begin debugging. You may attempt to propose a fix a **maximum of two times**. If the tests still fail after your second proposed fix, you **must stop**, report the persistent failure, and ask the user for guidance.
 
@@ -158,19 +158,19 @@ uv sync --all-groups
 ### Daily Development
 ```bash
 # Run all tests
-uv run pytest
+./.venv/bin/python -m pytest
 
 # Run tests with coverage
-uv run pytest --cov=pyprobe
+./.venv/bin/python -m pytest --cov=pyprobe
 
-# Run specific test file
-uv run pytest tests/gui/test_waveform_plot_gui.py
+# Run specific GUI test file (headless)
+QT_QPA_PLATFORM=offscreen ./.venv/bin/python -m pytest tests/gui/test_waveform_plot_gui.py
 ```
 
 ### Before Committing
 ```bash
 # Run full test suite and linting
-uv run pytest && uv run ruff check .
+./.venv/bin/python -m pytest && ruff check .
 ```
 
 ## Testing Requirements
@@ -192,6 +192,22 @@ uv run pytest && uv run ruff check .
 - Test with `--forked` flag if tests interfere with each other
 - Verify plot rendering with pyqtgraph ViewBox assertions
 - Check theme application across all widgets
+- > **RULE: If a test creates a `QWidget`, it MUST call `qtbot.addWidget(w)`. Always. No exceptions.**
+- **MANDATORY: Every test that creates a Qt/pyqtgraph widget MUST:**
+  1. **Register it** with `qtbot.addWidget(w)` — this gives pytest-qt ownership of the C++ object's lifetime for deterministic cleanup.
+  2. **Explicitly destroy it** before the test returns. The cleanup is three lines — no exceptions, no shortcuts:
+  ```python
+  qtbot.addWidget(w)   # register for lifecycle management
+  # ... test body ...
+  w.close()
+  w.deleteLater()
+  qapp.processEvents()
+  ```
+  This is not optional for "complex" widgets only. Any widget can grow secondary axes, legends, or axis label rebuilds in a future commit, turning a safe test into a teardown bomb. Always clean up.
+
+  **Past failure:** `TestComplexMAWidgetColor` tests passed assertions but crashed in teardown with `AttributeError: 'LabelItem' object has no attribute '_sizeHint'`. Root cause: `set_series_color()` calls `setLabel()`, which recreates pyqtgraph's internal `LabelItem` objects post-construction. Without explicit cleanup, GC destroyed them in random order while Qt still held references. Tests in other files using the same widget (`test_draw_mode_e2e.py`, `test_draw_mode.py`) were unaffected because they already had `deleteLater()` calls.
+- **DO NOT remove the `_flush_qt_events` autouse fixture** in `tests/gui/conftest.py`. It is the project-wide safety net that processes pending Qt events after every test, preventing deferred callbacks from accumulating across tests and crashing on freed C++ objects.
+- **The `_enforce_widget_cleanup` autouse fixture** will `pytest.fail()` any test that creates a `pyprobe.*` widget without calling `close()`. If you see "Leaked N widget(s) without cleanup", add `qtbot.addWidget(w)` + the cleanup pattern above.
 
 ## Code Review Process
 
@@ -228,6 +244,7 @@ Before requesting review:
    - Keyboard shortcuts documented and working
    - Theme consistency across all widgets
    - Proper Qt cleanup (no leaked signals/slots)
+   - Every GUI test registers widgets with `qtbot.addWidget()` and destroys them (`close()` → `deleteLater()` → `processEvents()`)
 
 ## Commit Guidelines
 
@@ -277,23 +294,23 @@ A task is complete when:
 1. Create hotfix branch from main
 2. Write failing test for bug
 3. Implement minimal fix
-4. Run full test suite (`uv run pytest`)
+4. Run full test suite (`./.venv/bin/python -m pytest`)
 5. Push and let CI verify
 6. Document in plan.md
 
 ### Segfault or Crash
 1. Clear stale bytecache: `find . -name __pycache__ -not -path '*/.venv/*' -exec rm -rf {} +`
 2. Check for native library conflicts (scipy vs PyQt6 import order)
-3. Run with `--forked` to isolate: `uv run pytest --forked`
+3. Run with `--forked` to isolate: `./.venv/bin/python -m pytest --forked`
 4. Check stderr (stdout is captured by IPC transport)
 5. Document root cause in CLAUDE.md
 
 ## Release Workflow
 
 ### Pre-Release Checklist
-- [ ] All tests passing (`uv run pytest`)
+- [ ] All tests passing (`./.venv/bin/python -m pytest`)
 - [ ] Coverage >80%
-- [ ] No linting errors (`uv run ruff check .`)
+- [ ] No linting errors (`ruff check .`)
 - [ ] Pre-push hook passes
 - [ ] No gitignored files tracked (`scripts/list_remote_ignored.py`)
 - [ ] Version bumped in `pyproject.toml`

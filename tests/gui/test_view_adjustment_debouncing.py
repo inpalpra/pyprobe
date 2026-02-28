@@ -10,17 +10,14 @@ from pyprobe.gui.probe_controller import ProbeController
 from unittest.mock import MagicMock
 import pyqtgraph as pg
 
-@pytest.fixture
-def app():
-    return QApplication.instance() or QApplication([])
-
-def test_view_adjustment_debouncing(app):
+def test_view_adjustment_debouncing(qtbot, qapp):
     # Setup
     anchor = ProbeAnchor(file="test.py", line=10, col=1, symbol="var")
     color = QColor("#00ffff")
     recorder = StepRecorder()
     
     panel = ProbePanel(anchor=anchor, color=color, dtype="float64", window_id="w0")
+    qtbot.addWidget(panel)
     
     # Wire recorder
     panel.view_adjusted.connect(
@@ -36,14 +33,17 @@ def test_view_adjustment_debouncing(app):
     
     # Wait for less than debounce interval (500ms)
     time.sleep(0.1)
-    app.processEvents()
+    qapp.processEvents()
     assert len(recorder.steps) == 0
     
     # Wait for remaining debounce interval
     time.sleep(0.5)
-    app.processEvents()
+    qapp.processEvents()
     
     assert len(recorder.steps) == 1
     assert "Adjusted view" in recorder.steps[0].description
     
     recorder.stop()
+    panel.close()
+    panel.deleteLater()
+    qapp.processEvents()

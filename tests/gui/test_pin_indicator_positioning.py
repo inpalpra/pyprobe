@@ -12,13 +12,17 @@ from pyprobe.plots.pin_indicator import PinIndicator, PinButton
 
 
 @pytest.fixture
-def indicator(qapp):
+def indicator(qtbot, qapp):
     """Create a PinIndicator."""
     pi = PinIndicator()
+    qtbot.addWidget(pi)
     pi.resize(600, 400)
     pi.show()
     qapp.processEvents()
-    return pi
+    yield pi
+    pi.close()
+    pi.deleteLater()
+    qapp.processEvents()
 
 
 class TestPinButtonState:

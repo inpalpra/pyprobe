@@ -11,13 +11,17 @@ from pyprobe.core.data_classifier import DTYPE_SCALAR
 
 
 @pytest.fixture
-def scalar_display(qapp, probe_color):
+def scalar_display(qtbot, qapp, probe_color):
     """Create a ScalarDisplayWidget for testing."""
     w = ScalarDisplayWidget("my_value", probe_color)
+    qtbot.addWidget(w)
     w.resize(300, 200)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestScalarDisplayValues:
@@ -81,6 +85,10 @@ class TestScalarDisplayPlugin:
         from pyprobe.plugins.builtins.scalar_history import ScalarHistoryPlugin
         assert ScalarDisplayPlugin().priority < ScalarHistoryPlugin().priority
 
-    def test_create_widget(self, qapp, probe_color):
+    def test_create_widget(self, qtbot, qapp, probe_color):
         w = ScalarDisplayPlugin().create_widget("x", probe_color)
+        qtbot.addWidget(w)
         assert isinstance(w, ScalarDisplayWidget)
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()

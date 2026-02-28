@@ -45,12 +45,16 @@ class TestComplexRIXAxis:
     """Real & Imag downsampling preserves x-axis."""
 
     @pytest.fixture
-    def ri(self, qapp, probe_color):
+    def ri(self, qtbot, qapp, probe_color):
         w = ComplexRIWidget("z", probe_color)
+        qtbot.addWidget(w)
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_short_array_passthrough(self, ri):
         data = np.array([1+2j, 3+4j, 5+6j])
@@ -95,12 +99,16 @@ class TestComplexMAXAxis:
     """Mag & Phase downsampling preserves x-axis."""
 
     @pytest.fixture
-    def ma(self, qapp, probe_color):
+    def ma(self, qtbot, qapp, probe_color):
         w = ComplexMAWidget("z", probe_color)
+        qtbot.addWidget(w)
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_long_array_x_spans_full_range(self, ma):
         N = 16000
@@ -126,12 +134,16 @@ class TestSingleCurveXAxis:
     """SingleCurveWidget (Log Mag, Lin Mag, Phase) downsampling."""
 
     @pytest.fixture
-    def single(self, qapp, probe_color):
+    def single(self, qtbot, qapp, probe_color):
         w = SingleCurveWidget("z", probe_color, "Test")
+        qtbot.addWidget(w)
         w.resize(600, 400)
         w.show()
         qapp.processEvents()
-        return w
+        yield w
+        w.close()
+        w.deleteLater()
+        qapp.processEvents()
 
     def test_long_array_x_spans_full_range(self, single):
         N = 16000

@@ -15,12 +15,16 @@ from pyprobe.core.data_classifier import DTYPE_ARRAY_1D
 
 
 @pytest.fixture
-def waveform(qapp, probe_color):
+def waveform(qtbot, qapp, probe_color):
     w = WaveformWidget("test_signal", probe_color)
+    qtbot.addWidget(w)
     w.resize(600, 400)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 
 class TestResetZoomBehavior:

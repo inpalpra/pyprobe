@@ -14,13 +14,18 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 from pyprobe.plugins.builtins.waveform import WaveformWidget
+from PyQt6.QtGui import QColor
 
 @pytest.fixture
-def widget(qapp):
-    w = WaveformWidget("test", "blue")
+def widget(qtbot, qapp):
+    w = WaveformWidget("test", QColor("blue"))
+    qtbot.addWidget(w)
     w.show()
     qapp.processEvents()
-    return w
+    yield w
+    w.close()
+    w.deleteLater()
+    qapp.processEvents()
 
 def test_mute_button_hides_curve(widget, qapp):
     # 1. Setup data
@@ -39,7 +44,7 @@ def test_mute_button_hides_curve(widget, qapp):
 
 **Run Test:**
 ```bash
-uv run pytest tests/gui/test_waveform_mute.py
+QT_QPA_PLATFORM=offscreen ./.venv/bin/python -m pytest tests/gui/test_waveform_mute.py
 # Result: AttributeError: 'WaveformWidget' object has no attribute 'set_muted'
 ```
 
@@ -56,7 +61,7 @@ class WaveformWidget(BasePlotWidget):
 
 **Run Test:**
 ```bash
-uv run pytest tests/gui/test_waveform_mute.py
+QT_QPA_PLATFORM=offscreen ./.venv/bin/python -m pytest tests/gui/test_waveform_mute.py
 # Result: 1 passed
 ```
 
