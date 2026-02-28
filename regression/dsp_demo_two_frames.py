@@ -88,7 +88,7 @@ def main():
         peak_to_avg = np.max(np.abs(received_symbols)) / np.mean(np.abs(received_symbols))
 
         # Short delay
-        time.sleep(0.1)
+        time.sleep(0.01)
 
     # Write expected values to JSON for test verification
     with open('/tmp/dsp_demo_two_frames_expected.json', 'w') as f:

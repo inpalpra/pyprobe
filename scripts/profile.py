@@ -277,7 +277,7 @@ def main():
     parser.add_argument(
         "target",
         nargs="?",
-        default=str(PROJECT_ROOT / "tests" / "gui"),
+        default=str(PROJECT_ROOT / "tests"),
         help="Test path",
     )
 
