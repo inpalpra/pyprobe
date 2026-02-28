@@ -1397,7 +1397,7 @@ class WaveformFftMagAnglePlugin(ProbePlugin):
     
     name = "FFT Mag & Phase"
     icon = "activity"
-    priority = 110  # Higher than Constellation (100) to ensure it can be default if requested
+    priority = 95  # Below Waveform (100) so plain waveform is default for 1D arrays
     
     def can_handle(self, dtype: str, shape: Optional[Tuple[int, ...]]) -> bool:
         return dtype in (DTYPE_ARRAY_1D, DTYPE_ARRAY_2D, DTYPE_WAVEFORM_REAL, DTYPE_WAVEFORM_COLLECTION, DTYPE_ARRAY_COLLECTION, DTYPE_ARRAY_COMPLEX, DTYPE_WAVEFORM_COMPLEX)

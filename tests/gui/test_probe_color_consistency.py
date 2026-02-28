@@ -91,11 +91,13 @@ def test_color_consistency_overlay(controller, qtbot):
     
     # Find the overlay curve in panel_main's plot
     plot = panel_main._plot
-    overlay_key = f"ov_rhs" # rhs because not an assignment in this mock
     assert hasattr(plot, '_overlay_curves')
-    assert overlay_key in plot._overlay_curves
+    # Key format: "{trace_id}_{symbol}_{lhs|rhs}"
+    ov_trace_id = controller._registry.get_trace_id(anchor_ov) or ""
+    overlay_key = f"{ov_trace_id}_ov_rhs"  # rhs because not an assignment in this mock
+    assert overlay_key in plot._overlay_curves, f"Expected key '{overlay_key}' in {list(plot._overlay_curves.keys())}"
     curve = plot._overlay_curves[overlay_key]
-    
+
     # Check curve color
     actual_color = curve.opts['pen'].color().name()
     expected_color = ov_color.name()
@@ -121,7 +123,9 @@ def test_color_consistency_overlay_after_change(controller, qtbot):
     
     plot = panel_main._plot
     assert hasattr(plot, '_overlay_curves')
-    curve = plot._overlay_curves["ov_rhs"]
+    ov_trace_id = controller._registry.get_trace_id(anchor_ov) or ""
+    overlay_key = f"{ov_trace_id}_ov_rhs"
+    curve = plot._overlay_curves[overlay_key]
     assert curve.opts['pen'].color() == new_color, "Overlay added after color change should use NEW color"
 
 def test_color_consistency_constellation_overlay(controller, qtbot):
@@ -143,7 +147,9 @@ def test_color_consistency_constellation_overlay(controller, qtbot):
     
     plot = panel_main._plot
     assert hasattr(plot, '_overlay_scatters')
-    scatter = plot._overlay_scatters["ov_rhs"]
-    
+    ov_trace_id = controller._registry.get_trace_id(anchor_ov) or ""
+    overlay_key = f"{ov_trace_id}_ov_rhs"
+    scatter = plot._overlay_scatters[overlay_key]
+
     # Check brush color
     assert scatter.opts['brush'].color().name() == ov_color.name(), "Constellation overlay should use probe color"

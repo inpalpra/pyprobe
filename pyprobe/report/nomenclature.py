@@ -14,7 +14,7 @@ def get_trace_components(trace_id: str, lens_name: str) -> tuple[str, ...]:
     if lens_name == "Real & Imag":
         return (f"{trace_id}.real", f"{trace_id}.imag")
     elif lens_name == "Mag & Phase":
-        return (f"{trace_id}.mag_db", f"{trace_id}.phase_rad")
+        return (f"{trace_id}.mag_db", f"{trace_id}.phase_deg")
     elif lens_name in ("FFT Mag & Phase", "FFT Mag (dB)"):
         return (f"{trace_id}.fft_mag_db", f"{trace_id}.fft_angle_deg")
     elif lens_name == "Log Mag (dB)":
