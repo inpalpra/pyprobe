@@ -386,12 +386,12 @@ def _run_all_scenarios(qapp, tmp_path_factory):
     # C6 Pycache
     pyc_dir = tmp_path / "pyc_test"
     pyc_dir.mkdir()
-    _make_py_file(str(pyc_dir), "main.py")
+    main_py_path = _make_py_file(str(pyc_dir), "main.py")
     pyc_inner = pyc_dir / "__pycache__"
     pyc_inner.mkdir()
     (pyc_inner / "main.cpython-312.pyc").write_bytes(b"\x00\x00\x00\x00")
     p_c2.set_root(str(pyc_dir))
-    for _ in range(5): qapp.processEvents()
+    _wait_for(lambda: p_c2._fs_model.index(main_py_path).isValid(), qapp, timeout=5.0)
     visible_files_c6 = []
     def _collect_c6(parent):
         for r in range(p_c2._proxy.rowCount(parent)):

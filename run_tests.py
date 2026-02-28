@@ -168,6 +168,12 @@ def main() -> int:
         help="Extra arguments forwarded verbatim to pytest.",
     )
     args = parser.parse_args()
+    
+    # argparse's REMAINDER will include the literal '--' if the user provided it.
+    # Pytest interprets '--' to mean "stop parsing flags", which breaks things.
+    # We strip it out here so we just pass the raw flags to pytest.
+    if args.pytest_args and args.pytest_args[0] == "--":
+        args.pytest_args = args.pytest_args[1:]
 
     suites = discover_suites(TESTS_DIR)
     if not suites:
