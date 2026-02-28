@@ -1,0 +1,14 @@
+# Tests to skip in the release / pre-push gate.
+# Both .github/workflows/release.yml and .git/hooks/pre-push read this file.
+# One path per line. Blank lines and lines starting with # are ignored.
+
+tests/gui/test_probe_temporal_correctness.py
+tests/gui/test_script_runner_subprocess.py
+tests/gui/test_folder_browsing.py
+tests/test_e2e_capture_pipeline.py
+tests/test_e2e_folder_browsing.py
+tests/test_cli_automation.py
+tests/test_constellation_verify.py
+tests/test_overlay_drag_drop_single_frame.py
+tests/test_overlay_drag_drop_two_frames.py
+tests/ipc/test_socket_channel.py

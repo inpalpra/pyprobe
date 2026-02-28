@@ -9,27 +9,30 @@ PyProbe is an interactive variable-probing debugger for Python DSP development. 
 ## Commands
 
 ```bash
+# create venv if it doesn't exist
+uv venv --python 3.12
+
 # Install dependencies (uses uv with pyproject.toml)
 uv sync
 
 # Run the application
-python -m pyprobe [script.py] [--auto-run] [--auto-quit]
-python -m pyprobe script.py -p "line:symbol:instance" -w "line:symbol"
+./.venv/bin/python -m pyprobe [script.py] [--auto-run] [--auto-quit]
+./.venv/bin/python -m pyprobe script.py -p "line:symbol:instance" -w "line:symbol"
 
 # Run all test suites (core → ipc → gui → top-level)
-python run_tests.py
+./.venv/bin/python run_tests.py
 
 # Run a single suite
-python run_tests.py --suite core
-python run_tests.py --suite gui
-python run_tests.py --suite ipc
-python run_tests.py --suite top-level
+./.venv/bin/python run_tests.py --suite core
+./.venv/bin/python run_tests.py --suite gui
+./.venv/bin/python run_tests.py --suite ipc
+./.venv/bin/python run_tests.py --suite top-level
 
 # Run a single test file
-python -m pytest tests/core/test_tracer.py
+./.venv/bin/python -m pytest tests/core/test_tracer.py
 
 # Run with extra pytest flags
-python run_tests.py -v --failfast
+./.venv/bin/python run_tests.py -v --failfast
 ```
 
 ## Architecture
@@ -70,6 +73,12 @@ PyProbe runs as two processes connected via IPC:
 ## Testing
 
 Tests use `pytest` with `pytest-qt` for GUI tests. Test suites are in `tests/core/`, `tests/ipc/`, `tests/gui/`, and top-level integration tests in `tests/`. The `conftest.py` provides shared fixtures. GUI tests require a display (or virtual framebuffer).
+
+### Pre-push hook
+
+A `.git/hooks/pre-push` hook blocks pushes to `origin/main` unless the release test suite passes locally. It runs the same pytest invocation as the CI `test-wheel` job in `.github/workflows/release.yml`.
+
+Both the hook and CI read the skip list from **`tests/release_skip.txt`** (single source of truth). To add or remove skipped tests, edit that file — both consumers pick it up automatically.
 
 ## Key constraints
 

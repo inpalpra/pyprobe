@@ -3,12 +3,12 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 60,
-      "col": 26,
-      "symbol": "signal_i",
+      "col": 36,
+      "symbol": "signal_q",
       "func": "main",
       "is_assignment": true,
-      "color": "#ee2b2b",
-      "lens": "FFT Mag & Phase",
+      "color": "#9d2bee",
+      "lens": null,
       "markers": {
         "Waveform": [],
         "FFT Mag & Phase": []
@@ -36,12 +36,12 @@
     {
       "file": "/Users/ppal/repos/pyprobe/examples/dsp_demo.py",
       "line": 60,
-      "col": 36,
-      "symbol": "signal_q",
+      "col": 26,
+      "symbol": "signal_i",
       "func": "main",
       "is_assignment": true,
-      "color": "#9d2bee",
-      "lens": null,
+      "color": "#ee2b2b",
+      "lens": "FFT Mag & Phase",
       "markers": {
         "Waveform": [],
         "FFT Mag & Phase": []
