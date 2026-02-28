@@ -69,6 +69,7 @@ def run_pyprobe_with_overlay(
         raise RuntimeError(f"PyProbe failed with code {result.returncode}:\n{output}")
 
     # Parse PLOT_DATA lines from output (each is a single line of JSON)
+    last_valid_data = {}
     for line in output.splitlines():
         if not line.startswith('PLOT_DATA:'):
             continue
@@ -76,9 +77,11 @@ def run_pyprobe_with_overlay(
         try:
             data = json.loads(json_str)
             if 'curves' in data:
-                return data
+                last_valid_data = data
         except json.JSONDecodeError:
             continue
+    if last_valid_data:
+        return last_valid_data
 
     # Fallback: return first parseable PLOT_DATA if none had curves
     for line in output.splitlines():

@@ -62,7 +62,7 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
                 if line.startswith("if __name__ =="):
                     megascript_content += "    if True:\n"
                 else:
-                    megascript_content += "    " + line
+                    megascript_content += "    " + line.rstrip('\r\n') + "\n"
                 current_megascript_line += 1
                 
                 for p_line, symbol, inst in lines_to_probe.get(name, []):
