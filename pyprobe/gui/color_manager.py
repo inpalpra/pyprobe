@@ -29,10 +29,11 @@ class ColorManager:
             color = QColor.fromHslF(hue / 360.0, saturation, lightness)
             colors.append(color)
         return colors
-    
-    PALETTE = _generate_palette.__func__(MAX_PROBES)
 
     def __init__(self):
+        # Per-instance palette so appends in update_color/reserve_color
+        # don't leak across instances (important for test isolation).
+        self.PALETTE = self._generate_palette(self.MAX_PROBES)
         # OrderedDict for LRU tracking: anchor -> color index
         self._assignments: OrderedDict[ProbeAnchor, int] = OrderedDict()
         # Available indices for color recycling (stack)
