@@ -393,18 +393,18 @@ class ProbePanel(QFrame):
         from ..plugins import PluginRegistry
         from PyQt6.QtCore import QTimer
         
-        registry = PluginRegistry.instance()
-        plugin = registry.get_plugin_by_name(plugin_name, getattr(self, '_dtype', None))
-        
-        if not plugin:
-            return
-            
-        # Capture markers before disposing old widget
+        # Capture markers before disposing old widget (must happen before early return)
         if self._plot and hasattr(self._plot, '_marker_store'):
             old_lens = self._current_plugin.name if self._current_plugin else "Unknown"
             self._marker_vault[old_lens] = self._plot._marker_store.get_markers()
             # Dispose old marker store but KEEP the IDs in the global registry
             self._plot._marker_store.dispose(release_ids=False)
+
+        registry = PluginRegistry.instance()
+        plugin = registry.get_plugin_by_name(plugin_name, getattr(self, '_dtype', None))
+        
+        if not plugin:
+            return
 
         # Remove old plot widget
         if self._plot:

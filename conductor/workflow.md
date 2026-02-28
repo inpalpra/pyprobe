@@ -166,9 +166,6 @@ uv run pytest --cov=pyprobe
 
 # Run specific test file
 uv run pytest tests/gui/test_waveform_plot_gui.py
-
-# Run tests excluding E2E (useful for fast iteration)
-uv run pytest -m "not e2e"
 ```
 
 ### Before Committing

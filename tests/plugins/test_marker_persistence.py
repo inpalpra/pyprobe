@@ -28,7 +28,7 @@ def test_markers_preserved_during_switch(qtbot, sample_anchor, probe_color):
     assert len(store.get_markers()) == 1
     
     # 3. Switch to another lens
-    panel._on_lens_changed("FFT Mag (dB) / Angle (deg)")
+    panel._on_lens_changed("FFT Mag & Phase")
     qtbot.wait(50)
     
     # 4. Switch back to Waveform
@@ -52,7 +52,7 @@ def test_markers_unique_ids_across_views(qtbot, sample_anchor, probe_color):
     panel._plot._marker_store.add_marker(0, 10.0, 1.0) # gets m0
     
     # 2. Switch to FFT
-    panel._on_lens_changed("FFT Mag (dB) / Angle (deg)")
+    panel._on_lens_changed("FFT Mag & Phase")
     
     # 3. Add marker to FFT
     m_fft = panel._plot._marker_store.add_marker(0, 5.0, 0.0)

@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.signal as signal
 from typing import Dict, Any
 
 class EquationEngine:
@@ -7,6 +6,10 @@ class EquationEngine:
     Evaluates mathematical expressions on trace data.
     """
     def __init__(self):
+        # Lazy-import scipy.signal to avoid segfault on macOS ARM64
+        # when PyQt6 is loaded before scipy (e.g. under pytest-qt).
+        import scipy.signal as signal
+
         # Restricted global scope for eval
         self.safe_globals = {
             "np": np,

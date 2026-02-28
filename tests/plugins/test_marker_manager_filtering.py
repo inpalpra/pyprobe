@@ -27,7 +27,7 @@ def test_marker_manager_filters_by_active_view(qtbot, sample_anchor, probe_color
     qtbot.waitUntil(lambda: manager.table.rowCount() == 1)
     
     # 3. Switch to FFT
-    panel._on_lens_changed("FFT Mag (dB) / Angle (deg)")
+    panel._on_lens_changed("FFT Mag & Phase")
     
     # 4. Verify MarkerManager table is EMPTY (since Waveform markers are parked)
     qtbot.waitUntil(lambda: manager.table.rowCount() == 0)
@@ -70,7 +70,7 @@ def test_marker_manager_multi_panel_filtering(qtbot, sample_anchor_factory, prob
     qtbot.waitUntil(lambda: manager.table.rowCount() == 2)
     
     # 3. Switch panel1 to FFT
-    panel1._on_lens_changed("FFT Mag (dB) / Angle (deg)")
+    panel1._on_lens_changed("FFT Mag & Phase")
     
     # 4. Verify manager only shows panel2's marker (m1)
     qtbot.waitUntil(lambda: manager.table.rowCount() == 1)
