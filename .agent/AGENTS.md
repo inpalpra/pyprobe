@@ -1,0 +1,1 @@
+Strictly follow the guidelines and instructions in `CLAUDE.md` in the project's root folder.

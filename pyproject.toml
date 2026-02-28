@@ -36,6 +36,9 @@ dependencies = [
     "pytest-xdist>=3.8.0",
     "pytest-forked>=1.6.0",
     "jsonschema>=4.26.0",
+    "pytest-json-report>=1.5.0",
+    "pytest-profiling>=1.8.1",
+    "pytest-html>=4.2.0",
 ]
 
 [project.scripts]

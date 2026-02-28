@@ -31,7 +31,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 
 # Default number of parallel workers (1 = sequential).
 # Override with --parallel N on the command line.
-DEFAULT_PARALLEL = 4
+DEFAULT_PARALLEL = max(os.cpu_count()-4, 1)
 
 # Auto-discover subdirectories containing test files.
 # Any subdir of tests/ with test_*.py files becomes a suite.

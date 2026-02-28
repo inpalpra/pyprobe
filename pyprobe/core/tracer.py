@@ -198,6 +198,14 @@ class VariableTracer:
         self._anchor_watches.pop(anchor, None)
 
     def _trace_func(self, frame, event: str, arg) -> Optional[Callable]:
+        import traceback
+        try:
+            return self._trace_func_impl(frame, event, arg)
+        except Exception as e:
+            print(f"CRITICAL TRACER ERROR: {e}\n{traceback.format_exc()}", file=sys.stderr)
+            return self._trace_func
+
+    def _trace_func_impl(self, frame, event: str, arg) -> Optional[Callable]:
         """
         Trace function with anchor-based matching.
 
