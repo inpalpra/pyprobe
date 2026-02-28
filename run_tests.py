@@ -1,12 +1,15 @@
-#!/usr/bin/env python
+#!./.venv/bin/python
 """
 run_tests.py — Auto-discover and run all pyprobe test suites.
 
 Scans the tests/ directory for test files, groups them by suite
-(core / gui / ipc / top-level), then runs each group with pytest.
+(core / gui / ipc / plots / plugins / report / top-level),
+then runs each group with pytest.
 
 Usage:
-    python run_tests.py                   # run all suites
+    python run_tests.py                   # run all suites (4 workers)
+    python run_tests.py --parallel 1      # run sequentially
+    python run_tests.py -p 8              # 8 parallel workers
     python run_tests.py --suite gui       # run one suite by name
     python run_tests.py --failfast        # stop on first failure
     python run_tests.py --no-header       # skip the pretty header
@@ -24,6 +27,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.resolve()
 TESTS_DIR = REPO_ROOT / "tests"
+
+# Default number of parallel workers (1 = sequential).
+# Override with --parallel N on the command line.
+DEFAULT_PARALLEL = 4
 
 # Auto-discover subdirectories containing test files.
 # Any subdir of tests/ with test_*.py files becomes a suite.
@@ -70,6 +77,7 @@ def run_suite(
     files: list[Path],
     extra_args: list[str],
     failfast: bool,
+    parallel: int = 1,
 ) -> tuple[int, float]:
     """
     Run pytest on a list of files.
@@ -78,6 +86,8 @@ def run_suite(
     """
     cmd = [sys.executable, "-m", "pytest"]
     cmd += [str(f) for f in files]
+    if parallel > 1:
+        cmd += ["-n", str(parallel), "--forked", "--dist=loadfile"]
     cmd += extra_args
     if failfast:
         cmd.append("-x")
@@ -131,6 +141,13 @@ def main() -> int:
         action="store_true",
         help="Skip the discovery summary header.",
     )
+    parser.add_argument(
+        "--parallel", "-p",
+        type=int,
+        default=DEFAULT_PARALLEL,
+        metavar="N",
+        help=f"Number of parallel workers (default: {DEFAULT_PARALLEL}). Use 1 for sequential.",
+    )
     # Collect any extra flags (e.g. -v, --tb=short) and forward to pytest.
     parser.add_argument(
         "pytest_args",
@@ -154,7 +171,8 @@ def main() -> int:
 
     if not args.no_header:
         total_files = sum(len(v) for v in suites.values())
-        banner(f"pyprobe test runner — {len(suites)} suite(s), {total_files} file(s)")
+        mode = f"{args.parallel} workers" if args.parallel > 1 else "sequential"
+        banner(f"pyprobe test runner — {len(suites)} suite(s), {total_files} file(s), {mode}")
         for suite_name, files in suites.items():
             print(f"  {YELLOW}{suite_name}{RESET}  ({len(files)} file(s))")
             for f in files:
@@ -166,7 +184,7 @@ def main() -> int:
 
     for suite_name, files in suites.items():
         banner(f"Suite: {suite_name}")
-        rc, elapsed = run_suite(suite_name, files, args.pytest_args, args.failfast)
+        rc, elapsed = run_suite(suite_name, files, args.pytest_args, args.failfast, args.parallel)
         results.append((suite_name, rc, elapsed))
         if rc != 0:
             overall_rc = rc
