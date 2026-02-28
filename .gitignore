@@ -6,3 +6,4 @@ dist/
 **/bin_test/
 .gemini/
 gha-creds-*.json
+tmp/
