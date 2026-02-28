@@ -68,3 +68,8 @@ include = ["pyprobe*"]
 [tool.uv.sources]
 pyplan = { git = "https://github.com/inpalpra/pyplan.git", rev = "main" }
 rfutil = { git = "https://github.com/inpalpra/rfutil" }
+
+[tool.pytest.ini_options]
+markers = [
+    "performance: performance-sensitive tests"
+]
