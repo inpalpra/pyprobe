@@ -28,49 +28,46 @@ def runner(temp_script):
     runner.use_legacy_ipc = False
     return runner
 
-def test_start_launches_subprocess(runner):
+def test_script_runner_lifecycle_fast(runner):
+    # This requires the MessageHandler or something to verify,
+    # but we can just test that the runner doesn't crash when starting with anchors.
+    from pyprobe.core.anchor import ProbeAnchor
+    runner.configure(script_path=runner._script_path, get_active_anchors=lambda: [
+        ProbeAnchor(file="test.py", line=2, col=0, symbol="x")
+    ])
+    
     runner.start()
     
+    # 1. test_start_launches_subprocess
     # Check that self._ipc is a SocketIPCChannel
     assert isinstance(runner._ipc, SocketIPCChannel)
     
     # Check that self._runner_process is a Popen, not mp.Process
     assert isinstance(runner._runner_process, subprocess.Popen)
-    assert runner._runner_process.poll() is None  # Process is running
-    
-    runner.stop()
+    proc = runner._runner_process
+    assert proc.poll() is None  # Process is running
 
-def test_start_tracer_connects(runner, temp_script):
-    runner.start()
-    
+    # 2. test_start_tracer_connects
     # Wait for tracer to connect to the socket
     connected = runner._ipc.wait_for_connection(timeout=2.0)
     assert connected is True, "Tracer did not connect to the GUI socket"
-    
-    runner.stop()
 
-def test_stop_terminates_subprocess(runner):
-    runner.start()
-    proc = runner._runner_process
+    # 3. test_probe_commands_reach_tracer
+    # If it connected and didn't crash, the command was sent successfully
+    time.sleep(0.5)
     assert proc.poll() is None
     
+    # 4. test_stop_terminates_subprocess & test_stop_cleanup_no_leak
     runner.stop()
     
     # Process should be terminated
     assert proc.poll() is not None
-
-def test_stop_cleanup_no_leak(runner):
-    runner.start()
-    proc = runner._runner_process
-    ipc = runner._ipc
-    
-    runner.stop()
     
     # Ensure runner state is cleaned up
     assert runner._runner_process is None
     assert runner._ipc is None
 
-def test_legacy_mode_still_works(temp_script):
+def test_legacy_mode_lifecycle_fast(temp_script):
     runner = ScriptRunner()
     runner.configure(script_path=temp_script, get_active_anchors=lambda: [])
     runner.use_legacy_ipc = True
@@ -80,23 +77,11 @@ def test_legacy_mode_still_works(temp_script):
     # Should use old mp.Process and IPCChannel
     assert isinstance(runner._ipc, IPCChannel)
     assert isinstance(runner._runner_process, mp.Process)
-    assert runner._runner_process.is_alive()
+    proc = runner._runner_process
+    assert proc.is_alive()
     
     runner.stop()
-
-def test_probe_commands_reach_tracer(runner):
-    # This requires the MessageHandler or something to verify,
-    # but we can just test that the runner doesn't crash when starting with anchors.
-    from pyprobe.core.anchor import ProbeAnchor
-    runner.configure(script_path=runner._script_path, get_active_anchors=lambda: [
-        ProbeAnchor(file="test.py", line=2, col=0, symbol="x")
-    ])
     
-    runner.start()
-    assert runner._ipc.wait_for_connection(timeout=2.0)
-    
-    # If it connected and didn't crash, the command was sent successfully
-    time.sleep(0.5)
-    assert runner._runner_process.poll() is None
-    
-    runner.stop()
+    assert not proc.is_alive()
+    assert runner._runner_process is None
+    assert runner._ipc is None

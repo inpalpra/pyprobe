@@ -14,18 +14,34 @@ from pyprobe.core.data_classifier import (
 )
 
 
-@pytest.fixture
-def waveform(qtbot, qapp, probe_color):
+@pytest.fixture(scope="module")
+def waveform(qapp):
     """Create a WaveformWidget for testing."""
-    w = WaveformWidget("test_signal", probe_color)
-    qtbot.addWidget(w)
+    w = WaveformWidget("test_signal", QColor("#00ffff"))
     w.resize(600, 400)
     w.show()
     qapp.processEvents()
+    
+    # Wrap update_data to process events automatically and guarantee visual rendering cycle
+    original_update = w.update_data
+    def _update_with_events(*args, **kwargs):
+        original_update(*args, **kwargs)
+        if qapp:
+            qapp.processEvents()
+    w.update_data = _update_with_events
+    
     yield w
+    
+    w.update_data = original_update
     w.close()
     w.deleteLater()
     qapp.processEvents()
+
+
+class TestInitialState:
+    def test_stats_initial_state(self, waveform):
+        """Stats label shows placeholder before data."""
+        assert "--" in waveform._stats_label.text()
 
 
 class TestWaveform1DData:
@@ -104,9 +120,7 @@ class TestWaveformLabels:
         assert "10" in text
         assert "6" in text
 
-    def test_stats_initial_state(self, waveform):
-        """Stats label shows placeholder before data."""
-        assert "--" in waveform._stats_label.text()
+        assert "6" in text
 
 
 class TestWaveformDownsampling:
