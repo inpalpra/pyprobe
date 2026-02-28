@@ -1,11 +1,22 @@
-#!/Users/ppal/repos/pyprobe/.venv/bin/python
+#!./.venv/bin/python
 """
 Profile GUI tests and generate HTML performance report.
 
 Uses pytest-json-report.
-Outputs:
+Outputs in tmp/:
 - gui_profile.json
-- gui_profile.html
+- gui_profile_<run_id>[_headless].html
+- gui_profile_aggregated_<run_id>[_headless].html
+
+Usage Examples:
+    # Run all tests in 'tests' directory
+    ./scripts/profile.py
+    
+    # Run tests in a specific file
+    ./scripts/profile.py tests/gui/test_probe_temporal_fast.py
+    
+    # Run tests in headless mode
+    ./scripts/profile.py tests/gui/test_folder_browsing_fast.py --headless
 """
 
 import json

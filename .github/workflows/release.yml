@@ -183,7 +183,7 @@ jobs:
         run: |
           IGNORES=$(grep -v '^#' tests/release_skip.txt | grep -v '^$' | sed 's/^/--ignore=/' | tr '\n' ' ')
           xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest tests/ -v --tb=short $IGNORES
+            /tmp/test-env/bin/python -m pytest tests/ -n auto --dist=loadfile -v --tb=short $IGNORES
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
@@ -254,4 +254,4 @@ jobs:
         run: |
           IGNORES=$(grep -v '^#' tests/release_skip.txt | grep -v '^$' | sed 's/^/--ignore=/' | tr '\n' ' ')
           xvfb-run --auto-servernum \
-            /tmp/verify-env/bin/python -m pytest tests/ -v --tb=short $IGNORES
+            /tmp/verify-env/bin/python -m pytest tests/ -n auto --dist=loadfile -v --tb=short $IGNORES
