@@ -42,7 +42,7 @@ def _close_panel(panel):
     for child in panel.findChildren(QPushButton):
         if child.text() == "\u00d7":
             QTest.mouseClick(child, Qt.MouseButton.LeftButton)
-            QTest.qWait(20)
+            QTest.qWait(10)
             return
     raise RuntimeError("Close button not found on panel")
 
