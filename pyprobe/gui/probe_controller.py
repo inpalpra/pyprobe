@@ -282,7 +282,9 @@ class ProbeController(QObject):
             # Use explicit lens_name if provided, otherwise check stored metadata
             lens_to_apply = lens_name or self._probe_metadata[anchor].get('lens')
             if lens_to_apply:
-                dropdown.set_lens(lens_to_apply)
+                if not dropdown.set_lens(lens_to_apply):
+                    # Dropdown has no compatible plugins yet (no data); defer
+                    panel._pending_lens = lens_to_apply
         
         # Connect color changed signal
         panel.color_changed.connect(self._on_probe_color_changed)
@@ -676,8 +678,9 @@ class ProbeController(QObject):
                 # Add overlay data to the waveform or constellation plot
                 from pyprobe.plugins.builtins.waveform import WaveformWidget
                 from pyprobe.plugins.builtins.complex_plots import ComplexWidget
+                from pyprobe.plugins.builtins.constellation import ConstellationWidget
 
-                if plot is None or not isinstance(plot, (WaveformWidget, ComplexWidget)):
+                if plot is None or not isinstance(plot, (WaveformWidget, ComplexWidget, ConstellationWidget)):
                     # Buffer for later: plot widget not created yet or is still a
                     # placeholder type (e.g. ScalarHistoryChart) that will be replaced
                     # once the primary signal's data arrives and determines the final type.
@@ -697,9 +700,17 @@ class ProbeController(QObject):
                 # Use unique key that includes is_assignment to distinguish LHS/RHS
                 overlay_key = f"{anchor.symbol}_{'lhs' if anchor.is_assignment else 'rhs'}"
 
-                from pyprobe.plugins.builtins.waveform import WaveformWidget
-                from pyprobe.plugins.builtins.complex_plots import ComplexWidget
-                if isinstance(plot, (WaveformWidget, ComplexWidget)):
+                if isinstance(plot, ConstellationWidget):
+                    self._add_overlay_to_constellation(
+                        plot,
+                        matching_overlay,
+                        payload['value'],
+                        payload['dtype'],
+                        payload.get('shape'),
+                        primary_anchor=panel._anchor,
+                        target_panel=panel
+                    )
+                elif isinstance(plot, (WaveformWidget, ComplexWidget)):
                     self._add_overlay_to_waveform(
                         plot,
                         matching_overlay,
@@ -709,10 +720,6 @@ class ProbeController(QObject):
                         primary_anchor=panel._anchor,
                         target_panel=panel
                     )
-                else:
-                    # Fallback for other types (e.g. pure ConstellationWidget if it existed separately)
-                    # currently ConstellationWidget IS a ComplexWidget.
-                    pass
     
     def flush_pending_overlays(self):
         """
@@ -1101,9 +1108,6 @@ class ProbeController(QObject):
             if anchor not in plot._overlay_scatters_by_anchor:
                 plot._overlay_scatters_by_anchor[anchor] = []
             plot._overlay_scatters_by_anchor[anchor].append(scatter)
-
-            ensure_legend()
-            plot._legend.addItem(scatter, f"{trace_id}: {symbol}")
 
             ensure_legend()
             plot._legend.addItem(scatter, f"{trace_id}: {symbol}")

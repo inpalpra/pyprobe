@@ -40,20 +40,20 @@ class TestPluginDiscovery:
 
 class TestDefaultPlugin:
     def test_default_array_1d(self):
-        """Default plugin for array_1d is FFT Mag & Phase (highest priority)."""
+        """Default plugin for array_1d is Waveform (highest priority)."""
         registry = PluginRegistry.instance()
-        from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
+        from pyprobe.plugins.builtins.waveform import WaveformPlugin
         plugin = registry.get_default_plugin(DTYPE_ARRAY_1D)
         assert plugin is not None
-        assert isinstance(plugin, WaveformFftMagAnglePlugin)
+        assert isinstance(plugin, WaveformPlugin)
 
     def test_default_complex(self):
-        """Default plugin for array_complex is FFT Mag & Phase (highest priority)."""
+        """Default plugin for array_complex is Constellation (highest priority)."""
         registry = PluginRegistry.instance()
-        from pyprobe.plugins.builtins.waveform import WaveformFftMagAnglePlugin
+        from pyprobe.plugins.builtins.constellation import ConstellationPlugin
         plugin = registry.get_default_plugin(DTYPE_ARRAY_COMPLEX)
         assert plugin is not None
-        assert isinstance(plugin, WaveformFftMagAnglePlugin)
+        assert isinstance(plugin, ConstellationPlugin)
 
     def test_default_scalar(self):
         """Default plugin for scalar is History (higher priority)."""

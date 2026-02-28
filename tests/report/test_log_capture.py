@@ -1,3 +1,4 @@
+import os
 import stat
 import pytest
 from pathlib import Path
@@ -61,6 +62,7 @@ def test_log_capture_missing_file_returns_none():
     assert snapshot is None
 
 
+@pytest.mark.skipif(os.getuid() == 0, reason="root can read any file regardless of permissions")
 def test_log_capture_does_not_raise_on_permission_error(tmp_path):
     """Unreadable file returns None gracefully; PermissionError is not propagated."""
     locked = tmp_path / "locked.log"

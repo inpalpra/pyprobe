@@ -153,6 +153,7 @@ class ProbePanel(QFrame):
 
         self._marker_vault = {}  # lens_name -> list[MarkerData]
         self._is_closing = False
+        self._pending_lens: Optional[str] = None  # Deferred lens preference
 
         self._setup_ui()
 
@@ -320,7 +321,12 @@ class ProbePanel(QFrame):
         # Update dropdown if dtype changed
         if self._lens_dropdown is not None and (prev_dtype != dtype):
             self._lens_dropdown.update_for_dtype(dtype, shape)
-            
+
+            # Apply deferred lens preference if set (e.g. from add_probe with lens_name)
+            if self._pending_lens:
+                self._lens_dropdown.set_lens(self._pending_lens)
+                self._pending_lens = None
+
             # Since signals were blocked in dropdown update, check if we need to switch
             current_lens_name = self._lens_dropdown.currentText()
             
