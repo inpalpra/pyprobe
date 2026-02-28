@@ -1,0 +1,55 @@
+name: Test Only
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Linux display dependencies (for Qt/GUI tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libglib2.0-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
+            libxcb-xkb1 libxkbcommon-x11-0 \
+            xvfb
+
+      - name: Install isolated venv with uv
+        run: |
+          uv venv /tmp/test-env
+          uv pip install --python /tmp/test-env .
+          uv pip install --python /tmp/test-env pytest pytest-qt pytest-xdist pytest-forked
+
+      - name: Run wheel-safe test suite
+        run: |
+          xvfb-run --auto-servernum \
+            /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
+              --ignore=tests/gui/test_probe_temporal_correctness.py \
+              --ignore=tests/gui/test_script_runner_subprocess.py \
+              --ignore=tests/gui/test_folder_browsing.py \
+              --ignore=tests/test_e2e_capture_pipeline.py \
+              --ignore=tests/test_e2e_folder_browsing.py \
+              --ignore=tests/test_cli_automation.py \
+              --ignore=tests/test_constellation_verify.py \
+              --ignore=tests/test_overlay_drag_drop_single_frame.py \
+              --ignore=tests/test_overlay_drag_drop_two_frames.py \
+              --ignore=tests/ipc/test_socket_channel.py
