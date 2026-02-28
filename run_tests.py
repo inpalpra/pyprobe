@@ -7,7 +7,8 @@ Scans the tests/ directory for test files, groups them by suite
 then runs each group with pytest.
 
 Usage:
-    python run_tests.py                   # run all suites (4 workers)
+    python run_tests.py                   # run all suites (4 workers, offscreen)
+    python run_tests.py --show-gui        # show Qt windows during tests
     python run_tests.py --parallel 1      # run sequentially
     python run_tests.py -p 8              # 8 parallel workers
     python run_tests.py --suite gui       # run one suite by name
@@ -78,6 +79,7 @@ def run_suite(
     extra_args: list[str],
     failfast: bool,
     parallel: int = 1,
+    show_gui: bool = False,
 ) -> tuple[int, float]:
     """
     Run pytest on a list of files.
@@ -87,13 +89,19 @@ def run_suite(
     cmd = [sys.executable, "-m", "pytest"]
     cmd += [str(f) for f in files]
     if parallel > 1:
-        cmd += ["-n", str(parallel), "--forked", "--dist=loadfile"]
+        cmd += ["-n", str(parallel), "--dist=loadfile"]
     cmd += extra_args
     if failfast:
         cmd.append("-x")
 
+    # By default, run Qt offscreen so windows don't steal focus.
+    # Use --show-gui to see actual windows.
+    env = os.environ.copy()
+    if not show_gui and "QT_QPA_PLATFORM" not in os.environ:
+        env["QT_QPA_PLATFORM"] = "offscreen"
+
     t0 = time.perf_counter()
-    result = subprocess.run(cmd, cwd=REPO_ROOT)
+    result = subprocess.run(cmd, cwd=REPO_ROOT, env=env)
     elapsed = time.perf_counter() - t0
 
     return result.returncode, elapsed
@@ -148,6 +156,11 @@ def main() -> int:
         metavar="N",
         help=f"Number of parallel workers (default: {DEFAULT_PARALLEL}). Use 1 for sequential.",
     )
+    parser.add_argument(
+        "--show-gui",
+        action="store_true",
+        help="Show Qt windows during tests (default: offscreen).",
+    )
     # Collect any extra flags (e.g. -v, --tb=short) and forward to pytest.
     parser.add_argument(
         "pytest_args",
@@ -184,7 +197,7 @@ def main() -> int:
 
     for suite_name, files in suites.items():
         banner(f"Suite: {suite_name}")
-        rc, elapsed = run_suite(suite_name, files, args.pytest_args, args.failfast, args.parallel)
+        rc, elapsed = run_suite(suite_name, files, args.pytest_args, args.failfast, args.parallel, args.show_gui)
         results.append((suite_name, rc, elapsed))
         if rc != 0:
             overall_rc = rc
