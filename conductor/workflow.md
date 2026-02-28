@@ -32,11 +32,11 @@ All tasks follow a strict lifecycle:
    - With the safety of passing tests, refactor the implementation code and the test code to improve clarity, remove duplication, and enhance performance without changing the external behavior.
    - Rerun tests to ensure they still pass after refactoring.
 
-6. **Verify Coverage:** Run coverage reports using the project's chosen tools. For example, in a Python project, this might look like:
+6. **Verify Coverage:** Run coverage reports:
    ```bash
-   pytest --cov=app --cov-report=html
+   uv run pytest --cov=pyprobe --cov-report=html
    ```
-   Target: >80% coverage for new code. The specific tools and commands will vary by language and framework.
+   Target: >80% coverage for new code.
 
 7. **Document Deviations:** If implementation differs from tech stack:
    - **STOP** implementation
@@ -82,7 +82,7 @@ All tasks follow a strict lifecycle:
 
 3.  **Execute Automated Tests with Proactive Debugging:**
     -   Before execution, you **must** announce the exact shell command you will use to run the tests.
-    -   **Example Announcement:** "I will now run the automated test suite to verify the phase. **Command:** `CI=true npm test`"
+    -   **Example Announcement:** "I will now run the automated test suite to verify the phase. **Command:** `uv run pytest`"
     -   Execute the announced command.
     -   If tests fail, you **must** inform the user and begin debugging. You may attempt to propose a fix a **maximum of two times**. If the tests still fail after your second proposed fix, you **must stop**, report the persistent failure, and ask the user for guidance.
 
@@ -91,24 +91,23 @@ All tasks follow a strict lifecycle:
     -   You **must** generate a step-by-step plan that walks the user through the verification process, including any necessary commands and specific, expected outcomes.
     -   The plan you present to the user **must** follow this format:
 
-        **For a Frontend Change:**
+        **Example for a GUI Change:**
         ```
         The automated tests have passed. For manual verification, please follow these steps:
 
         **Manual Verification Steps:**
-        1.  **Start the development server with the command:** `npm run dev`
-        2.  **Open your browser to:** `http://localhost:3000`
-        3.  **Confirm that you see:** The new user profile page, with the user's name and email displayed correctly.
+        1.  **Launch PyProbe:** `uv run pyprobe`
+        2.  **Open a test script:** Load one of the regression scripts from `regression/`
+        3.  **Confirm that you see:** The expected plot rendering, marker behavior, or UI change.
         ```
 
-        **For a Backend Change:**
+        **Example for a Core/IPC Change:**
         ```
         The automated tests have passed. For manual verification, please follow these steps:
 
         **Manual Verification Steps:**
-        1.  **Ensure the server is running.**
-        2.  **Execute the following command in your terminal:** `curl -X POST http://localhost:8080/api/v1/users -d '{"name": "test"}'`
-        3.  **Confirm that you receive:** A JSON response with a status of `201 Created`.
+        1.  **Run a regression script:** `uv run python regression/<script>.py`
+        2.  **Confirm that:** PyProbe launches, receives data, and displays plots correctly.
         ```
 
 5.  **Await Explicit User Feedback:**
@@ -144,7 +143,7 @@ Before marking any task complete, verify:
 - [ ] All public functions/methods are documented (e.g., docstrings, JSDoc, GoDoc)
 - [ ] Type safety is enforced (e.g., type hints, TypeScript types, Go types)
 - [ ] No linting or static analysis errors (using the project's configured tools)
-- [ ] Works correctly on mobile (if applicable)
+- [ ] Works correctly in the desktop GUI
 - [ ] Documentation updated if needed
 - [ ] No security vulnerabilities introduced
 
@@ -183,17 +182,16 @@ uv run pytest && uv run ruff check .
 - Test both success and failure cases.
 
 ### Integration Testing
-- Test complete user flows
-- Verify database transactions
-- Test authentication and authorization
-- Check form submissions
+- Test complete user flows (probe lifecycle, lens switching, overlay)
+- Verify IPC message roundtrips between runner and GUI
+- Test plugin registry and widget creation
+- Check marker persistence across lens switches
 
-### Mobile Testing
-- Test on actual iPhone when possible
-- Use Safari developer tools
-- Test touch interactions
-- Verify responsive layouts
-- Check performance on 3G/4G
+### GUI Testing
+- Use `pytest-qt` with `qtbot` for widget testing
+- Test with `--forked` flag if tests interfere with each other
+- Verify plot rendering with pyqtgraph ViewBox assertions
+- Check theme application across all widgets
 
 ## Code Review Process
 
@@ -217,21 +215,19 @@ Before requesting review:
    - Coverage adequate (>80%)
 
 4. **Security**
-   - No hardcoded secrets
-   - Input validation present
-   - SQL injection prevented
-   - XSS protection in place
+   - No hardcoded secrets or file paths
+   - Input validation on IPC messages
+   - Safe deserialization of probe data
 
 5. **Performance**
-   - Database queries optimized
-   - Images optimized
-   - Caching implemented where needed
+   - Plot update throttling for high-frequency data
+   - No unnecessary widget rebuilds
+   - Memory-efficient buffer management
 
-6. **Mobile Experience**
-   - Touch targets adequate (44x44px)
-   - Text readable without zooming
-   - Performance acceptable on mobile
-   - Interactions feel native
+6. **Desktop UX**
+   - Keyboard shortcuts documented and working
+   - Theme consistency across all widgets
+   - Proper Qt cleanup (no leaked signals/slots)
 
 ## Commit Guidelines
 
@@ -270,60 +266,49 @@ A task is complete when:
 3. Code coverage meets project requirements
 4. Documentation complete (if applicable)
 5. Code passes all configured linting and static analysis checks
-6. Works beautifully on mobile (if applicable)
+6. Works correctly in the desktop GUI
 7. Implementation notes added to `plan.md`
 8. Changes committed with proper message
 9. Git note with task summary attached to the commit
 
 ## Emergency Procedures
 
-### Critical Bug in Production
+### Critical Bug in Release
 1. Create hotfix branch from main
 2. Write failing test for bug
 3. Implement minimal fix
-4. Test thoroughly including mobile
-5. Deploy immediately
+4. Run full test suite (`uv run pytest`)
+5. Push and let CI verify
 6. Document in plan.md
 
-### Data Loss
-1. Stop all write operations
-2. Restore from latest backup
-3. Verify data integrity
-4. Document incident
-5. Update backup procedures
+### Segfault or Crash
+1. Clear stale bytecache: `find . -name __pycache__ -not -path '*/.venv/*' -exec rm -rf {} +`
+2. Check for native library conflicts (scipy vs PyQt6 import order)
+3. Run with `--forked` to isolate: `uv run pytest --forked`
+4. Check stderr (stdout is captured by IPC transport)
+5. Document root cause in CLAUDE.md
 
-### Security Breach
-1. Rotate all secrets immediately
-2. Review access logs
-3. Patch vulnerability
-4. Notify affected users (if any)
-5. Document and update security procedures
+## Release Workflow
 
-## Deployment Workflow
-
-### Pre-Deployment Checklist
-- [ ] All tests passing
+### Pre-Release Checklist
+- [ ] All tests passing (`uv run pytest`)
 - [ ] Coverage >80%
-- [ ] No linting errors
-- [ ] Mobile testing complete
-- [ ] Environment variables configured
-- [ ] Database migrations ready
-- [ ] Backup created
+- [ ] No linting errors (`uv run ruff check .`)
+- [ ] Pre-push hook passes
+- [ ] No gitignored files tracked (`scripts/list_remote_ignored.py`)
+- [ ] Version bumped in `pyproject.toml`
 
-### Deployment Steps
+### Release Steps
 1. Merge feature branch to main
-2. Tag release with version
-3. Push to deployment service
-4. Run database migrations
-5. Verify deployment
-6. Test critical paths
-7. Monitor for errors
+2. Tag release with version (`git tag vX.Y.Z`)
+3. Push tags (`git push --tags`)
+4. CI builds and publishes wheel (`.github/workflows/release.yml`)
+5. Verify package installs cleanly: `pip install pyprobe==X.Y.Z`
 
-### Post-Deployment
-1. Monitor analytics
-2. Check error logs
-3. Gather user feedback
-4. Plan next iteration
+### Post-Release
+1. Run regression scripts against installed package
+2. Check GitHub Actions logs for warnings
+3. Plan next iteration
 
 ## Continuous Improvement
 
