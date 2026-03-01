@@ -181,6 +181,9 @@ jobs:
 
       - name: Run wheel-safe test suite
         run: |
+          # Slow subprocess-based tests are ignored here; their _fast variants
+          # (megascript pattern) are collected and run automatically.
+          # Keep this list in sync with test-only.yml.
           xvfb-run --auto-servernum \
             /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
               --ignore=tests/gui/test_probe_temporal_correctness.py \

@@ -71,7 +71,8 @@ jobs:
                 ${{ github.event.inputs.test_pattern }} \
                 ${{ github.event.inputs.extra_args }}
           else
-            # Full suite (same ignores as release.yml)
+            # Full suite — slow subprocess tests ignored; their _fast variants run.
+            # Keep this list in sync with release.yml.
             xvfb-run --auto-servernum \
               /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
                 --ignore=tests/gui/test_probe_temporal_correctness.py \
