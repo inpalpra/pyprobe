@@ -123,7 +123,6 @@ class VariableTracer:
                 if flushed:
                     self._send_record_batch(flushed)
             except Exception as e:
-                import sys
                 print(f"[TRACER] Warn: Failed to flush pending captures on stop: {e}", file=sys.stderr)
 
         self._enabled = False

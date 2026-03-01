@@ -39,17 +39,11 @@ jobs:
           uv pip install --python /tmp/test-env .
           uv pip install --python /tmp/test-env pytest pytest-qt pytest-xdist pytest-forked
 
-      - name: Run wheel-safe test suite
+      - name: Run targeted tests (debug)
         run: |
           xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
-              --ignore=tests/gui/test_probe_temporal_correctness.py \
-              --ignore=tests/gui/test_script_runner_subprocess.py \
-              --ignore=tests/gui/test_folder_browsing.py \
-              --ignore=tests/test_e2e_capture_pipeline.py \
-              --ignore=tests/test_e2e_folder_browsing.py \
-              --ignore=tests/test_cli_automation.py \
-              --ignore=tests/test_constellation_verify.py \
-              --ignore=tests/test_overlay_drag_drop_single_frame.py \
-              --ignore=tests/test_overlay_drag_drop_two_frames.py \
-              --ignore=tests/ipc/test_socket_channel.py
+            /tmp/test-env/bin/python -m pytest -v --tb=long \
+              tests/test_overlay_drag_drop_two_frames_fast.py \
+              tests/test_e2e_capture_pipeline_fast.py \
+              tests/core/test_tracer_capture_records.py \
+              tests/test_capture_pipeline.py
