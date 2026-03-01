@@ -211,7 +211,9 @@ class MessageHandler(QObject):
             return
 
         for _ in range(200):
-            msg = ipc.receive_data(timeout=0)
+            # Using timeout=0.01 gives the queue a tiny window to resolve race conditions
+            # where the script's final flush_all messages arrive slightly behind DATA_SCRIPT_END
+            msg = ipc.receive_data(timeout=0.01)
             if msg is None:
                 break
             if msg.msg_type == MessageType.DATA_SCRIPT_END:

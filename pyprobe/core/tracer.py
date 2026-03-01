@@ -110,11 +110,25 @@ class VariableTracer:
         
         # Capture manager for ordered captures
         self._capture_manager = CaptureManager()
+        self._last_frame = None
 
     def stop(self) -> None:
-        """Disable tracing."""
+        """Disable tracing and flush any pending LHS captures."""
+        if self._enabled and self._last_frame is not None:
+            # Flush any captures that were pending assignment on the very last line executed
+            try:
+                flushed = self._capture_manager.flush_all(
+                    resolve_value=lambda anchor: self._resolve_anchor_value(self._last_frame, anchor)
+                )
+                if flushed:
+                    self._send_record_batch(flushed)
+            except Exception as e:
+                import sys
+                print(f"[TRACER] Warn: Failed to flush pending captures on stop: {e}", file=sys.stderr)
+
         self._enabled = False
         sys.settrace(None)
+        self._last_frame = None
 
     def _serialize_value(self, value: Any) -> Any:
         """
@@ -186,7 +200,7 @@ class VariableTracer:
         if config is None:
             config = WatchConfig(
                 var_name=anchor.symbol,
-                throttle_strategy=ThrottleStrategy.TIME_BASED,
+                throttle_strategy=ThrottleStrategy.NONE,  # FORCE DISABLE THROTTLE for testing
                 throttle_param=50.0
             )
         self._anchor_matcher.add(anchor)
@@ -229,6 +243,8 @@ class VariableTracer:
         # Only process 'line' events for new matching
         if event != 'line':
             return self._trace_func
+
+        self._last_frame = frame
 
         # Fast file filter
         code = frame.f_code

@@ -946,12 +946,13 @@ class ProbeController(QObject):
             
             # Downsample if needed
             if len(data) > plot.MAX_DISPLAY_POINTS:
-                real_data = plot.downsample(real_data)
-                imag_data = plot.downsample(imag_data)
-                x = np.arange(len(real_data))
-            
-            plot._overlay_curves[real_key].setData(x, real_data)
-            plot._overlay_curves[imag_key].setData(x, imag_data)
+                x_real, real_data = plot.downsample(real_data)
+                x_imag, imag_data = plot.downsample(imag_data)
+                plot._overlay_curves[real_key].setData(x_real, real_data)
+                plot._overlay_curves[imag_key].setData(x_imag, imag_data)
+            else:
+                plot._overlay_curves[real_key].setData(x, real_data)
+                plot._overlay_curves[imag_key].setData(x, imag_data)
         else:
             # Single real curve
             if symbol_key not in plot._overlay_curves:

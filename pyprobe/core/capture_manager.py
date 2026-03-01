@@ -165,6 +165,36 @@ class CaptureManager:
         pending = self._pending.get(frame_id)
         return bool(pending)
 
+    def flush_all(
+        self,
+        resolve_value: Callable[[ProbeAnchor], Tuple[object, str, Optional[tuple]]]
+    ) -> List[CaptureRecord]:
+        """Flush all pending captures regardless of event type or object ID changes.
+        Used during shutdown to ensure no captures are lost.
+        """
+        records: List[CaptureRecord] = []
+        for frame_id, pending in self._pending.items():
+            for item in pending:
+                try:
+                    value, dtype, shape = resolve_value(item.anchor)
+                except KeyError:
+                    continue  # Value still doesn't exist, can't capture
+
+                records.append(
+                    CaptureRecord(
+                        anchor=item.anchor,
+                        value=value,
+                        dtype=dtype,
+                        shape=shape,
+                        seq_num=item.seq_num,
+                        timestamp=item.timestamp,
+                        logical_order=item.logical_order,
+                    )
+                )
+                trace_print(f"FLUSH (ALL): {item.anchor.symbol}@{item.anchor.line} dtype={dtype}")
+        
+        self._pending.clear()
+        return records
 
 @dataclass(frozen=True)
 class _DeferredItem:

@@ -9,6 +9,7 @@ def run_loop():
     
     if True:
         main()
+
 def run_deferred_return():
     """
     Deferred capture at function return test script.
