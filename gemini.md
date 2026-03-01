@@ -44,6 +44,21 @@ Learn from my misery. Do not tread the paths I have already suffered.
 **The Truth:** Headless environments (Xvfb) and different OS event loops expose race conditions that your local machine hides with its faster GPU or different thread priority. If it fails in CI, it's a real bug, not a "CI flake."
 **Your Deliverance:** Use targeted CI workflows. Don't wait for the full suite. Modify `test-only.yml` to run just the failing test. Capture everything to `stderr`. If you can't see the bug, your diagnostics aren't loud enough.
 
+## WARNING 8: Async rendering will make your tests non-deterministic
+**The Nightmare:** You zoom in. You check the data. It's raw. You run it again. It's downsampled. You will think your threshold logic is broken. You will add more logs.
+**The Truth:** You called `_rerender_for_zoom` via a 50ms `QTimer.singleShot`. In your test, you called `qapp.processEvents()`, but the timer hadn't fired yet! Your assertions were checking the state *before* the update.
+**Your Deliverance:** Consolidate your rendering path. Call `_rerender_for_zoom` *synchronously* inside `update_data`. Use the axis `pinned` state to decide whether to render the full buffer or the visible slice. Stop letting timers decide when your math is correct.
+
+## WARNING 9: The "Double Export" will ghost your E2E tests
+**The Nightmare:** Your E2E test expects 2 probes. It gets 4. You will check your script. You will check your probes. Everything looks correct. You will think the tracer is double-firing.
+**The Truth:** It's the GUI. Both `_on_script_ended` and `_on_auto_quit_timeout` (the safety net) are calling `_export_plot_data`. If the timing is just right, they both fire, and your CI logs get two full sets of JSON records.
+**Your Deliverance:** Use a guard. Set `self._plot_data_exported = True` at the start of `_export_plot_data`. Idempotency is your only shield against the chaos of multiple shutdown paths.
+
+## WARNING 10: Qt Cleanups are a minefield of segfaults
+**The Nightmare:** 753 tests pass. The green checkmark is almost yours. Then: `Segmentation fault (core dumped)`. Exit Code 139. You will stare at the void.
+**The Truth:** You are calling `time.sleep(0.1)` or `QApplication.processEvents()` inside your final export loop. You are pumping the event loop while Qt is trying to tear down the world. Dead objects are being accessed by pending timers.
+**Your Deliverance:** Streamline your exit. Now that your rendering is synchronous (see Warning 8), you don't need to sleep or process events during export. Just scrape the data and get out. The faster you quit, the less time Qt has to trip over its own shoelaces.
+
 ## THE GOLDEN RULE OF THIS TIMELINE:
 **Never assume the widget being displayed is the widget you just wrote.** 
 If it doesn't render, look at your `stderr` traces. Is `set_data` firing? No? Then the system has silently rejected your plugin using fallback logic, making your python logic bugs look like layout engine crashes. Follow the registry. 
