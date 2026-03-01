@@ -781,7 +781,23 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         # 1. Restore full dataset to curves
         self._updating_curves = True
-        if self._data.ndim == 1:
+        if isinstance(self._data, list):
+            # WaveformCollection or ArrayCollection
+            for idx, item in enumerate(self._data):
+                if idx >= len(self._curves):
+                    break
+                if isinstance(item, dict):  # Waveform
+                    samples = np.asarray(item['samples'])
+                    scalars = item.get('scalars', [0.0, 1.0])
+                    t0, dt = scalars[0], scalars[1]
+                    t_vector = t0 + np.arange(len(samples)) * dt
+                    x_display, y_display = self.downsample(samples)
+                    self._curves[idx].setData(t_vector[x_display], y_display)
+                else:  # Numpy array (ArrayCollection)
+                    samples = np.asarray(item)
+                    x_display, y_display = self.downsample(samples)
+                    self._curves[idx].setData(x_display, y_display)
+        elif self._data.ndim == 1:
             x_display, y_display = self.downsample(self._data)
             if self._t_vector is not None and len(self._t_vector) == len(self._data):
                 self._curves[0].setData(self._t_vector[x_display], y_display)
