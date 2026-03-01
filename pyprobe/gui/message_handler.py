@@ -142,10 +142,14 @@ class MessageHandler(QObject):
             if exit_code is not None:
                 if self._tracer:
                     self._tracer.trace_error(f"Subprocess exited (code={exit_code}) but no DATA_SCRIPT_END received!")
+                
+                # DRAIN THE QUEUE! The script may have finished and called os._exit 
+                # before we could read all its pending messages (like the final frame).
+                self._drain_after_end()
+                
                 # Prevent repeated firing - use cleanup which sets is_running to False
                 self._script_runner.soft_cleanup_for_loop()
-                # Force script_ended if subprocess died
-                self.script_ended.emit()
+                # Note: self.script_ended.emit() is called by _drain_after_end
 
     def _dispatch(self, msg: Message):
         """

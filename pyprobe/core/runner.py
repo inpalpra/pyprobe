@@ -373,7 +373,7 @@ def run_script_subprocess(
     # before we call os._exit(). The feeder thread runs in background and
     # os._exit() terminates immediately, potentially losing queued messages.
     import time
-    time.sleep(0.1)  # 100ms should be enough for the feeder thread
+    time.sleep(0.5)  # 500ms should be enough for the feeder thread even on slow CI
     
     # Cancel join threads to prevent hang on exit
     try:
