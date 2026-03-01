@@ -18,7 +18,7 @@ Goal: Identify every downsampling code path in the codebase, determine which one
     - [x] **CRITICAL:** Confirm that these tests fail with the current codebase.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research & Reproduction' (Protocol in workflow.md)
 
-## Phase 2: Implementation (TDD)
+## Phase 2: Implementation (TDD) [checkpoint: d8acfa5]
 Goal: Fix every downsample code path that violates the `[0, N-1]` invariant, as identified in Phase 1.
 
 - [x] Task: Fix Waveform Plot Downsampling
@@ -32,18 +32,18 @@ Goal: Fix every downsample code path that violates the `[0, N-1]` invariant, as 
 - [x] Task: Verify General Downsampling Integrity
     - [x] Confirm all downsample paths in the codebase now satisfy the `[0, N-1]` rule.
     - [x] All regression tests from Phase 1 pass.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Implementation (TDD)' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Implementation (TDD)' (Protocol in workflow.md)
 
 ## Phase 3: Final Verification & Cleanup
 Goal: Ensure no regressions and confirm the fix in the actual application.
 
-- [ ] Task: Run Full Test Suite
-    - [ ] Run all existing GUI and Core tests to ensure no regressions in axis synchronization or rendering.
-- [ ] Task: Manual Verification with `dsp_demo.py`
-    - [ ] Run `examples/dsp_demo.py`.
-    - [ ] Verify `FFT Mag & Phase` lens shows no truncation (both Magnitude and Phase).
-    - [ ] Verify `Waveform` lens shows no truncation.
-    - [ ] Verify `Constellation` lens shows no truncation.
-    - [ ] Verify zooming in and out on the right edge of any plot consistently shows the last sample.
-    - [ ] Verify "Reset Zoom" (double-click or home button) restores the full data range with no missing segments.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Final Verification & Cleanup' (Protocol in workflow.md)
+- [x] Task: Run Full Test Suite
+    - [x] Run all existing GUI and Core tests to ensure no regressions in axis synchronization or rendering.
+- [x] Task: Manual Verification with `dsp_demo.py`
+    - [x] Run `examples/dsp_demo.py`.
+    - [x] Verify `FFT Mag & Phase` lens shows no truncation (both Magnitude and Phase).
+    - [x] Verify `Waveform` lens shows no truncation.
+    - [x] Verify `Constellation` lens shows no truncation.
+    - [x] Verify zooming in and out on the right edge of any plot consistently shows the last sample.
+    - [x] Verify "Reset Zoom" (double-click or home button) restores the full data range with no missing segments.
+- [~] Task: Conductor - User Manual Verification 'Phase 3: Final Verification & Cleanup' (Protocol in workflow.md)
