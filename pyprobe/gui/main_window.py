@@ -837,7 +837,9 @@ class MainWindow(QMainWindow):
 
     def _force_quit(self):
         """Force quit the application due to timeout."""
+        print("[DIAG-PATH] _force_quit (timeout)", file=sys.stderr)
         logger.info("Auto-quit timeout reached, forcing application exit")
+        self._force_redraw()
         self._export_plot_data()
         sys.stderr.flush()
         sys.stdout.flush()
@@ -1603,6 +1605,7 @@ class MainWindow(QMainWindow):
                 logger.info("Auto-quit requested, closing application")
                 # Delay to allow GUI updates to complete, then export, cleanup, and quit
                 def export_and_quit():
+                    print("[DIAG-PATH] export_and_quit (script_ended)", file=sys.stderr)
                     # DIAGNOSTIC: dump buffer + panel state before export
                     import numpy as np
                     for a, buf in self._redraw_throttler._buffers.items():
