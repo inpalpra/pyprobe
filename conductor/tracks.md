@@ -19,5 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: test_downsample_bug.py::test_zoom_in_shows_raw_data -> Expected ~1000 raw points, got 5000 (downsampling not triggering); test_downsample_bug.py::test_intermediate_zoom_redownsamples -> x starts at 0, expected >= 2000 (zoom range not applied); test_reset_zoom_bug.py::test_reset_view_range_does_not_drift -> View range assertion failure. find root causes and fix them. these failed in test-workflow-fixes branch when test-only github workflow was run. You have access to gh cli tool to run github commands**
+- [x] **Track: test_downsample_bug.py::test_zoom_in_shows_raw_data -> Expected ~1000 raw points, got 5000 (downsampling not triggering); test_downsample_bug.py::test_intermediate_zoom_redownsamples -> x starts at 0, expected >= 2000 (zoom range not applied); test_reset_zoom_bug.py::test_reset_view_range_does_not_drift -> View range assertion failure. find root causes and fix them. these failed in test-workflow-fixes branch when test-only github workflow was run. You have access to gh cli tool to run github commands**
 *Link: [./tracks/fix_downsampling_zoom_reset_20260301/](./tracks/fix_downsampling_zoom_reset_20260301/)*
