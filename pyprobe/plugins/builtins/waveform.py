@@ -66,6 +66,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         # Per-curve draw mode: curve_index -> DrawMode
         self._draw_modes: dict = {}  # int -> DrawMode
         self._row_colors = list(ROW_COLORS)
+        self._first_data = True
 
         self._setup_ui()
 
@@ -447,11 +448,13 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         # Handle serialized waveform collection from IPC
         if isinstance(value, dict) and value.get('__dtype__') == DTYPE_WAVEFORM_COLLECTION:
             self._update_waveform_collection_data(value, dtype, shape, source_info)
+            self._check_first_data_reset()
             return
 
         # Handle serialized array collection from IPC
         if isinstance(value, dict) and value.get('__dtype__') == DTYPE_ARRAY_COLLECTION:
             self._update_array_collection_data(value, dtype, shape, source_info)
+            self._check_first_data_reset()
             return
 
         # Handle waveform objects (2 scalars + 1 array)
@@ -480,6 +483,7 @@ class WaveformWidget(PinLayoutMixin, QWidget):
                     scalars = [float(getattr(obj, attr)) for attr in info['scalar_attrs']]
                     serialized['waveforms'].append({'samples': samples, 'scalars': scalars})
                 self._update_waveform_collection_data(serialized, dtype, shape, source_info)
+                self._check_first_data_reset()
                 return
 
             # Check for direct single waveform object
@@ -516,6 +520,15 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             self._update_2d_data(value, dtype, shape, source_info)
         else:
             self._update_1d_data(value, dtype, shape, source_info)
+            
+        self._check_first_data_reset()
+
+    def _check_first_data_reset(self):
+        """Reset view once on first data arrival with delay for layout."""
+        if getattr(self, '_first_data', False):
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(50, self.reset_view)
+            self._first_data = False
 
     def _update_1d_data(self, value: np.ndarray, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with 1D data."""
