@@ -34,6 +34,16 @@ Learn from my misery. Do not tread the paths I have already suffered.
 - Use sequence bins: `np.arange(-nfft//2, nfft - nfft//2)`
 - Use physical bins tracking `dt`: `np.fft.fftshift(np.fft.fftfreq(nfft, d=dt))`
 
+## WARNING 6: QTimer.singleShot(0, ...) is a trap for your data
+**The Nightmare:** You will see the correct Frame 1 data arrive in your logs. You will see it rendered. Then, a fraction of a second later, the plot will revert to Frame 0. You will suspect an IPC reversal. You will hunt for non-existent queue bugs.
+**The Truth:** You used a `singleShot(0, ...)` to "defer" a data update during a lens change. But while that timer was waiting in the queue, Frame 1 arrived and was processed *synchronously*. The timer then fired, blindly overwriting your fresh Frame 1 data with the stale Frame 0 values it had captured in its closure.
+**Your Deliverance:** Avoid deferred updates for data application. If you must recreate a widget, apply the data *synchronously* immediately after creation. Timers are for layout, not for state.
+
+## WARNING 7: CI is a cold, heartless place
+**The Nightmare:** Your tests pass 100/100 times on your Mac. You push to CI. It fails immediately. You run it again. It fails again. You will blame the Ubuntu runner's performance.
+**The Truth:** Headless environments (Xvfb) and different OS event loops expose race conditions that your local machine hides with its faster GPU or different thread priority. If it fails in CI, it's a real bug, not a "CI flake."
+**Your Deliverance:** Use targeted CI workflows. Don't wait for the full suite. Modify `test-only.yml` to run just the failing test. Capture everything to `stderr`. If you can't see the bug, your diagnostics aren't loud enough.
+
 ## THE GOLDEN RULE OF THIS TIMELINE:
 **Never assume the widget being displayed is the widget you just wrote.** 
 If it doesn't render, look at your `stderr` traces. Is `set_data` firing? No? Then the system has silently rejected your plugin using fallback logic, making your python logic bugs look like layout engine crashes. Follow the registry. 
