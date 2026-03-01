@@ -86,3 +86,5 @@ jobs:
                 --ignore=tests/ipc/test_socket_channel.py \
                 ${{ github.event.inputs.extra_args }}
           fi
+
+

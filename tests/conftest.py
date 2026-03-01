@@ -14,7 +14,34 @@ from pyprobe.core.anchor import ProbeAnchor
 from pyprobe.core.capture_record import CaptureRecord
 
 
-# Replaced by pytest-qt's built-in `qapp` fixture
+@pytest.fixture(scope="session", autouse=True)
+def _qt_cleanup_on_exit():
+    """Ensure clean Qt shutdown to prevent SIGSEGV during pytest teardown.
+
+    Without this, pending QTimers and signals can fire after Python has
+    garbage-collected the widgets they reference, causing segfaults on
+    Linux/Xvfb (especially in CI). This fixture runs after ALL tests
+    and explicitly tears down Qt state before pytest-qt destroys QApplication.
+    """
+    yield  # All tests run here
+
+    app = QApplication.instance()
+    if app is None:
+        return
+
+    # 1. Close all top-level widgets (cancels their child timers)
+    for widget in app.topLevelWidgets():
+        try:
+            widget.close()
+        except RuntimeError:
+            pass  # Already deleted
+
+    # 2. Drain the event loop so deleteLater() calls execute
+    app.processEvents()
+
+    # 3. Kill any remaining timers by processing once more
+    app.processEvents()
+
 
 @pytest.fixture
 def sample_anchor():
