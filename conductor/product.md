@@ -22,6 +22,8 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - **Reference-Counted Graph Management:** Formal architecture for managing graph windows (w0, w1...) and their contained traces. Variables are automatically "unprobed" (highlights and icons removed) when no longer referenced in any active window.
 - **Synchronized Multi-Axis Interaction:** Dual-axis lenses (FFT, Mag/Phase) employ proportional vertical synchronization, ensuring that panning or zooming one axis updates the other relative to its own scale and units.
 - **Global Signal Color Consistency:** Automatic synchronization of probe colors across all windows and overlays, maintaining visual identity for every signal regardless of where it is plotted.
+- **Intelligent Zoom-Responsive Downsampling:** High-performance rendering for massive datasets that dynamically switches between downsampled and raw data based on the visible range, ensuring both rapid panning and forensic detail.
+- **Stable Zoom Reset:** Immediate, flicker-free return to full data view via synchronized curve restoration and axis unpinning, preventing range drift and incremental widening.
 - **Interactive Trace Control:** Easily remove specific traces via legend double-clicks or right-click context menus.
 - **Global Trace IDs:** Unique tr<n> IDs for all probed variables for easy reference in equations.
 - **Persistent Marker System:** Markers survive view/lens switches and application restarts.
