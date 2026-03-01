@@ -94,6 +94,8 @@ def main():
     with open('/tmp/dsp_demo_two_frames_expected.json', 'w') as f:
         json.dump(expected_data, f)
 
+    # Let PLOT_DATA signals propagate in PyProbe before auto-quit intercepts
+    time.sleep(0.3)
 
 if __name__ == "__main__":
     main()
