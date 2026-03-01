@@ -2,10 +2,19 @@ name: Test Only
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "test-workflow-fixes" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      test_pattern:
+        description: 'Pytest pattern or file to run'
+        required: true
+        default: 'tests/test_overlay_drag_drop_two_frames_fast.py'
+      extra_args:
+        description: 'Extra arguments to pass to pytest'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -21,6 +30,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Install Linux display dependencies (for Qt/GUI tests)
         run: |
@@ -33,17 +44,15 @@ jobs:
             libxcb-xkb1 libxkbcommon-x11-0 \
             xvfb
 
-      - name: Install isolated venv with uv
-        run: |
-          uv venv /tmp/test-env
-          uv pip install --python /tmp/test-env .
-          uv pip install --python /tmp/test-env pytest pytest-qt pytest-xdist pytest-forked
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Run targeted tests (debug)
         run: |
           xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest -v -s --tb=long \
-              tests/test_overlay_drag_drop_two_frames_fast.py \
-              tests/test_e2e_capture_pipeline_fast.py \
-              tests/core/test_tracer_capture_records.py \
-              tests/test_capture_pipeline.py
+            uv run pytest -s -v --tb=long \
+              ${{ github.event.inputs.test_pattern || 'tests/test_overlay_drag_drop_two_frames_fast.py' }} \
+              ${{ github.event.inputs.extra_args }}
