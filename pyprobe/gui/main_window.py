@@ -1603,6 +1603,24 @@ class MainWindow(QMainWindow):
                 logger.info("Auto-quit requested, closing application")
                 # Delay to allow GUI updates to complete, then export, cleanup, and quit
                 def export_and_quit():
+                    # DIAGNOSTIC: dump buffer + panel state before export
+                    import numpy as np
+                    for a, buf in self._redraw_throttler._buffers.items():
+                        ts, vals = buf.get_plot_data()
+                        v0 = None
+                        if vals:
+                            v0 = vals[-1]
+                            if hasattr(v0, 'real'):
+                                v0 = np.asarray(v0).real[:3].tolist() if hasattr(v0, '__len__') else v0
+                        print(f"[DIAG-BUF] {a.symbol}@{a.line}: {len(vals)} records, last[:3]={v0}", file=sys.stderr)
+                    for a, panels in self._probe_panels.items():
+                        for p in panels:
+                            if not is_obj_deleted(p) and not p.is_closing:
+                                pd = p.get_plot_data()
+                                if isinstance(pd, list) and pd:
+                                    for c in pd:
+                                        y3 = c.get('y', [])[:3]
+                                        print(f"[DIAG-PANEL] {a.symbol}@{a.line} curve={c.get('name')}: y[:3]={y3}", file=sys.stderr)
                     self._export_plot_data()
                     self._script_runner.cleanup()
                     QTimer.singleShot(500, QApplication.quit)
