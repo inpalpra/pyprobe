@@ -5,12 +5,14 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+  # Manual dispatch for targeted debugging
   workflow_dispatch:
     inputs:
       test_pattern:
-        description: 'Pytest pattern or file to run'
-        required: true
-        default: 'tests/test_overlay_drag_drop_two_frames_fast.py'
+        description: 'Pytest pattern or file to run (leave empty for full suite)'
+        required: false
+        default: ''
       extra_args:
         description: 'Extra arguments to pass to pytest'
         required: false
@@ -50,9 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv /tmp/test-env
-          # Install current package without extras that require private repos
           uv pip install --python /tmp/test-env .
-          # Install specific test plugins
           uv pip install --python /tmp/test-env \
             pytest-qt \
             pytest-xdist \
@@ -62,9 +62,27 @@ jobs:
             pytest-html \
             pytest-metadata
 
-      - name: Run targeted tests (debug)
+      - name: Run tests
         run: |
-          xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest -s -v --tb=long \
-              ${{ github.event.inputs.test_pattern || 'tests/test_overlay_drag_drop_two_frames_fast.py' }} \
-              ${{ github.event.inputs.extra_args }}
+          if [ -n "${{ github.event.inputs.test_pattern }}" ]; then
+            # Targeted run via workflow_dispatch
+            xvfb-run --auto-servernum \
+              /tmp/test-env/bin/python -m pytest -s -v --tb=long \
+                ${{ github.event.inputs.test_pattern }} \
+                ${{ github.event.inputs.extra_args }}
+          else
+            # Full suite (same ignores as release.yml)
+            xvfb-run --auto-servernum \
+              /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
+                --ignore=tests/gui/test_probe_temporal_correctness.py \
+                --ignore=tests/gui/test_script_runner_subprocess.py \
+                --ignore=tests/gui/test_folder_browsing.py \
+                --ignore=tests/test_e2e_capture_pipeline.py \
+                --ignore=tests/test_e2e_folder_browsing.py \
+                --ignore=tests/test_cli_automation.py \
+                --ignore=tests/test_constellation_verify.py \
+                --ignore=tests/test_overlay_drag_drop_single_frame.py \
+                --ignore=tests/test_overlay_drag_drop_two_frames.py \
+                --ignore=tests/ipc/test_socket_channel.py \
+                ${{ github.event.inputs.extra_args }}
+          fi
