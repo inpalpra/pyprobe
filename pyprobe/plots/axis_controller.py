@@ -75,7 +75,7 @@ class AxisController(QObject):
     def reset(self) -> None:
         self.set_pinned('x', False)
         self.set_pinned('y', False)
-        self._plot_item.autoRange()
+        self._plot_item.autoRange(padding=0)
     
     @property
     def x_pinned(self) -> bool:

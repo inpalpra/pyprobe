@@ -526,9 +526,11 @@ class WaveformWidget(PinLayoutMixin, QWidget):
     def _check_first_data_reset(self):
         """Reset view once on first data arrival with delay for layout."""
         if getattr(self, '_first_data', False):
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(50, self.reset_view)
             self._first_data = False
+            # Only perform the initial auto-range if the user hasn't already 
+            # started interacting (pinning) or if the test hasn't manualy zoomed.
+            if self._axis_controller and not self._axis_controller.x_pinned:
+                QTimer.singleShot(50, self.reset_view)
 
     def _update_1d_data(self, value: np.ndarray, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with 1D data."""
@@ -541,29 +543,14 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         mode = self._draw_modes.get(0, DrawMode.LINE)
         apply_draw_mode(self._curves[0], mode, self._color.name())
 
-        # Downsample if needed
-        x_display, y_display = self.downsample(self._data)
-
-        # Update plot - use time vector if available (Waveform objects)
-        self._updating_curves = True
-        if self._t_vector is not None and len(self._t_vector) == len(self._data):
-            # Map sample indices through time vector
-            t_display = self._t_vector[x_display]
-            self._curves[0].setData(t_display, y_display)
-            self._plot_widget.setLabel('bottom', 'Time')
-        else:
-            self._curves[0].setData(x_display, y_display)
-            self._plot_widget.setLabel('bottom', 'Sample Index')
-        self._updating_curves = False
-
         # Update info label
         self._info_label.setText(source_info)
 
         # Update stats
         self._update_stats_from_data(self._data, shape=shape if shape else value.shape)
 
-        self._refresh_markers()
-
+        # Trigger rendering (respects current zoom)
+        self._rerender_for_zoom()
 
     def _update_2d_data(self, value: np.ndarray, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with 2D data (each row is a time series)."""
@@ -573,33 +560,14 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         # Ensure correct number of curves
         self._ensure_curves(num_rows)
 
-        # Update each row
-        self._updating_curves = True
-        for row_idx in range(num_rows):
-            row_data = value[row_idx, :]
-            x_display, y_display = self.downsample(row_data)
-            
-            if self._t_vector is not None and len(self._t_vector) == len(row_data):
-                t_display = self._t_vector[x_display]
-                self._curves[row_idx].setData(t_display, y_display)
-            else:
-                self._curves[row_idx].setData(x_display, y_display)
-        self._updating_curves = False
-
-        # Set x-axis label
-        if self._t_vector is not None:
-            self._plot_widget.setLabel('bottom', 'Time')
-        else:
-            self._plot_widget.setLabel('bottom', 'Sample Index')
-
         # Update info label
         self._info_label.setText(source_info)
 
         # Update stats (aggregate across all rows)
         self._update_stats_from_data(self._data, prefix=f"{value.shape[0]} rows", shape=shape if shape else value.shape)
 
-        self._refresh_markers()
-
+        # Trigger rendering (respects current zoom)
+        self._rerender_for_zoom()
 
     def _update_waveform_collection_data(self, value: dict, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with waveform collection."""
@@ -614,24 +582,8 @@ class WaveformWidget(PinLayoutMixin, QWidget):
 
         # Collect all samples for stats
         all_samples = []
-
-        # Update each waveform with its own time vector
-        self._updating_curves = True
-        for idx, wf in enumerate(waveforms):
-            samples = np.asarray(wf['samples'])
-            scalars = wf.get('scalars', [0.0, 1.0])
-            t0, dt = scalars[0], scalars[1]
-            
-            # Compute time vector for this specific waveform
-            t_vector = t0 + np.arange(len(samples)) * dt
-            
-            x_indices, y_display = self.downsample(samples)
-            # Map sample indices through time vector
-            t_display = t_vector[x_indices]
-            
-            self._curves[idx].setData(t_display, y_display)
-            all_samples.append(samples)
-        self._updating_curves = False
+        for wf in waveforms:
+            all_samples.append(np.asarray(wf['samples']))
 
         self._plot_widget.setLabel('bottom', 'Time')
         self._info_label.setText(source_info)
@@ -640,7 +592,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             all_data = np.concatenate(all_samples)
             self._update_stats_from_data(all_data, f"{num_waveforms} wfms", shape=(num_waveforms, len(all_samples[0])) if all_samples else None)
         
-        self._refresh_markers()
+        # We need to store the waveforms for rerender_for_zoom to use
+        self._data = waveforms # Store as list of dicts for this specific widget type
+        self._rerender_for_zoom()
 
     def _update_array_collection_data(self, value: dict, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with array collection."""
@@ -652,14 +606,8 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         
         self._ensure_curves(num_arrays)
         all_data = []
-
-        self._updating_curves = True
-        for idx, arr in enumerate(arrays):
-            samples = np.asarray(arr)
-            x_display, y_display = self.downsample(samples)
-            self._curves[idx].setData(x_display, y_display)
-            all_data.append(samples)
-        self._updating_curves = False
+        for arr in arrays:
+            all_data.append(np.asarray(arr))
 
         self._plot_widget.setLabel('bottom', 'Sample Index')
         self._info_label.setText(source_info)
@@ -668,7 +616,9 @@ class WaveformWidget(PinLayoutMixin, QWidget):
             concatenated = np.concatenate(all_data)
             self._update_stats_from_data(concatenated, f"{num_arrays} arrays", shape=(num_arrays, len(all_data[0])) if all_data else None)
             
-        self._refresh_markers()
+        # Store for rerender_for_zoom
+        self._data = all_data 
+        self._rerender_for_zoom()
 
     def _update_stats(self):
         """Update statistics display for 1D data."""
@@ -712,20 +662,26 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         plot_item = self._plot_widget.getPlotItem()
         vb = plot_item.getViewBox()
         x_min, x_max = vb.viewRange()[0]
+        x_pinned = self._axis_controller.x_pinned if self._axis_controller else False
         
-        def get_indices(n_length):
-            if self._t_vector is not None and len(self._t_vector) == n_length:
-                if self._t_vector[-1] > self._t_vector[0]:
+        def get_indices(n_length, t_vec=None):
+            # If not pinned, we should always use the full range to allow auto-range to work.
+            # Programmatic zooms in tests must pin the axis to verify zoomed re-rendering.
+            if not x_pinned:
+                return 0, n_length
+                
+            if t_vec is not None and len(t_vec) == n_length:
+                if t_vec[-1] > t_vec[0]:
                     import bisect
-                    i_min = bisect.bisect_left(self._t_vector, x_min)
-                    i_max = bisect.bisect_right(self._t_vector, x_max)
+                    i_min = bisect.bisect_left(t_vec, x_min)
+                    i_max = bisect.bisect_right(t_vec, x_max)
                     return max(0, i_min), min(n_length, i_max)
             return max(0, int(np.floor(x_min))), min(n_length, int(np.ceil(x_max)) + 1)
             
         # For 1D data
-        if self._data.ndim == 1:
+        if isinstance(self._data, np.ndarray) and self._data.ndim == 1:
             n = len(self._data)
-            i_min, i_max = get_indices(n)
+            i_min, i_max = get_indices(n, self._t_vector)
             if i_min >= i_max:
                 return
             
@@ -747,10 +703,10 @@ class WaveformWidget(PinLayoutMixin, QWidget):
                 self._curves[0].setData(x, y)
             self._updating_curves = False
         
-        elif self._data.ndim == 2:
+        elif isinstance(self._data, np.ndarray) and self._data.ndim == 2:
             # 2D: re-downsample each row for visible range
             n_cols = self._data.shape[1]
-            i_min, i_max = get_indices(n_cols)
+            i_min, i_max = get_indices(n_cols, self._t_vector)
             if i_min >= i_max:
                 return
             
@@ -769,6 +725,43 @@ class WaveformWidget(PinLayoutMixin, QWidget):
                     self._curves[row_idx].setData(x, y)
             self._updating_curves = False
 
+        elif isinstance(self._data, list):
+            # WaveformCollection or ArrayCollection
+            self._updating_curves = True
+            for idx, item in enumerate(self._data):
+                if idx >= len(self._curves):
+                    break
+                
+                if isinstance(item, dict): # Waveform
+                    samples = np.asarray(item['samples'])
+                    scalars = item.get('scalars', [0.0, 1.0])
+                    t0, dt = scalars[0], scalars[1]
+                    t_vector = t0 + np.arange(len(samples)) * dt
+                    
+                    i_min, i_max = get_indices(len(samples), t_vector)
+                    if i_min < i_max:
+                        visible_slice = samples[i_min:i_max]
+                        if len(visible_slice) <= self.MAX_DISPLAY_POINTS:
+                            x = np.arange(i_min, i_max)
+                            y = visible_slice
+                        else:
+                            x, y = self.downsample(visible_slice, x_offset=i_min)
+                        self._curves[idx].setData(t_vector[x], y)
+                else: # Numpy array (ArrayCollection)
+                    samples = np.asarray(item)
+                    i_min, i_max = get_indices(len(samples))
+                    if i_min < i_max:
+                        visible_slice = samples[i_min:i_max]
+                        if len(visible_slice) <= self.MAX_DISPLAY_POINTS:
+                            x = np.arange(i_min, i_max)
+                            y = visible_slice
+                        else:
+                            x, y = self.downsample(visible_slice, x_offset=i_min)
+                        self._curves[idx].setData(x, y)
+            self._updating_curves = False
+
+        self._refresh_markers()
+
     def reset_view(self) -> None:
         """Reset the view: restore full data to curves, unpin axes, snap to full range.
         
@@ -778,6 +771,10 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         dataset before auto-ranging.
         """
         if self._data is None:
+            return
+
+        # If the user already pinned an axis, don't force a reset over their zoom
+        if self._axis_controller and (self._axis_controller.x_pinned or self._axis_controller.y_pinned):
             return
         
         # 1. Restore full dataset to curves

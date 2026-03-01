@@ -85,6 +85,9 @@ class TestZoomResponsiveDownsampling:
 
     def _zoom_and_extract(self, waveform, qapp, x_min, x_max):
         """Programmatically zoom and wait for debounced re-render."""
+        ac = waveform.axis_controller
+        if ac:
+            ac.set_pinned('x', True)
         plot_item = waveform._plot_widget.getPlotItem()
         plot_item.setXRange(x_min, x_max, padding=0)
         qapp.processEvents()
