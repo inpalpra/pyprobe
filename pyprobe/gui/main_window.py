@@ -1678,7 +1678,6 @@ class MainWindow(QMainWindow):
         import json
         import numpy as np
         import sys
-        from .probe_state import is_obj_deleted
 
         # Ensure any pending throttled data is plotted before export
         self._force_redraw()
