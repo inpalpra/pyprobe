@@ -19,5 +19,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: CI test fails on github, passes locally. Solve it. Use GH API to talk to github, monitor workflows etc. directly. Suspected race condition in export_and_quit.**
+- [x] **Track: CI test fails on github, passes locally. Solve it. Use GH API to talk to github, monitor workflows etc. directly. Suspected race condition in export_and_quit.**
 *Link: [./tracks/ci_e2e_fix_20260301/](./tracks/ci_e2e_fix_20260301/)*
