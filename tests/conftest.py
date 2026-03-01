@@ -4,6 +4,7 @@ Provides centralized QApplication, sample data factories, and
 PlotAssertions helper for verifying rendered widget state.
 """
 
+import gc
 import sys
 import numpy as np
 import pytest
@@ -20,8 +21,15 @@ def _qt_cleanup_on_exit():
 
     Without this, pending QTimers and signals can fire after Python has
     garbage-collected the widgets they reference, causing segfaults on
-    Linux/Xvfb (especially in CI). This fixture runs after ALL tests
-    and explicitly tears down Qt state before pytest-qt destroys QApplication.
+    Linux/Xvfb (especially in CI).  This fixture runs after ALL tests
+    and aggressively tears down Qt state before the interpreter exits.
+
+    Strategy (belt-and-suspenders):
+      1. Close + deleteLater every top-level widget.
+      2. gc.collect() to break Python ref-cycles so C++ destructors run.
+      3. Four processEvents() passes to drain multi-level timer chains
+         (timer → deleteLater → destroy event → next timer).
+      4. closeAllWindows() as a final catch-all.
     """
     yield  # All tests run here
 
@@ -29,17 +37,23 @@ def _qt_cleanup_on_exit():
     if app is None:
         return
 
-    # 1. Close all top-level widgets (cancels their child timers)
+    # 1. Close + schedule destruction for every top-level widget
     for widget in app.topLevelWidgets():
         try:
             widget.close()
+            widget.deleteLater()
         except RuntimeError:
-            pass  # Already deleted
+            pass  # C++ side already deleted
 
-    # 2. Drain the event loop so deleteLater() calls execute
-    app.processEvents()
+    # 2. Break Python ref-cycles so C++ destructors can fire
+    gc.collect()
 
-    # 3. Kill any remaining timers by processing once more
+    # 3. Four drain passes handle deeply-nested deferred chains
+    for _ in range(4):
+        app.processEvents()
+
+    # 4. Final catch-all
+    app.closeAllWindows()
     app.processEvents()
 
 
