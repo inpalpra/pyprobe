@@ -48,11 +48,23 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: |
+          uv venv /tmp/test-env
+          # Install current package without extras that require private repos
+          uv pip install --python /tmp/test-env .
+          # Install specific test plugins
+          uv pip install --python /tmp/test-env \
+            pytest-qt \
+            pytest-xdist \
+            pytest-forked \
+            pytest-json-report \
+            pytest-profiling \
+            pytest-html \
+            pytest-metadata
 
       - name: Run targeted tests (debug)
         run: |
           xvfb-run --auto-servernum \
-            uv run pytest -s -v --tb=long \
+            /tmp/test-env/bin/python -m pytest -s -v --tb=long \
               ${{ github.event.inputs.test_pattern || 'tests/test_overlay_drag_drop_two_frames_fast.py' }} \
               ${{ github.event.inputs.extra_args }}
