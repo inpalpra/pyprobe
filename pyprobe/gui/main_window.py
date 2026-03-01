@@ -1671,6 +1671,10 @@ class MainWindow(QMainWindow):
         For waveform with overlays (list of curve dicts):
         PLOT_DATA:{"symbol": "x", "curves": [{"name": "x", "y": [...], "is_overlay": false}, ...]}
         """
+        if getattr(self, '_plot_data_exported', False):
+            return
+        self._plot_data_exported = True
+
         import json
         import numpy as np
         from PyQt6.QtWidgets import QApplication
