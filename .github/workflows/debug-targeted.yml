@@ -31,6 +31,6 @@ jobs:
       - name: Run targeted tests
         run: |
           xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest -v --tb=long \
+            /tmp/test-env/bin/python -m pytest -s -v --tb=long \
               tests/test_overlay_drag_drop_two_frames_fast.py \
               tests/test_e2e_capture_pipeline_fast.py
