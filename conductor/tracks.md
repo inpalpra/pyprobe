@@ -16,8 +16,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [ ] **Track: Upgraded Step Recorder & Scene Graph**
 *Link: [./tracks/upgraded_step_recorder_20260227/](./tracks/upgraded_step_recorder_20260227/)*
-
----
-
-- [x] **Track: fix the decimation or zoom related ux bug where some traces don't show their last part on graphs unless user zooms in to that area of the graph. graphs rendered this way are useless @../../.gemini/tmp/pyprobe/images/clipboard-1772347106142.png**
-*Link: [./tracks/trace_truncation_fix_20260301/](./tracks/trace_truncation_fix_20260301/)*
