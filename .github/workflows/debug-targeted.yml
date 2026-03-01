@@ -2,6 +2,15 @@ name: Debug Targeted
 
 on:
   workflow_dispatch:
+    inputs:
+      test_pattern:
+        description: 'Pytest pattern or file to run (e.g. tests/gui/test_waveform_plot_gui.py)'
+        required: true
+        default: 'tests/test_overlay_drag_drop_two_frames_fast.py'
+      extra_args:
+        description: 'Extra arguments to pass to pytest'
+        required: false
+        default: ''
 
 jobs:
   test-targeted:
@@ -10,6 +19,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Install Linux display deps
         run: |
@@ -22,15 +33,15 @@ jobs:
             libxcb-xkb1 libxkbcommon-x11-0 \
             xvfb
 
-      - name: Install
-        run: |
-          uv venv /tmp/test-env
-          uv pip install --python /tmp/test-env .
-          uv pip install --python /tmp/test-env pytest pytest-qt
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Run targeted tests
         run: |
           xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest -s -v --tb=long \
-              tests/test_overlay_drag_drop_two_frames_fast.py \
-              tests/test_e2e_capture_pipeline_fast.py
+            uv run pytest -s -v --tb=long \
+              ${{ github.event.inputs.test_pattern }} \
+              ${{ github.event.inputs.extra_args }}
