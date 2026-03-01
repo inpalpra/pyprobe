@@ -3,7 +3,7 @@
 ## Phase 1: CI Debug Infrastructure & Diagnostic Collection
 Fix the debug pipeline and collect evidence before proposing any fix.
 
-- [ ] Task: Fix `.github/workflows/debug-targeted.yml` to support isolated E2E GUI test runs (e.g., via `inputs` for test files/patterns).
+- [x] Task: Fix `.github/workflows/debug-targeted.yml` to support isolated E2E GUI test runs (e.g., via `inputs` for test files/patterns). (fc64a48)
 - [ ] Task: Collect and analyze existing CI logs from the failing run (Run ID `22533427606`). Look for `[DIAG-BUF]` and `[DIAG-PANEL]` stderr output — these are embedded diagnostics showing throttler buffer vs widget state. See `docs/ci_debug_report.md` for context.
 - [ ] Task: Run the failing test (`test_overlay_drag_drop_two_frames_fast.py`) in isolation via `debug-targeted.yml` and capture full stderr/stdout.
 - [ ] Task: Confirm or refute the current hypothesis: that the `RedrawThrottler` buffer holds correct data but the `WaveformWidget` has not consumed it by export time.
