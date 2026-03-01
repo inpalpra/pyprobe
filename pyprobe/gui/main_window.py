@@ -1677,22 +1677,11 @@ class MainWindow(QMainWindow):
 
         import json
         import numpy as np
-        from PyQt6.QtWidgets import QApplication
-        import time
-        from PyQt6.QtCore import QEventLoop
-        
-        # UI rendering (overlay curves, autorange) happens via QTimer.singleShot
-        # We MUST drain the Qt Event loop completely so these timers fire
-        # and attach the actual plot data to the widgets before we scrape them!
-        QApplication.processEvents()
-        time.sleep(0.1)  # Let pending 50ms zoom timers expire
-        QApplication.processEvents()
+        import sys
+        from .probe_state import is_obj_deleted
 
         # Ensure any pending throttled data is plotted before export
         self._force_redraw()
-        
-        # Flush again in case _force_redraw triggered more singleShots
-        QApplication.processEvents()
 
         class NumpyEncoder(json.JSONEncoder):
             """JSON encoder that handles numpy types."""
