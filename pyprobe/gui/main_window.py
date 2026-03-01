@@ -1669,6 +1669,9 @@ class MainWindow(QMainWindow):
         """
         import json
         import numpy as np
+        
+        # Ensure any pending throttled data is plotted before export
+        self._force_redraw()
 
         class NumpyEncoder(json.JSONEncoder):
             """JSON encoder that handles numpy types."""
