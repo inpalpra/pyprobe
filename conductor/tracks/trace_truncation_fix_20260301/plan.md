@@ -1,6 +1,5 @@
 # Implementation Plan: Fix Trace Truncation and Zoom/Decimation UX Bug
-
-## Phase 1: Research & Reproduction
+## Phase 1: Research & Reproduction [checkpoint: eb325e9]
 Goal: Identify every downsampling code path in the codebase, determine which ones violate the `[0, N-1]` boundary invariant, and establish a failing baseline.
 
 - [x] Task: Identify Downsampling Code Paths
@@ -17,21 +16,22 @@ Goal: Identify every downsampling code path in the codebase, determine which one
     - [x] Include a test that the Phase trace in `FFT Mag & Phase` reaches the last frequency bin, not just the Magnitude trace.
     - [x] Check whether existing tests (e.g. `test_downsample_bug.py`) already partially cover this — strengthen their assertions if so, rather than duplicating.
     - [x] **CRITICAL:** Confirm that these tests fail with the current codebase.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Research & Reproduction' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Research & Reproduction' (Protocol in workflow.md)
 
 ## Phase 2: Implementation (TDD)
 Goal: Fix every downsample code path that violates the `[0, N-1]` invariant, as identified in Phase 1.
 
-- [ ] Task: Fix Affected Downsample Path(s)
-    - [ ] For each downsample implementation that Phase 1 identified as truncating, modify it so the output x-indices span the closed interval `[0, N-1]` for any input length.
-    - [ ] Do not modify downsample implementations that are already correct.
-    - [ ] After each fix, confirm the corresponding regression tests from Phase 1 now pass.
-- [ ] Task: Verify FFT Mag & Phase End-to-End
-    - [ ] Confirm the FFT Mag & Phase lens (which inherits its downsample from whichever base class it extends) benefits from the fix.
-    - [ ] Verify both the Magnitude and Phase traces independently reach the last frequency bin.
-- [ ] Task: Verify General Downsampling Integrity
-    - [ ] Confirm all downsample paths in the codebase now satisfy the `[0, N-1]` rule.
-    - [ ] All regression tests from Phase 1 pass.
+- [x] Task: Fix Waveform Plot Downsampling
+    - [x] Modify the Waveform widget's downsample path to include the last sample correctly.
+    - [x] Ensure the x-indices span `[0, N-1]`.
+    - [x] Verify fix with `tests/gui/test_trace_truncation_repro.py`.
+    - [x] After each fix, confirm the corresponding regression tests from Phase 1 now pass.
+- [x] Task: Verify FFT Mag & Phase End-to-End
+    - [x] Confirm the FFT Mag & Phase lens (which inherits its downsample from whichever base class it extends) benefits from the fix.
+    - [x] Verify both the Magnitude and Phase traces independently reach the last frequency bin.
+- [x] Task: Verify General Downsampling Integrity
+    - [x] Confirm all downsample paths in the codebase now satisfy the `[0, N-1]` rule.
+    - [x] All regression tests from Phase 1 pass.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Implementation (TDD)' (Protocol in workflow.md)
 
 ## Phase 3: Final Verification & Cleanup

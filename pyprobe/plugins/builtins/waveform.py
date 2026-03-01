@@ -412,31 +412,31 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         if n_points <= 0:
             n_points = self.MAX_DISPLAY_POINTS
         
-        if len(data) <= n_points:
-            return np.arange(len(data)) + x_offset, data
+        n = len(data)
+        if n <= n_points:
+            return np.arange(n) + x_offset, data
 
         # Number of chunks
         n_chunks = n_points // 2
-        chunk_size = len(data) // n_chunks
-
-        # Reshape and get min/max per chunk
-        # Truncate to multiple of chunk_size
-        truncated = data[:n_chunks * chunk_size]
-        reshaped = truncated.reshape(n_chunks, chunk_size)
-
-        mins = reshaped.min(axis=1)
-        maxs = reshaped.max(axis=1)
-
-        # Build x-indices that map back to original sample positions
-        chunk_starts = np.arange(n_chunks) * chunk_size
+        
+        # Use np.linspace to get edges that cover the full range [0, n]
+        edges = np.linspace(0, n, n_chunks + 1, dtype=int)
+        
         x = np.empty(n_chunks * 2, dtype=np.int64)
-        x[0::2] = chunk_starts + x_offset
-        x[1::2] = chunk_starts + (chunk_size - 1) + x_offset
-
-        # Interleave min and max y-values
         y = np.empty(n_chunks * 2, dtype=data.dtype)
-        y[0::2] = mins
-        y[1::2] = maxs
+        
+        for i in range(n_chunks):
+            chunk = data[edges[i]:edges[i + 1]]
+            if len(chunk) == 0:
+                continue
+            amin = int(np.argmin(chunk))
+            amax = int(np.argmax(chunk))
+            # Always emit (lower_index, upper_index) order so the line is monotonic in x
+            lo, hi = sorted([amin, amax])
+            x[2 * i]     = edges[i] + lo + x_offset
+            x[2 * i + 1] = edges[i] + hi + x_offset
+            y[2 * i]     = chunk[lo]
+            y[2 * i + 1] = chunk[hi]
 
         return x, y
 
