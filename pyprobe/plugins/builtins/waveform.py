@@ -528,9 +528,15 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         if getattr(self, '_first_data', False):
             self._first_data = False
             # Only perform the initial auto-range if the user hasn't already 
-            # started interacting (pinning) or if the test hasn't manualy zoomed.
+            # started interacting (pinning).
             if self._axis_controller and not self._axis_controller.x_pinned:
-                QTimer.singleShot(50, self.reset_view)
+                QTimer.singleShot(50, self._auto_reset_view)
+
+    def _auto_reset_view(self):
+        """Perform initial reset only if user hasn't already zoomed/pinned."""
+        if self._axis_controller and (self._axis_controller.x_pinned or self._axis_controller.y_pinned):
+            return
+        self.reset_view()
 
     def _update_1d_data(self, value: np.ndarray, dtype: str, shape: Optional[tuple], source_info: str):
         """Update plot with 1D data."""
@@ -771,10 +777,6 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         dataset before auto-ranging.
         """
         if self._data is None:
-            return
-
-        # If the user already pinned an axis, don't force a reset over their zoom
-        if self._axis_controller and (self._axis_controller.x_pinned or self._axis_controller.y_pinned):
             return
         
         # 1. Restore full dataset to curves
