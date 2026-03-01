@@ -17,3 +17,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [ ] **Track: Upgraded Step Recorder & Scene Graph**
 *Link: [./tracks/upgraded_step_recorder_20260227/](./tracks/upgraded_step_recorder_20260227/)*
 
+---
+
+- [ ] **Track: CI test fails on github, passes locally. Solve it. Use GH API to talk to github, monitor workflows etc. directly. Suspected race condition in export_and_quit.**
+*Link: [./tracks/ci_e2e_fix_20260301/](./tracks/ci_e2e_fix_20260301/)*
