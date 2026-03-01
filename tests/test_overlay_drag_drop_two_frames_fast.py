@@ -63,10 +63,11 @@ def run_pyprobe_with_overlay(
 
     output = result.stdout + "\n" + result.stderr
 
-    # Forward subprocess DIAG lines to CI stderr for visibility
-    for line in output.splitlines():
-        if line.startswith('[DIAG'):
-            print(line, file=_sys.stderr)
+    # Forward full subprocess stderr to CI for debugging
+    if result.stderr:
+        print("=== SUBPROCESS STDERR START ===", file=_sys.stderr)
+        print(result.stderr[-2000:], file=_sys.stderr)  # Last 2000 chars to avoid bloat
+        print("=== SUBPROCESS STDERR END ===", file=_sys.stderr)
 
     # Parse PLOT_DATA lines from output (each is a single line of JSON)
     # Accept even if process crashed during cleanup (e.g. SIGSEGV on headless CI)
