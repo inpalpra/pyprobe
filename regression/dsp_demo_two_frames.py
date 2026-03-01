@@ -94,6 +94,5 @@ def main():
     with open('/tmp/dsp_demo_two_frames_expected.json', 'w') as f:
         json.dump(expected_data, f)
 
-
 if __name__ == "__main__":
     main()

@@ -1,0 +1,47 @@
+name: Debug Targeted
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_pattern:
+        description: 'Pytest pattern or file to run (e.g. tests/gui/test_waveform_plot_gui.py)'
+        required: true
+        default: 'tests/test_overlay_drag_drop_two_frames_fast.py'
+      extra_args:
+        description: 'Extra arguments to pass to pytest'
+        required: false
+        default: ''
+
+jobs:
+  test-targeted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install Linux display deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libglib2.0-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
+            libxcb-xkb1 libxkbcommon-x11-0 \
+            xvfb
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run targeted tests
+        run: |
+          xvfb-run --auto-servernum \
+            uv run pytest -s -v --tb=long \
+              ${{ github.event.inputs.test_pattern }} \
+              ${{ github.event.inputs.extra_args }}

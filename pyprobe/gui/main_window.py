@@ -837,7 +837,9 @@ class MainWindow(QMainWindow):
 
     def _force_quit(self):
         """Force quit the application due to timeout."""
+        print("[DIAG-PATH] _force_quit (timeout)", file=sys.stderr)
         logger.info("Auto-quit timeout reached, forcing application exit")
+        self._force_redraw()
         self._export_plot_data()
         sys.stderr.flush()
         sys.stdout.flush()
@@ -1572,7 +1574,7 @@ class MainWindow(QMainWindow):
 
         # Ensure final buffered data is rendered after fast runs
         self._force_redraw()
-        
+
         # Check loop BEFORE cleanup to decide how to handle
         should_loop = self._control_bar.is_loop_enabled and not self._script_runner.user_stopped
         logger.debug(f"  is_loop_enabled={self._control_bar.is_loop_enabled}, user_stopped={self._script_runner.user_stopped}, should_loop={should_loop}")
@@ -1592,7 +1594,6 @@ class MainWindow(QMainWindow):
             self._tracer.trace_reaction_state_changed(f"script ended, stopping")
             self._message_handler.stop_polling()
             self._fps_timer.stop()
-            self._script_runner.cleanup()
             self._control_bar.set_running(False)
             self._status_bar.showMessage("Ready")
 
@@ -1602,12 +1603,15 @@ class MainWindow(QMainWindow):
                 import json
                 
                 logger.info("Auto-quit requested, closing application")
-                # Delay to allow GUI updates to complete, then export and quit
+                # Delay to allow GUI updates to complete, then export, cleanup, and quit
                 def export_and_quit():
                     self._export_plot_data()
+                    self._script_runner.cleanup()
                     QTimer.singleShot(500, QApplication.quit)
                 
                 QTimer.singleShot(500, export_and_quit)
+            else:
+                self._script_runner.cleanup()
 
     def _do_restart_loop(self):
         """Restart script for loop mode (called after delay)."""
@@ -1667,8 +1671,16 @@ class MainWindow(QMainWindow):
         For waveform with overlays (list of curve dicts):
         PLOT_DATA:{"symbol": "x", "curves": [{"name": "x", "y": [...], "is_overlay": false}, ...]}
         """
+        if getattr(self, '_plot_data_exported', False):
+            return
+        self._plot_data_exported = True
+
         import json
         import numpy as np
+        import sys
+
+        # Ensure any pending throttled data is plotted before export
+        self._force_redraw()
 
         class NumpyEncoder(json.JSONEncoder):
             """JSON encoder that handles numpy types."""

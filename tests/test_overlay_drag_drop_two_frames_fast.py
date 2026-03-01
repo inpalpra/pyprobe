@@ -11,6 +11,7 @@ without requiring GUI mouse interaction.
 """
 
 import json
+import sys as _sys
 import os
 import subprocess
 import sys
@@ -61,6 +62,14 @@ def run_pyprobe_with_overlay(
     )
 
     output = result.stdout + "\n" + result.stderr
+
+    # Forward subprocess output info to CI for debugging
+    print(f"[SUBPROC] rc={result.returncode} stdout_len={len(result.stdout)} stderr_len={len(result.stderr)}", file=_sys.stderr)
+    # Dump last 2000 chars of combined output for DIAG visibility
+    combined = result.stdout + result.stderr
+    for line in combined.splitlines()[-30:]:
+        if 'DIAG' in line or 'PLOT_DATA' in line:
+            print(f"[SUBPROC] {line}", file=_sys.stderr)
 
     # Parse PLOT_DATA lines from output (each is a single line of JSON)
     # Accept even if process crashed during cleanup (e.g. SIGSEGV on headless CI)
@@ -135,6 +144,17 @@ class TestOverlayDragDropTwoFramesFast(unittest.TestCase):
         """
         # Rely on the class-level cached payload
         plot_data = self.plot_data
+
+        # DIAGNOSTIC: dump first few values for CI debugging
+        if 'curves' in plot_data:
+            curves = plot_data['curves']
+            primary = [c for c in curves if not c.get('is_overlay', False)]
+            if primary:
+                y = primary[0].get('y', [])
+                print(f"[DIAG] plot signal_i[:3] = {y[:3]}", file=_sys.stderr)
+        if self.expected_data:
+            for i, frame in enumerate(self.expected_data):
+                print(f"[DIAG] expected frame {i} signal_i[:3] = {frame['signal_i'][:3]}", file=_sys.stderr)
 
         self.assertIn('curves', plot_data,
                       f"No 'curves' key in PLOT_DATA. Got keys: {list(plot_data.keys())}. "

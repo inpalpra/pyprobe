@@ -445,9 +445,9 @@ class ProbePanel(QFrame):
         # and causing duplicate values.
         if hasattr(self, '_data') and self._data is not None:
             if not hasattr(self._plot, 'update_history'):
-                # Capture current values in lambda closure
-                data, dtype, shape = self._data, self._dtype, getattr(self, '_shape', None)
-                QTimer.singleShot(0, lambda: plugin.update(self._plot, data, dtype, shape))
+                # Application MUST be synchronous to avoid race conditions where 
+                # a later update_data() call is overwritten by a delayed timer!
+                plugin.update(self._plot, self._data, self._dtype, getattr(self, '_shape', None))
 
     @property
     def current_lens(self) -> str:
