@@ -13,3 +13,8 @@ def test_ci_dockerfile_exists():
 
 def test_build_ci_image_workflow_exists():
     assert os.path.exists(".github/workflows/build-ci-image.yml")
+
+def test_ci_workflow_uses_ghcr_image():
+    with open(".github/workflows/ci.yml", "r") as f:
+        content = f.read()
+    assert "ghcr.io/inpalpra/pyprobe-ci" in content
