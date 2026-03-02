@@ -5,11 +5,11 @@
 - [x] Task: Create `dev-tests/infra` and `dev-tests/manual` directory structure. (d17f25f)
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Audit and Preparation' (Protocol in workflow.md) (442206a)
 
-## Phase 2: Reorganization (Move Files)
+## Phase 2: Reorganization (Move Files) [checkpoint: 8d02c60]
 - [x] Task: Move `test_ci_config.py` and other infrastructure tests to `dev-tests/infra/`. (9134005)
 - [x] Task: Move `check_scroll_click.py` and other manual scripts to `dev-tests/manual/`. (d37f25f)
 - [x] Task: Update any internal imports or paths affected by the move. (5e95d4e)
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Reorganization (Move Files)' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Reorganization (Move Files)' (Protocol in workflow.md) (8d02c60)
 
 ## Phase 3: Infrastructure Refactor
 - [ ] Task: Refactor `.github/workflows/ci.yml` to add "Infra Check" job (running `dev-tests/`) and implement isolation check (deleting repo files before `tests/`).
