@@ -29,11 +29,13 @@ Goal: Move test helpers to a stable location and update tests to use relative pa
 ## Phase 3: Verification & Tooling [ ]
 Goal: Ensure the test suite passes in an isolated environment and provide a verification mechanism.
 
-- [ ] Task: Create Isolation Verification Script
-    - [ ] Create a script (e.g., `scripts/verify_isolated_tests.sh`) that builds a wheel, installs it in a temporary venv, and runs `pytest` from a different directory using only the `tests/` folder.
-- [ ] Task: Final Test Run & Fixes
-    - [ ] Run the full test suite in the isolated environment.
-    - [ ] Fix any remaining coupling issues discovered during the final run.
-- [ ] Task: Update CI Workflow (Optional/Advised)
-    - [ ] If applicable, update GitHub Actions to include an isolated test step to prevent future regressions.
+- [x] Task: Update Docker Verification Tooling
+    - [x] Update `docker/test.Dockerfile` to remove dependency on `regression/` directory.
+    - [x] Verify that `make verify-docker` passes without `regression/` copied into the container.
+- [x] Task: Final Test Run via Docker
+    - [x] Run `make verify-docker` and ensure all tests pass in the fully isolated container.
+    - [x] Remove the temporary `scripts/verify_isolated_tests.sh`.
+
+- [x] Task: Update CI Workflow (Optional/Advised)
+    - [x] If applicable, update GitHub Actions to include an isolated test step to prevent future regressions.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Verification & Tooling' (Protocol in workflow.md)

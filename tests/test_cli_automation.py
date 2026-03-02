@@ -47,8 +47,9 @@ class TestCLIAutomation(unittest.TestCase):
             self.fail("Could not find pyprobe module in current directory or installed.")
 
         # Command to run
+        # Use sys.executable to ensure we use the same python as the test runner (crucial for isolated venv)
         cmd = [
-            python_exe, "-m", "pyprobe",
+            sys.executable, "-m", "pyprobe",
             "--auto-run",
             "--auto-quit",
             "--probe", "4:x:1",

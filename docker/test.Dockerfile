@@ -43,7 +43,6 @@ RUN pip install --no-cache-dir *.whl pytest pytest-qt pytest-forked numpy scipy 
 
 # Copy test suites and examples (NOT the source package pyprobe/)
 COPY tests/ ./tests/
-COPY regression/ ./regression/
 COPY examples/ ./examples/
 COPY pyproject.toml . 
 

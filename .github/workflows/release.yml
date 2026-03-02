@@ -235,8 +235,8 @@ jobs:
 
       - name: Remove source packages to prevent shadowing installed wheel
         run: |
-          echo "Removing source package directories to ensure tests use installed PyPI wheel"
-          rm -rf pyprobe pyprobe_tracer
+          echo "Removing source package and regression directories to ensure tests are decoupled"
+          rm -rf pyprobe pyprobe_tracer regression
           find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
 
       - name: Install Linux display dependencies
