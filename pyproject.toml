@@ -63,6 +63,7 @@ planning = [
 
 [tool.setuptools.package-data]
 "pyprobe.gui" = ["icons/*.svg"]
+"pyprobe.report" = ["report_schema.json"]
 
 [tool.setuptools.packages.find]
 where = ["."]

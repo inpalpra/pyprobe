@@ -399,47 +399,69 @@ class WaveformWidget(PinLayoutMixin, QWidget):
         """
         Downsample data for display while preserving visual features.
         Uses min-max decimation to preserve peaks.
-        
+
         Args:
             data: The array to downsample.
             n_points: Max display points (0 = use MAX_DISPLAY_POINTS).
             x_offset: Offset added to x-indices (for sliced data).
-        
+
         Returns:
             (x_indices, y_values) tuple. x_indices map back to original
             sample positions so the plot x-axis stays correct.
         """
         if n_points <= 0:
             n_points = self.MAX_DISPLAY_POINTS
-        
+
         n = len(data)
         if n <= n_points:
             return np.arange(n) + x_offset, data
 
-        # Number of chunks
-        n_chunks = n_points // 2
-        
-        # Use np.linspace to get edges that cover the full range [0, n]
+        if n < 2:
+            return np.arange(n) + x_offset, data
+
+        # Reserve 2 points for first and last samples to ensure boundary coverage
+        # The remaining points are used for min-max chunks
+        n_chunks = (n_points - 2) // 2
+        if n_chunks <= 0:
+            # Fallback for very low n_points: just first and last
+            return np.array([x_offset, n - 1 + x_offset], dtype=np.int64), np.array([data[0], data[-1]], dtype=data.dtype)
+
+        # Use np.linspace for middle edges [0, n]
+        # We start chunks from index 0 to n-1, but we'll manually set first/last
         edges = np.linspace(0, n, n_chunks + 1, dtype=int)
-        
-        x = np.empty(n_chunks * 2, dtype=np.int64)
-        y = np.empty(n_chunks * 2, dtype=data.dtype)
-        
+
+        x = np.empty(n_chunks * 2 + 2, dtype=np.int64)
+        y = np.empty(n_chunks * 2 + 2, dtype=data.dtype)
+
+        # First point
+        x[0] = x_offset
+        y[0] = data[0]
+
+        # Middle chunks
         for i in range(n_chunks):
             chunk = data[edges[i]:edges[i + 1]]
             if len(chunk) == 0:
+                # Should not happen with linspace(0, n, n_chunks+1) where n > n_chunks
+                x[2 * i + 1] = edges[i] + x_offset
+                x[2 * i + 2] = edges[i] + x_offset
+                y[2 * i + 1] = data[edges[i]]
+                y[2 * i + 2] = data[edges[i]]
                 continue
+
             amin = int(np.argmin(chunk))
             amax = int(np.argmax(chunk))
-            # Always emit (lower_index, upper_index) order so the line is monotonic in x
             lo, hi = sorted([amin, amax])
-            x[2 * i]     = edges[i] + lo + x_offset
-            x[2 * i + 1] = edges[i] + hi + x_offset
-            y[2 * i]     = chunk[lo]
-            y[2 * i + 1] = chunk[hi]
+
+            x[2 * i + 1] = edges[i] + lo + x_offset
+            x[2 * i + 2] = edges[i] + hi + x_offset
+            y[2 * i + 1] = chunk[lo]
+            y[2 * i + 2] = chunk[hi]
+
+        # Last point
+        x[-1] = n - 1 + x_offset
+        y[-1] = data[-1]
 
         return x, y
-
     def update_data(self, value: Any, dtype: str, shape: Optional[Tuple[int, ...]] = None, source_info: str = "") -> None:
         """Update the widget with new data."""
         if value is None:

@@ -22,8 +22,14 @@ class TestCLIAutomation(unittest.TestCase):
         # Path to pyprobe module (assuming run from repo root)
         # We need to make sure we're running the module from the current repo
         cwd = os.getcwd()
-        if not os.path.exists(os.path.join(cwd, 'pyprobe', '__main__.py')):
-            self.fail("Could not find pyprobe module in current directory. Run from repo root.")
+        has_local_module = os.path.exists(os.path.join(cwd, 'pyprobe', '__main__.py'))
+        
+        # If not local, check if it is installed
+        if not has_local_module:
+            try:
+                import pyprobe
+            except ImportError:
+                self.fail("Could not find pyprobe module in current directory or installed. Run from repo root.")
 
         # Path to regression script
         script_path = os.path.join(cwd, 'regression', 'loop.py')

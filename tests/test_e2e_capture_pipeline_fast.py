@@ -21,8 +21,8 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
            correct line offsets at runtime so probes always map accurately.
         """
         cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, 'pyprobe', '__main__.py')):
-            raise RuntimeError("Run tests from repo root")
+        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
+            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
             
         cls.megascript_path = os.path.join(cls.repo_root, "tests", "gui", "data", "e2e_capture_temporal_megascript.py")
         os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)

@@ -34,24 +34,45 @@ def downsample(data: np.ndarray, n_points: int = 0, x_offset: int = 0) -> tuple:
     n = len(data)
     if n <= n_points:
         return np.arange(n) + x_offset, data
-    
-    n_chunks = n_points // 2
-    # Boundaries always span [0, n] — no remainder
+
+    if n < 2:
+        return np.arange(n) + x_offset, data
+
+    # Reserve 2 points for first and last samples to ensure boundary coverage
+    n_chunks = (n_points - 2) // 2
+    if n_chunks <= 0:
+        return np.array([x_offset, n - 1 + x_offset], dtype=np.int64), np.array([data[0], data[-1]], dtype=data.dtype)
+
     edges = np.linspace(0, n, n_chunks + 1, dtype=int)
     
-    x = np.empty(n_chunks * 2, dtype=np.int64)
-    y = np.empty(n_chunks * 2, dtype=data.dtype)
+    x = np.empty(n_chunks * 2 + 2, dtype=np.int64)
+    y = np.empty(n_chunks * 2 + 2, dtype=data.dtype)
     
+    # First point
+    x[0] = x_offset
+    y[0] = data[0]
+
     for i in range(n_chunks):
         chunk = data[edges[i]:edges[i + 1]]
+        if len(chunk) == 0:
+            x[2 * i + 1] = edges[i] + x_offset
+            x[2 * i + 2] = edges[i] + x_offset
+            y[2 * i + 1] = data[edges[i]]
+            y[2 * i + 2] = data[edges[i]]
+            continue
+            
         amin = int(np.argmin(chunk))
         amax = int(np.argmax(chunk))
-        # Always emit (lower_index, upper_index) order so the line is monotonic in x
         lo, hi = sorted([amin, amax])
-        x[2 * i]     = edges[i] + lo + x_offset
-        x[2 * i + 1] = edges[i] + hi + x_offset
-        y[2 * i]     = chunk[lo]
-        y[2 * i + 1] = chunk[hi]
+        
+        x[2 * i + 1] = edges[i] + lo + x_offset
+        x[2 * i + 2] = edges[i] + hi + x_offset
+        y[2 * i + 1] = chunk[lo]
+        y[2 * i + 2] = chunk[hi]
+
+    # Last point
+    x[-1] = n - 1 + x_offset
+    y[-1] = data[-1]
     
     return x, y
 

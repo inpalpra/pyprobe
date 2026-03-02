@@ -1,13 +1,13 @@
 import json
-import os
 import jsonschema
 import pytest
+from importlib.resources import files as _pkg_files
 from pyprobe.report.report_model import (
     BugReport, SessionState, ProbeTraceEntry, GraphWidgetEntry, WidgetTraceEntry, RecordedStep
 )
 from pyprobe.report.formatter import ReportFormatter
 
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), '../../pyprobe/report/report_schema.json')
+SCHEMA_PATH = str(_pkg_files('pyprobe.report').joinpath('report_schema.json'))
 
 @pytest.fixture
 def schema():
