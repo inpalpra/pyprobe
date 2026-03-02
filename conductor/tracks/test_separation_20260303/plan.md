@@ -11,12 +11,12 @@
 - [x] Task: Update any internal imports or paths affected by the move. (5e95d4e)
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Reorganization (Move Files)' (Protocol in workflow.md) (8d02c60)
 
-## Phase 3: Infrastructure Refactor
-- [ ] Task: Refactor `.github/workflows/ci.yml` to add "Infra Check" job (running `dev-tests/`) and implement isolation check (deleting repo files before `tests/`).
-- [ ] Task: Refactor `.github/workflows/release.yml` to enforce test isolation (ensuring product tests run without repo context).
-- [ ] Task: Update `run_tests.py` to discover and execute both `tests/` and `dev-tests/` by default.
-- [ ] Task: Update `scripts/test_artifact.sh` to strictly target the `tests/` directory.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Infrastructure Refactor' (Protocol in workflow.md)
+## Phase 3: Infrastructure Refactor [checkpoint: d035c2c]
+- [x] Task: Refactor `.github/workflows/ci.yml` to add "Infra Check" job (running `dev-tests/`) and implement isolation check (deleting repo files before `tests/`). (d035c2c)
+- [x] Task: Refactor `.github/workflows/release.yml` to enforce test isolation (ensuring product tests run without repo context). (d035c2c)
+- [x] Task: Update `run_tests.py` to discover and execute both `tests/` and `dev-tests/` by default. (d035c2c)
+- [x] Task: Update `scripts/test_artifact.sh` to strictly target the `tests/` directory. (d035c2c)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Infrastructure Refactor' (Protocol in workflow.md) (d035c2c)
 
 ## Phase 4: Final Verification
 - [ ] Task: Verify local `run_tests.py` correctly executes both test suites.
