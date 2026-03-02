@@ -62,6 +62,12 @@ jobs:
             pytest-html \
             pytest-metadata
 
+      - name: Hide source package to ensure portability
+        run: |
+          mv pyprobe _pyprobe_hidden
+          mv examples _examples_hidden
+          mv regression _regression_hidden
+
       - name: Run tests
         run: |
           # Tolerate exit-139 (SIGSEGV during Qt/C++ cleanup at process exit).

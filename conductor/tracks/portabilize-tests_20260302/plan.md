@@ -16,8 +16,8 @@
 - [x] Identify and refactor all other tests using repo-root detection or `sys.path` hacks. 30cf21e
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Test Refactoring' (Protocol in workflow.md) f6c291d
 
-## Phase 4: CI/CD & Validation
-- [ ] Task: Update `make verify-docker` to ensure tests run in an isolated environment with only the installed package.
-- [ ] Task: Update `.github/workflows/tests-only.yml` (if needed) to enforce portable test execution.
-- [ ] Task: Verify all tests pass in a clean environment where only `tests/` and the installed package exist.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: CI/CD & Validation' (Protocol in workflow.md)
+## Phase 4: CI/CD & Validation [checkpoint: 34e2c1d]
+- [x] Task: Update `make verify-docker` to ensure tests run in an isolated environment with only the installed package. 30cf21e
+- [x] Task: Update `.github/workflows/tests-only.yml` (if needed) to enforce portable test execution. 30cf21e
+- [x] Task: Verify all tests pass in a clean environment where only `tests/` and the installed package exist. 30cf21e
+- [x] Task: Conductor - User Manual Verification 'Phase 4: CI/CD & Validation' (Protocol in workflow.md) 34e2c1d
