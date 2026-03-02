@@ -23,3 +23,8 @@ def test_release_workflow_uses_ghcr_image():
     with open(".github/workflows/release.yml", "r") as f:
         content = f.read()
     assert "ghcr.io/inpalpra/pyprobe-ci" in content
+
+def test_local_dockerfile_uses_ghcr_image():
+    with open("docker/Dockerfile", "r") as f:
+        content = f.read()
+    assert "ghcr.io/inpalpra/pyprobe-ci" in content
