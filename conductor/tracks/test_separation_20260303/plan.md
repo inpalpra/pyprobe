@@ -1,9 +1,9 @@
 # Implementation Plan: Refactor: Separate Product Tests from Infrastructure Tests
 
-## Phase 1: Audit and Preparation
-- [ ] Task: Perform deep audit of `tests/` to identify all repository-dependent files and manual utilities.
-- [ ] Task: Create `dev-tests/infra` and `dev-tests/manual` directory structure.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Audit and Preparation' (Protocol in workflow.md)
+## Phase 1: Audit and Preparation [checkpoint: 442206a]
+- [x] Task: Perform deep audit of `tests/` to identify all repository-dependent files and manual utilities. (6eca418)
+- [x] Task: Create `dev-tests/infra` and `dev-tests/manual` directory structure. (d17f25f)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Audit and Preparation' (Protocol in workflow.md) (442206a)
 
 ## Phase 2: Reorganization (Move Files)
 - [ ] Task: Move `test_ci_config.py` and other infrastructure tests to `dev-tests/infra/`.
