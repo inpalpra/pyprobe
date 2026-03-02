@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: Implement a versioned CI image strategy using GHCR for PyProbe**
+- [x] **Track: Implement a versioned CI image strategy using GHCR for PyProbe**
 *Link: [./tracks/ci_gh_image_20260303/](./tracks/ci_gh_image_20260303/)*
