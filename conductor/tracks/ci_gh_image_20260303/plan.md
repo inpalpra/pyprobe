@@ -26,8 +26,8 @@ This track implements a versioned CI image strategy using GitHub Container Regis
 
 ## Phase 3: Local Dev Parity & Cleanup [ ]
 
-- [ ] Task: Update local Dockerfile to extend the CI base image
-    - [ ] Modify `docker/Dockerfile` to use `ghcr.io/inpalpra/pyprobe-ci:<version>` as its base
+- [x] Task: Update local Dockerfile to extend the CI base image 61a7f9c
+    - [x] Modify `docker/Dockerfile` to use `ghcr.io/inpalpra/pyprobe-ci:<version>` as its base
 - [ ] Task: Update Makefile for dynamic image tagging
     - [ ] Modify `Makefile` to read version from `.ci-version` and pass it as a build argument
 - [ ] Task: Verify local Docker execution
