@@ -19,10 +19,11 @@ All tasks follow a strict lifecycle:
 
 2. **Mark In Progress:** Before beginning work, edit `plan.md` and change the task from `[ ]` to `[~]`
 
-3. **Write Failing Tests (Red Phase):**
-   - Create a new test file for the feature or bug fix.
+### Write Failing Tests (Red Phase):
+   - Create a new test file for the feature or bug fix in the `tests/` directory.
    - Write one or more unit tests that clearly define the expected behavior and acceptance criteria for the task.
    - **CRITICAL:** Run the tests and confirm that they fail as expected. This is the "Red" phase of TDD. Do not proceed until you have failing tests.
+
 
 4. **Implement to Pass Tests (Green Phase):**
    - Write the minimum amount of application code necessary to make the failing tests pass.
@@ -34,7 +35,7 @@ All tasks follow a strict lifecycle:
 
 6. **Verify Coverage:** Run coverage reports:
    ```bash
-   uv run pytest --cov=pyprobe --cov-report=html
+   ./.venv/bin/python -m pytest --cov=pyprobe --cov-report=html
    ```
    Target: >80% coverage for new code.
 
@@ -160,20 +161,22 @@ uv sync --all-groups
 # Run all tests
 ./scripts/run_tests.sh
 
+# Run with full auto-discovery
+./.venv/bin/python run_tests.py
+
 # Run tests with coverage
 ./.venv/bin/python -m pytest --cov=pyprobe
-
-# Run specific test file
-./scripts/run_tests.sh tests/gui/test_waveform_plot_gui.py
 ```
 
 ### Before Committing
 ```bash
-# Run full test suite and linting
+# Run all tests and linting
 ./scripts/run_tests.sh && ruff check .
 
-# HIGH INTEGRITY: Run isolated Docker verification (Builds wheel + tests in clean container)
-# Use this to ensure tests are decoupled from source and validate the actual artifact.
+# HIGH INTEGRITY: Run isolated Docker verification
+# This builds the wheel, installs it in a clean container, moves the tests
+# to an isolated /tmp workspace, and verifies the artifact works without
+# repository source code (shadowing protection).
 make verify-docker
 ```
 

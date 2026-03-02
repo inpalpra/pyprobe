@@ -16,9 +16,6 @@
 ## Build & Testing
 - **pytest:** The primary testing framework.
 - **pytest-qt:** For testing PyQt6 components.
-- **Test Suite Partitioning:** 
-  - **Product Tests (`tests/`):** Standalone tests verifying package behavior. Runnable against an installed wheel in a clean environment without repository source code.
-  - **Dev & Infra Tests (`dev-tests/`):** Repository-level checks for CI/CD, environment health, and manual verification utilities.
 - **Docker:** Used for artifact-first, isolated verification.
   - **Canonical Environment:** Multi-arch base image (`ghcr.io/inpalpra/pyprobe-ci`) for deterministic builds and testing.
   - **Forced Isolation:** Artifact verification scripts simulate a clean OS by moving tests to an isolated workspace, preventing accidental shadowing by source code.

@@ -11,17 +11,7 @@ permissions:
 
 jobs:
 
-  infra-check:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run infrastructure tests
-        run: pytest dev-tests/infra/
-
   test-wheel:
-    needs: infra-check
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
