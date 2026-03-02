@@ -27,8 +27,8 @@ jobs:
 
       - name: Build image
         run: |
-          docker build 
-            -t ghcr.io/inpalpra/pyprobe-ci:${{ steps.version.outputs.VERSION }} 
+          docker build \
+            -t ghcr.io/inpalpra/pyprobe-ci:${{ steps.version.outputs.VERSION }} \
             -f docker/ci.Dockerfile .
 
       - name: Push image
