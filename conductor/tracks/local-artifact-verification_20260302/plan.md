@@ -36,13 +36,13 @@ This plan outlines the steps to implement a high-integrity, multi-stage Docker p
 - [x] **Task: Conductor - User Manual Verification 'Phase 2: Isolated Test Stage with GUI Support' (Protocol in workflow.md)** e457e70
 
 ## Phase 3: Final Orchestration and Cleanup
-- [ ] **Task: Replace Makefile.docker**
-    - [ ] Remove the existing `Makefile.docker`.
-    - [ ] Create a new `Makefile` in the root directory.
-    - [ ] Implement targets: `verify-docker`, `build-artifact`, `test-artifact`, and `clean`.
-    - [ ] Ensure the `clean` target safely removes `dist/`, `build/`, and any temporary Docker artifacts.
-- [ ] **Task: Final End-to-End Validation**
-    - [ ] Run `make verify-docker` and confirm the entire pipeline completes successfully.
-    - [ ] Verify that all intermediate containers are cleaned up.
-    - [ ] Test the `make clean` target.
-- [ ] **Task: Conductor - User Manual Verification 'Phase 3: Final Orchestration and Cleanup' (Protocol in workflow.md)**
+- [x] **Task: Replace Makefile.docker**
+    - [x] Remove the existing `Makefile.docker`.
+    - [x] Create a new `Makefile` in the root directory.
+    - [x] Implement targets: `verify-docker`, `build-artifact`, `test-artifact`, and `clean`.
+    - [x] Ensure the `clean` target safely removes `dist/`, `build/`, and any temporary Docker artifacts.
+- [x] **Task: Final End-to-End Validation**
+    - [x] Run `make verify-docker` and confirm the entire pipeline completes successfully.
+    - [x] Verify that all intermediate containers are cleaned up.
+    - [x] Test the `make clean` target.
+- [~] **Task: Conductor - User Manual Verification 'Phase 3: Final Orchestration and Cleanup' (Protocol in workflow.md)**
