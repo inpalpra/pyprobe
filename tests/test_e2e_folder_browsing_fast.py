@@ -98,8 +98,8 @@ class TestE2EFolderBrowsingFast(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, "pyprobe", "__main__.py")):
-            raise RuntimeError("Tests must be run from the repository root.")
+        if not os.path.isdir(os.path.join(cls.repo_root, "regression")):
+            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
 
         cls.examples_dir = os.path.join(cls.repo_root, "examples")
         cls.folder_test_dir = os.path.join(cls.repo_root, "regression", "folder_test")

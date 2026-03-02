@@ -5,7 +5,11 @@
       "Bash(grep:*)",
       "Bash(find:*)",
       "Bash(wc:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(gh run:*)",
+      "Bash(tar:*)",
+      "Bash(unzip:*)",
+      "Bash(uv build:*)"
     ]
   }
 }

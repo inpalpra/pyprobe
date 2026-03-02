@@ -232,7 +232,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-          sparse-checkout: tests
+
+      - name: Remove source packages to prevent shadowing installed wheel
+        run: |
+          echo "Removing source package directories to ensure tests use installed PyPI wheel"
+          rm -rf pyprobe pyprobe_tracer
+          find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
 
       - name: Install Linux display dependencies
         run: |

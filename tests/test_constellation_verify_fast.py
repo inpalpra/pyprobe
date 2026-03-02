@@ -79,8 +79,8 @@ class TestConstellationDataVerificationFast(unittest.TestCase):
     def setUpClass(cls):
         """Verify we're running from repo root and cache subprocess execution."""
         cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, 'pyprobe', '__main__.py')):
-            raise RuntimeError("Run tests from repo root")
+        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
+            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
             
         cls.script = os.path.join(cls.repo_root, 'regression', 'constellation_verify.py')
         
