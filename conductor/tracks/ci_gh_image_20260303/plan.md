@@ -30,6 +30,6 @@ This track implements a versioned CI image strategy using GitHub Container Regis
     - [x] Modify `docker/Dockerfile` to use `ghcr.io/inpalpra/pyprobe-ci:<version>` as its base
 - [x] Task: Update Makefile for dynamic image tagging 9bc11bc
     - [x] Modify `Makefile` to read version from `.ci-version` and pass it as a build argument
-- [ ] Task: Verify local Docker execution
-    - [ ] Run `make verify-docker` and ensure it passes
+- [x] Task: Verify local Docker execution
+    - [x] Run `make verify-docker` and ensure it passes
 - [ ] Task: Conductor - User Manual Verification 'Local Dev Parity & Cleanup' (Protocol in workflow.md)
