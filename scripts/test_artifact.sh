@@ -24,7 +24,7 @@ fi
 echo "Installing test dependencies..."
 pip install pytest pytest-qt pytest-xdist pytest-forked
 
-echo "Removing source tree to prevent shadowing..."
+echo "Removing source tree to prevent shadowing and repo dependencies..."
 # WARNING: This script is intended for CI/Docker environments.
 # Running this locally in your repo root will delete your source code.
 if [ -z "$CI" ] && [ ! -f /.dockerenv ]; then
@@ -33,8 +33,16 @@ if [ -z "$CI" ] && [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
-rm -rf pyprobe pyprobe_tracer examples regression
+# Clean up EVERYTHING that is not needed for running product tests.
+# tests/ and scripts/ (needed to run the tests) are kept.
+# pyproject.toml and uv.lock are also kept if needed, but not strictly by pytest.
+rm -rf pyprobe pyprobe_tracer examples dev-tests regression \
+       Makefile .git .github .agent .claude .vscode .pytest_cache .ruff_cache \
+       gemini.md Dockerfile Dockerfile.test pyprobe.spec release.sh \
+       CONSTITUTION.md CLAUDE.md README.md .proj2mdignore .gitignore .gitconfig .ci-version
+
 find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
+find . -maxdepth 1 -name "*.log" -exec rm -rf {} +
 
 echo "Verifying import location..."
 python - <<EOF

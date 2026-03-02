@@ -28,6 +28,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.resolve()
 TESTS_DIR = REPO_ROOT / "tests"
+DEV_TESTS_DIR = REPO_ROOT / "dev-tests"
 
 # Default number of parallel workers (1 = sequential).
 # Override with --parallel N on the command line.
@@ -45,28 +46,43 @@ EXCLUDE_FILES = {"check_scroll_click.py", "conftest.py"}
 
 # ── Discovery ─────────────────────────────────────────────────────────────────
 
-def discover_suites(tests_dir: Path) -> dict[str, list[Path]]:
+def discover_suites(tests_dir: Path, dev_tests_dir: Path) -> dict[str, list[Path]]:
     """Return an ordered dict of {suite_name: [test_file, ...]}."""
     suites: dict[str, list[Path]] = {}
 
-    # Auto-discover any subdirectory containing test files (sorted for determinism).
-    for sub_path in sorted(tests_dir.iterdir()):
-        if not sub_path.is_dir() or sub_path.name.startswith(("_", ".")):
-            continue
-        files = sorted(
-            p for p in sub_path.glob("test_*.py")
+    # 1. Product Tests (tests/)
+    if tests_dir.exists():
+        # Auto-discover any subdirectory containing test files (sorted for determinism).
+        for sub_path in sorted(tests_dir.iterdir()):
+            if not sub_path.is_dir() or sub_path.name.startswith(("_", ".")):
+                continue
+            files = sorted(
+                p for p in sub_path.glob("test_*.py")
+                if p.name not in EXCLUDE_FILES
+            )
+            if files:
+                suites[sub_path.name] = files
+
+        # Top-level test files last.
+        top = sorted(
+            p for p in tests_dir.glob("test_*.py")
             if p.name not in EXCLUDE_FILES
         )
-        if files:
-            suites[sub_path.name] = files
+        if top:
+            suites["top-level"] = top
 
-    # Top-level test files last.
-    top = sorted(
-        p for p in tests_dir.glob("test_*.py")
-        if p.name not in EXCLUDE_FILES
-    )
-    if top:
-        suites["top-level"] = top
+    # 2. Development & Infrastructure Tests (dev-tests/)
+    if dev_tests_dir.exists():
+        for sub_path in sorted(dev_tests_dir.iterdir()):
+            if not sub_path.is_dir() or sub_path.name.startswith(("_", ".")):
+                continue
+            files = sorted(
+                p for p in sub_path.glob("test_*.py")
+                if p.name not in EXCLUDE_FILES
+            )
+            if files:
+                # Prefix with 'dev-' to avoid name collisions with product suites.
+                suites[f"dev-{sub_path.name}"] = files
 
     return suites
 
@@ -175,9 +191,9 @@ def main() -> int:
     if args.pytest_args and args.pytest_args[0] == "--":
         args.pytest_args = args.pytest_args[1:]
 
-    suites = discover_suites(TESTS_DIR)
+    suites = discover_suites(TESTS_DIR, DEV_TESTS_DIR)
     if not suites:
-        print(f"{RED}No test suites found under {TESTS_DIR}{RESET}")
+        print(f"{RED}No test suites found under {TESTS_DIR} or {DEV_TESTS_DIR}{RESET}")
         return 1
 
     # Filter by --suite if requested.
