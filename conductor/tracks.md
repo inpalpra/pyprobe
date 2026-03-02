@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Artifact-first, Docker-isolated, zero-duplication CI architecture.**
+- [x] **Track: Artifact-first, Docker-isolated, zero-duplication CI architecture.**
 *Link: [./tracks/ci_unify_20260303/](./tracks/ci_unify_20260303/)*
