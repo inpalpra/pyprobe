@@ -20,22 +20,23 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
            all subsequent tests, breaking their probes. Building dynamically calculates the 
            correct line offsets at runtime so probes always map accurately.
         """
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
-            
-        cls.megascript_path = os.path.join(cls.repo_root, "tests", "gui", "data", "e2e_capture_temporal_megascript.py")
-        os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)
-        
-        files = {
-            "loop": os.path.join(cls.repo_root, "regression", "loop.py"),
-            "deferred_return": os.path.join(cls.repo_root, "regression", "deferred_return.py"),
-            "high_freq": os.path.join(cls.repo_root, "regression", "high_freq.py"),
-            "multi_probe": os.path.join(cls.repo_root, "regression", "multi_probe.py"),
-        }
-        
         megascript_content = 'import sys\nimport time\n'
         probes = []
+        
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        cls.megascript_path = os.path.join(test_dir, "gui", "data", "e2e_capture_temporal_megascript.py")
+        os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)
+        
+        # Determine base directory for helper scripts (in tests/data)
+        base_data_dir = os.path.join(test_dir, "data")
+            
+        files = {
+            "loop": os.path.join(base_data_dir, "loop.py"),
+            "deferred_return": os.path.join(base_data_dir, "deferred_return.py"),
+            "high_freq": os.path.join(base_data_dir, "high_freq.py"),
+            "multi_probe": os.path.join(base_data_dir, "multi_probe.py"),
+        }
         
         current_megascript_line = 3
         
@@ -47,6 +48,12 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
             "multi_probe": [(9, "a", 1), (9, "b", 1), (9, "x", 1)]
         }
         
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
+            
         funcs = []
         for name, path in files.items():
             func_name = f"run_{name}"

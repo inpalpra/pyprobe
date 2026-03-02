@@ -101,13 +101,20 @@ class TestOverlayDragDropFast(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root and cache subprocess execution."""
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
-            
-        script = os.path.join(cls.repo_root, 'regression', 'dsp_demo_single_frame.py')
+        """Determine paths relative to this test file and run the test."""
+        test_dir = os.path.dirname(os.path.abspath(__file__))
         
+        # Path to regression script (in tests/data)
+        script = os.path.join(test_dir, 'data', 'dsp_demo_single_frame.py')
+        if not os.path.exists(script):
+            raise RuntimeError(f"Could not find regression script at {script}")
+
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
+            
         # Run subprocess EXACTLY ONCE and cache for all test methods
         # Probe signal_i at line 70 (inside generate_qam_signal call)
         # signal_i is assigned at line 46 inside generate_qam_signal

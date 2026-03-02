@@ -110,12 +110,19 @@ class TestOverlayDragDropTwoFramesFast(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root and cache subprocess execution."""
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
+        """Determine paths relative to this test file and run the test."""
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Path to regression script (in tests/data)
+        script = os.path.join(test_dir, 'data', 'dsp_demo_two_frames.py')
+        if not os.path.exists(script):
+            raise RuntimeError(f"Could not find regression script at {script}")
 
-        script = os.path.join(cls.repo_root, 'regression', 'dsp_demo_two_frames.py')
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
 
         # Run subprocess EXACTLY ONCE and cache for all test methods
         # Probe signal_i at line 64 (tuple unpack assignment in main())

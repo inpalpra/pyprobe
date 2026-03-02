@@ -97,19 +97,18 @@ class TestE2EFolderBrowsingFast(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, "regression")):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
-
-        cls.examples_dir = os.path.join(cls.repo_root, "examples")
-        cls.folder_test_dir = os.path.join(cls.repo_root, "regression", "folder_test")
-
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Path to examples directory (lite version in tests/data)
+        cls.examples_dir = os.path.join(test_dir, "data", "examples_lite")
+        if not os.path.isdir(cls.examples_dir):
+            raise RuntimeError(f"Fixture folder not found: {cls.examples_dir}")
+        
+        # Path to fixture folder (in tests/data)
+        cls.folder_test_dir = os.path.join(test_dir, "data", "folder_test")
         if not os.path.isdir(cls.folder_test_dir):
-            raise RuntimeError(
-                f"Fixture folder not found: {cls.folder_test_dir}\n"
-                "Ensure regression/folder_test/ is present."
-            )
-            
+            raise RuntimeError(f"Fixture folder not found: {cls.folder_test_dir}")
+
         # Cache standard subprocess runs for A1, A2, and A3/A4
         # A1: Open folder only. Timeouts reduced from 3.0 to 0.5s for speed.
         cls.a1_returncode, cls.a1_output = run_pyprobe(

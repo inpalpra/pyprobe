@@ -41,14 +41,14 @@ COPY dist/*.whl .
 # Install the wheel and test dependencies
 RUN pip install --no-cache-dir *.whl pytest pytest-qt pytest-forked numpy scipy pyqt6 pyqtgraph
 
-# Copy test suites and examples (NOT the source package pyprobe/)
+# Copy test suites (NOT the source package pyprobe/ or examples/)
 COPY tests/ ./tests/
-COPY regression/ ./regression/
-COPY examples/ ./examples/
 COPY pyproject.toml . 
 
-# Ensure the source package pyprobe/ is NOT present to avoid shadowing
-RUN if [ -d "pyprobe" ]; then echo "Error: source package pyprobe/ found in test container!" && exit 1; fi
+# Ensure the source package pyprobe/ or examples/ is NOT present to avoid shadowing
+RUN if [ -d "pyprobe" ] || [ -d "examples" ] || [ -d "regression" ]; then \
+    echo "Error: source folder (pyprobe/examples/regression) found in test container!" && exit 1; \
+fi
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /workspace /verify-env

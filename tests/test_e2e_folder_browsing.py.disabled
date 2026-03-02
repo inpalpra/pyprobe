@@ -19,7 +19,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import unittest
 from typing import Dict, List, Optional, Tuple
 
@@ -60,17 +59,16 @@ def run_pyprobe(
 
     env = os.environ.copy()
 
-    with tempfile.TemporaryFile(mode="w+") as tmp_out:
-        result = subprocess.run(
-            cmd,
-            stdout=tmp_out,
-            stderr=tmp_out,
-            text=True,
-            env=env,
-            timeout=timeout,
-        )
-        tmp_out.seek(0)
-        output = tmp_out.read()
+    # Fast test pattern: capture directly to memory instead of tempfile
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=timeout,
+    )
+    
+    output = result.stdout + "\n" + result.stderr
 
     return result.returncode, output
 
@@ -94,23 +92,54 @@ def parse_plot_data(output: str) -> Dict[str, List[float]]:
 # Test suite
 # ---------------------------------------------------------------------------
 
-class TestE2EFolderBrowsing(unittest.TestCase):
+class TestE2EFolderBrowsingFast(unittest.TestCase):
     """Suite A: subprocess E2E tests for folder-open CLI flows."""
 
     @classmethod
     def setUpClass(cls):
-        cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, "pyprobe", "__main__.py")):
-            raise RuntimeError("Tests must be run from the repository root.")
-
-        cls.examples_dir = os.path.join(cls.repo_root, "examples")
-        cls.folder_test_dir = os.path.join(cls.repo_root, "regression", "folder_test")
-
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Path to examples directory (lite version in tests/data)
+        cls.examples_dir = os.path.join(test_dir, "data", "examples_lite")
+        if not os.path.isdir(cls.examples_dir):
+            raise RuntimeError(f"Fixture folder not found: {cls.examples_dir}")
+        
+        # Path to fixture folder (in tests/data)
+        cls.folder_test_dir = os.path.join(test_dir, "data", "folder_test")
         if not os.path.isdir(cls.folder_test_dir):
-            raise RuntimeError(
-                f"Fixture folder not found: {cls.folder_test_dir}\n"
-                "Ensure regression/folder_test/ is present."
-            )
+            raise RuntimeError(f"Fixture folder not found: {cls.folder_test_dir}")
+
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
+            
+        # Cache standard subprocess runs for A1, A2, and A3/A4
+        # A1: Open folder only. Timeouts reduced from 3.0 to 0.5s for speed.
+        cls.a1_returncode, cls.a1_output = run_pyprobe(
+            positional_arg=cls.examples_dir,
+            auto_quit_timeout=0.5,
+            timeout=10,
+        )
+        
+        # A2: Open folder with probes ignored.
+        cls.a2_returncode, cls.a2_output = run_pyprobe(
+            positional_arg=cls.examples_dir,
+            probes=["4:x:1"],
+            auto_quit_timeout=0.5,
+            timeout=10,
+        )
+        
+        # A3/A4: Open standard file test
+        script = os.path.join(cls.folder_test_dir, "loop_script.py")
+        cls.a3_returncode, cls.a3_output = run_pyprobe(
+            positional_arg=script,
+            probes=["2:y:1"],
+            auto_run=True,
+            auto_quit=True,
+            timeout=15,
+        )
 
     # ------------------------------------------------------------------
     # A1 — open folder only, no script, exits cleanly via timeout
@@ -122,17 +151,12 @@ class TestE2EFolderBrowsing(unittest.TestCase):
 
         Passing a directory as the positional arg opens the folder-browsing
         view.  With no file selected there is nothing to auto-quit on, so we
-        rely on ``--auto-quit-timeout`` for a hard-quit after 3 s.
+        rely on ``--auto-quit-timeout`` for a hard-quit after 3 s (reduced to 0.5s for speed).
         """
-        returncode, output = run_pyprobe(
-            positional_arg=self.examples_dir,
-            auto_quit_timeout=3.0,
-            timeout=10,
-        )
         self.assertEqual(
-            returncode, 0,
-            f"Expected clean exit (0) when opening a folder, got {returncode}.\n"
-            f"Output:\n{output}",
+            self.a1_returncode, 0,
+            f"Expected clean exit (0) when opening a folder, got {self.a1_returncode}.\n"
+            f"Output:\n{self.a1_output}",
         )
 
     # ------------------------------------------------------------------
@@ -147,18 +171,12 @@ class TestE2EFolderBrowsing(unittest.TestCase):
         nothing to attach to.  The app must not crash, and no PLOT_DATA must
         be emitted.
         """
-        returncode, output = run_pyprobe(
-            positional_arg=self.examples_dir,
-            probes=["4:x:1"],
-            auto_quit_timeout=3.0,
-            timeout=10,
-        )
         self.assertEqual(
-            returncode, 0,
-            f"Expected clean exit (0) with folder + --probe, got {returncode}.\n"
-            f"Output:\n{output}",
+            self.a2_returncode, 0,
+            f"Expected clean exit (0) with folder + --probe, got {self.a2_returncode}.\n"
+            f"Output:\n{self.a2_output}",
         )
-        plot_data = parse_plot_data(output)
+        plot_data = parse_plot_data(self.a2_output)
         self.assertEqual(
             plot_data, {},
             f"Expected no PLOT_DATA when no script was run, got: {plot_data}",
@@ -181,20 +199,12 @@ class TestE2EFolderBrowsing(unittest.TestCase):
             3          pass
             ...
         """
-        script = os.path.join(self.folder_test_dir, "loop_script.py")
-        returncode, output = run_pyprobe(
-            positional_arg=script,
-            probes=["2:y:1"],
-            auto_run=True,
-            auto_quit=True,
-            timeout=15,
-        )
         self.assertEqual(
-            returncode, 0,
-            f"PyProbe exited with code {returncode}.\nOutput:\n{output}",
+            self.a3_returncode, 0,
+            f"PyProbe exited with code {self.a3_returncode}.\nOutput:\n{self.a3_output}",
         )
-        plot_data = parse_plot_data(output)
-        self.assertIn("y", plot_data, f"No PLOT_DATA for 'y'.\nOutput:\n{output}")
+        plot_data = parse_plot_data(self.a3_output)
+        self.assertIn("y", plot_data, f"No PLOT_DATA for 'y'.\nOutput:\n{self.a3_output}")
         self.assertEqual(
             plot_data["y"],
             [10.0, 20.0, 30.0],
@@ -213,20 +223,12 @@ class TestE2EFolderBrowsing(unittest.TestCase):
         PLOT_DATA output.  Any divergence indicates the folder feature broke
         the default file-only path.
         """
-        script = os.path.join(self.folder_test_dir, "loop_script.py")
-        returncode, output = run_pyprobe(
-            positional_arg=script,
-            probes=["2:y:1"],
-            auto_run=True,
-            auto_quit=True,
-            timeout=15,
-        )
         self.assertEqual(
-            returncode, 0,
-            f"PyProbe exited with code {returncode}.\nOutput:\n{output}",
+            self.a3_returncode, 0,
+            f"PyProbe exited with code {self.a3_returncode}.\nOutput:\n{self.a3_output}",
         )
-        plot_data = parse_plot_data(output)
-        self.assertIn("y", plot_data, f"No PLOT_DATA for 'y'.\nOutput:\n{output}")
+        plot_data = parse_plot_data(self.a3_output)
+        self.assertIn("y", plot_data, f"No PLOT_DATA for 'y'.\nOutput:\n{self.a3_output}")
         self.assertEqual(
             plot_data["y"],
             [10.0, 20.0, 30.0],

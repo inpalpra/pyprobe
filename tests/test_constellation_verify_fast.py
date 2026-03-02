@@ -77,13 +77,21 @@ class TestConstellationDataVerificationFast(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root and cache subprocess execution."""
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
+        """Determine paths relative to this test file and run the test once."""
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Path to regression script (in tests/data)
+        cls.script = os.path.join(test_dir, 'data', 'constellation_verify.py')
+        if not os.path.exists(cls.script):
+            raise RuntimeError(f"Could not find regression script at {cls.script}")
+
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
+
             
-        cls.script = os.path.join(cls.repo_root, 'regression', 'constellation_verify.py')
-        
         # Probe received_symbols at line 60 (the assignment line)
         # Run exactly once for the class
         cls.plot_data = run_pyprobe_constellation_test(cls.script, "60:received_symbols:1")

@@ -13,9 +13,6 @@ from unittest.mock import Mock, MagicMock, patch
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 
-# Add project to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 from pyprobe.gui.control_bar import ControlBar
 from pyprobe.ipc.messages import Message, MessageType
 

@@ -19,26 +19,24 @@ class TestCLIAutomation(unittest.TestCase):
         # Path to python executable
         python_exe = sys.executable
         
-        # Path to pyprobe module (assuming run from repo root)
-        # We need to make sure we're running the module from the current repo
-        cwd = os.getcwd()
-        has_local_module = os.path.exists(os.path.join(cwd, 'pyprobe', '__main__.py'))
+        # Determine paths relative to this test file
+        test_dir = os.path.dirname(os.path.abspath(__file__))
         
-        # If not local, check if it is installed
-        if not has_local_module:
-            try:
-                import pyprobe
-            except ImportError:
-                self.fail("Could not find pyprobe module in current directory or installed. Run from repo root.")
-
-        # Path to regression script
-        script_path = os.path.join(cwd, 'regression', 'loop.py')
+        # Path to regression script (in tests/data)
+        script_path = os.path.join(test_dir, 'data', 'loop.py')
         if not os.path.exists(script_path):
             self.fail(f"Could not find regression script at {script_path}")
 
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            self.fail("Could not find pyprobe module installed in environment.")
+
         # Command to run
+        # Use sys.executable to ensure we use the same python as the test runner (crucial for isolated venv)
         cmd = [
-            python_exe, "-m", "pyprobe",
+            sys.executable, "-m", "pyprobe",
             "--auto-run",
             "--auto-quit",
             "--probe", "4:x:1",

@@ -18,7 +18,7 @@
 - **pytest-qt:** For testing PyQt6 components.
 - **Docker:** Used for high-integrity artifact verification via multi-stage builds.
   - **Build Stage:** Isolated container for building wheels.
-  - **Test Stage:** Isolated, non-root container with Xvfb for full GUI test verification.
+  - **Test Stage:** Isolated, non-root container with Xvfb for full GUI test verification. Tests are fully decoupled from the repository layout and validate the installed artifact.
 - **setuptools / uv:** For packaging and dependency management.
 - **Makefile:** Provides a unified interface for the local verification pipeline (`make verify-docker`).
 

@@ -179,6 +179,13 @@ jobs:
           print(f'✓ {len(svgs)} icon SVGs present')
           "
 
+      - name: Hide source package to ensure portability
+        run: |
+          mv pyprobe _pyprobe_hidden
+          mv pyprobe_tracer _pyprobe_tracer_hidden
+          mv examples _examples_hidden
+          mv regression _regression_hidden
+
       - name: Run wheel-safe test suite
         run: |
           # Slow/flaky tests ignored; their _fast variants run automatically.
@@ -235,8 +242,8 @@ jobs:
 
       - name: Remove source packages to prevent shadowing installed wheel
         run: |
-          echo "Removing source package directories to ensure tests use installed PyPI wheel"
-          rm -rf pyprobe pyprobe_tracer
+          echo "Removing source package and regression directories to ensure tests are decoupled"
+          rm -rf pyprobe pyprobe_tracer examples regression
           find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
 
       - name: Install Linux display dependencies

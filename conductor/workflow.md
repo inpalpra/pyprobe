@@ -171,6 +171,10 @@ QT_QPA_PLATFORM=offscreen ./.venv/bin/python -m pytest tests/gui/test_waveform_p
 ```bash
 # Run full test suite and linting
 ./.venv/bin/python -m pytest && ruff check .
+
+# HIGH INTEGRITY: Run isolated Docker verification (Builds wheel + tests in clean container)
+# Use this to ensure tests are decoupled from source and validate the actual artifact.
+rm -rf dist/* && make verify-docker
 ```
 
 ## Testing Requirements

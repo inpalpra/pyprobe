@@ -46,6 +46,7 @@ def run_pyprobe_constellation_test(
     
     env = os.environ.copy()
     
+    # Fast test pattern: capture directly to memory instead of tempfile
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -71,15 +72,36 @@ def run_pyprobe_constellation_test(
     return {}
 
 
-class TestConstellationDataVerification(unittest.TestCase):
+class TestConstellationDataVerificationFast(unittest.TestCase):
     """Verify constellation plot data matches source values."""
     
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root."""
-        cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, 'pyprobe', '__main__.py')):
-            raise RuntimeError("Run tests from repo root")
+        """Determine paths relative to this test file and run the test once."""
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Path to regression script (in tests/data)
+        cls.script = os.path.join(test_dir, 'data', 'constellation_verify.py')
+        if not os.path.exists(cls.script):
+            raise RuntimeError(f"Could not find regression script at {cls.script}")
+
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
+
+            
+        # Probe received_symbols at line 60 (the assignment line)
+        # Run exactly once for the class
+        cls.plot_data = run_pyprobe_constellation_test(cls.script, "60:received_symbols:1")
+        
+        # Preload expected data
+        cls.expected_data = None
+        expected_file = '/tmp/constellation_expected.json'
+        if os.path.exists(expected_file):
+            with open(expected_file, 'r') as f:
+                cls.expected_data = json.load(f)
     
     def test_constellation_values_match_source(self):
         """
@@ -91,41 +113,34 @@ class TestConstellationDataVerification(unittest.TestCase):
         The regression script uses a fixed random seed, so we can predict
         the exact statistics.
         """
-        script = os.path.join(self.repo_root, 'regression', 'constellation_verify.py')
-        
-        # Probe received_symbols at line 60 (the assignment line)
-        plot_data = run_pyprobe_constellation_test(script, "60:received_symbols:1")
+        plot_data = self.plot_data
         
         self.assertIn('real', plot_data, "No constellation real data found")
         self.assertIn('imag', plot_data, "No constellation imag data found")
         self.assertIn('mean_real', plot_data, "No mean_real statistic found")
         self.assertIn('mean_imag', plot_data, "No mean_imag statistic found")
         
-        # Load expected values from the JSON file the script writes
-        expected_file = '/tmp/constellation_expected.json'
-        if os.path.exists(expected_file):
-            with open(expected_file, 'r') as f:
-                expected = json.load(f)
+        expected = self.expected_data
 
-            # With history_count >= 2, the PLOT_DATA mean is computed over all
-            # captured frames combined (not just the last frame). Compute the
-            # expected combined mean across all frames for comparison.
-            if expected:
-                combined_mean_real = sum(f['mean_real'] for f in expected) / len(expected)
-                combined_mean_imag = sum(f['mean_imag'] for f in expected) / len(expected)
+        # With history_count >= 2, the PLOT_DATA mean is computed over all
+        # captured frames combined (not just the last frame). Compute the
+        # expected combined mean across all frames for comparison.
+        if expected:
+            combined_mean_real = sum(f['mean_real'] for f in expected) / len(expected)
+            combined_mean_imag = sum(f['mean_imag'] for f in expected) / len(expected)
 
-                self.assertAlmostEqual(
-                    plot_data['mean_real'],
-                    combined_mean_real,
-                    places=1,
-                    msg=f"Mean real mismatch: got {plot_data['mean_real']}, expected ~{combined_mean_real}"
-                )
-                self.assertAlmostEqual(
-                    plot_data['mean_imag'],
-                    combined_mean_imag,
-                    places=1,
-                    msg=f"Mean imag mismatch: got {plot_data['mean_imag']}, expected ~{combined_mean_imag}"
-                )
+            self.assertAlmostEqual(
+                plot_data['mean_real'],
+                combined_mean_real,
+                places=1,
+                msg=f"Mean real mismatch: got {plot_data['mean_real']}, expected ~{combined_mean_real}"
+            )
+            self.assertAlmostEqual(
+                plot_data['mean_imag'],
+                combined_mean_imag,
+                places=1,
+                msg=f"Mean imag mismatch: got {plot_data['mean_imag']}, expected ~{combined_mean_imag}"
+            )
         
         # Verify we have data (not empty)
         self.assertGreater(len(plot_data['real']), 0, "No real values captured")
@@ -140,9 +155,7 @@ class TestConstellationDataVerification(unittest.TestCase):
     
     def test_history_count_shows_all_iterations(self):
         """Verify that the constellation captures data from all iterations."""
-        script = os.path.join(self.repo_root, 'regression', 'constellation_verify.py')
-        
-        plot_data = run_pyprobe_constellation_test(script, "60:received_symbols:1")
+        plot_data = self.plot_data
         
         self.assertIn('history_count', plot_data, "No history_count found")
         self.assertGreaterEqual(
