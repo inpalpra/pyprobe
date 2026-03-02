@@ -19,21 +19,21 @@ This plan outlines the steps to implement a high-integrity, multi-stage Docker p
 - [x] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)** 6afbb1d
 
 ## Phase 2: Isolated Test Stage with GUI Support
-- [ ] **Task: Create Test Dockerfile**
-    - [ ] Create `docker/test.Dockerfile` starting from `python:3.12-slim`.
-    - [ ] Install system dependencies for GUI testing: `xvfb`, `libgl1-mesa-glx`, `libegl1`, `libdbus-1-3`, `libxkbcommon-x11-0`.
-    - [ ] Create a non-root user `appuser`.
-    - [ ] Configure `WORKDIR /workspace` and copy the built wheel, `tests/`, `regression/`, and `examples/`.
-    - [ ] Implement logic to create a virtual environment, install the wheel, and explicitly verify the absence of the `pyprobe/` source directory.
-- [ ] **Task: Update Verification Script (Test Logic)**
-    - [ ] Add logic to `scripts/verify-artifact.sh` to build the Stage B image.
-    - [ ] Add logic to run the test container under `Xvfb`.
-    - [ ] Ensure the script exits with a non-zero status if the tests fail.
-- [ ] **Task: Verify Isolated Execution**
-    - [ ] Run the full verification pipeline via `scripts/verify-artifact.sh`.
-    - [ ] Confirm that tests pass in the isolated container.
-    - [ ] Intentionally introduce a packaging error (e.g., exclude a required file in `pyproject.toml`) and confirm the pipeline fails.
-- [ ] **Task: Conductor - User Manual Verification 'Phase 2: Isolated Test Stage with GUI Support' (Protocol in workflow.md)**
+- [x] **Task: Create Test Dockerfile**
+    - [x] Create `docker/test.Dockerfile` starting from `python:3.12-slim`.
+    - [x] Install system dependencies for GUI testing: `xvfb`, `libgl1`, `libegl1`, `libdbus-1-3`, `libxkbcommon-x11-0`.
+    - [x] Create a non-root user `appuser`.
+    - [x] Configure `WORKDIR /workspace` and copy the built wheel, `tests/`, `regression/`, and `examples/`.
+    - [x] Implement logic to create a virtual environment, install the wheel, and explicitly verify the absence of the `pyprobe/` source directory.
+- [x] **Task: Update Verification Script (Test Logic)**
+    - [x] Add logic to `scripts/verify-artifact.sh` to build the Stage B image.
+    - [x] Add logic to run the test container under `Xvfb`.
+    - [x] Ensure the script exits with a non-zero status if the tests fail.
+- [x] **Task: Verify Isolated Execution**
+    - [x] Run the full verification pipeline via `scripts/verify-artifact.sh`.
+    - [x] Confirm that tests pass in the isolated container.
+    - [x] Intentionally introduce a packaging error and confirm the pipeline fails.
+- [~] **Task: Conductor - User Manual Verification 'Phase 2: Isolated Test Stage with GUI Support' (Protocol in workflow.md)**
 
 ## Phase 3: Final Orchestration and Cleanup
 - [ ] **Task: Replace Makefile.docker**
