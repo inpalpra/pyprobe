@@ -14,7 +14,7 @@ jobs:
   test-wheel:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/inpalpra/pyprobe-ci:v1
+      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
 
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/inpalpra/pyprobe-ci:v1
+      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
 
     steps:
       - uses: actions/checkout@v4
