@@ -112,18 +112,17 @@ class TestOverlayDragDropTwoFramesFast(unittest.TestCase):
     def setUpClass(cls):
         """Determine paths relative to this test file and run the test."""
         test_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.dirname(test_dir)
         
-        # Path to regression script (fallback if not moved to tests/data yet)
+        # Path to regression script (in tests/data)
         script = os.path.join(test_dir, 'data', 'dsp_demo_two_frames.py')
         if not os.path.exists(script):
-            script = os.path.join(repo_root, 'regression', 'dsp_demo_two_frames.py')
-            if not os.path.exists(script):
-                raise RuntimeError(f"Could not find regression script at {script}")
+            raise RuntimeError(f"Could not find regression script at {script}")
 
-        # Ensure pyprobe is available (add repo root to sys.path)
-        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
 
         # Run subprocess EXACTLY ONCE and cache for all test methods
         # Probe signal_i at line 64 (tuple unpack assignment in main())

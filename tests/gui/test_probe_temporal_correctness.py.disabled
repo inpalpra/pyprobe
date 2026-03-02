@@ -132,22 +132,17 @@ class TestProbeTemporalCorrectness(unittest.TestCase):
         """Determine paths relative to this test file and locate regression scripts."""
         gui_test_dir = os.path.dirname(os.path.abspath(__file__))
         test_dir = os.path.dirname(gui_test_dir)
-        repo_root = os.path.dirname(test_dir)
         
-        # Path to fixture folder (now in tests/data)
+        # Path to fixture folder (in tests/data)
         cls.temporal_dir = os.path.join(test_dir, "data", "temporal")
         if not os.path.isdir(cls.temporal_dir):
-            # Fallback for local development
-            cls.temporal_dir = os.path.join(repo_root, "regression", "temporal")
-            if not os.path.isdir(cls.temporal_dir):
-                raise RuntimeError(
-                    f"Fixture folder not found: {cls.temporal_dir}\n"
-                    "Ensure tests/data/temporal/ or regression/temporal/ is present."
-                )
+            raise RuntimeError(f"Fixture folder not found: {cls.temporal_dir}")
 
-        # Ensure pyprobe is available (add repo root to sys.path)
-        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
 
     def _run(self, script_name: str, probes: List[str]) -> List[dict]:
         """Shorthand E2E launcher."""

@@ -24,15 +24,12 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
         probes = []
         
         test_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.dirname(test_dir)
         
         cls.megascript_path = os.path.join(test_dir, "gui", "data", "e2e_capture_temporal_megascript.py")
         os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)
         
-        # Determine base directory for helper scripts (tests/data or regression)
+        # Determine base directory for helper scripts (in tests/data)
         base_data_dir = os.path.join(test_dir, "data")
-        if not os.path.exists(os.path.join(base_data_dir, "loop.py")):
-            base_data_dir = os.path.join(repo_root, "regression")
             
         files = {
             "loop": os.path.join(base_data_dir, "loop.py"),
@@ -51,9 +48,11 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
             "multi_probe": [(9, "a", 1), (9, "b", 1), (9, "x", 1)]
         }
         
-        # Ensure pyprobe is available (add repo root to sys.path)
-        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
-            sys.path.insert(0, repo_root)
+        # Ensure pyprobe is available
+        try:
+            import pyprobe
+        except ImportError:
+            raise ImportError("Could not find pyprobe module installed in environment.")
             
         funcs = []
         for name, path in files.items():

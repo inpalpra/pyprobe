@@ -17,19 +17,17 @@ from pyprobe.gui.main_window import MainWindow, SPLIT_TREE, SPLIT_CODE, SPLIT_PR
 
 _HERE = os.path.dirname(__file__)
 _TEST_DIR = os.path.dirname(_HERE)
-_REPO_ROOT = os.path.dirname(_TEST_DIR)
 
-# Path to fixture folder (now in tests/data)
+# Path to fixture folder (in tests/data)
 FOLDER_TEST_DIR = os.path.join(_TEST_DIR, "data", "folder_test")
 if not os.path.isdir(FOLDER_TEST_DIR):
-    # Fallback for local development
-    FOLDER_TEST_DIR = os.path.join(_REPO_ROOT, "regression", "folder_test")
+    raise RuntimeError(f"Fixture folder not found: {FOLDER_TEST_DIR}")
 
 LOOP_SCRIPT = os.path.abspath(os.path.join(FOLDER_TEST_DIR, "loop_script.py"))
 MAIN_ENTRY = os.path.abspath(os.path.join(FOLDER_TEST_DIR, "main_entry.py"))
 REGRESSION_LOOP = os.path.abspath(os.path.join(_TEST_DIR, "data", "loop.py"))
 if not os.path.exists(REGRESSION_LOOP):
-    REGRESSION_LOOP = os.path.abspath(os.path.join(_REPO_ROOT, "regression", "loop.py"))
+    raise RuntimeError(f"Loop script not found: {REGRESSION_LOOP}")
 
 _STATE = {}
 

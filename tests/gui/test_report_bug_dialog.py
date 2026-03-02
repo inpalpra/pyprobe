@@ -141,7 +141,7 @@ def test_report_sanitizes_paths_in_output(qtbot):
     collector = SessionStateCollector(
         file_getter=lambda: [
             OpenFileEntry(
-                path=f"{home}/repos/pyprobe/examples/demo.py",
+                path=f"{home}/some_folder/demo.py",
                 is_probed=True, is_executed=True, has_unsaved=False,
             )
         ],
@@ -462,7 +462,7 @@ def test_github_url_contains_no_home_path(qtbot):
     collector = SessionStateCollector(
         file_getter=lambda: [
             OpenFileEntry(
-                path=f"{home}/repos/pyprobe/examples/demo.py",
+                path=f"{home}/some_folder/demo.py",
                 is_probed=True, is_executed=True, has_unsaved=False,
             )
         ],
@@ -498,11 +498,11 @@ def test_path_sanitization_end_to_end(qtbot):
     home = str(Path.home())
 
     report = BugReport(
-        description=f"Crash at {home}/repos/pyprobe/main.py",
+        description=f"Crash at {home}/some_folder/main.py",
         steps=(
             RecordedStep(
                 seq_num=1,
-                description=f"Loaded file {home}/examples/demo.py",
+                description=f"Loaded file {home}/some_folder/demo.py",
                 timestamp=1.0,
                 action_type="LOAD",
                 target_element="FILE_TREE",
@@ -512,18 +512,18 @@ def test_path_sanitization_end_to_end(qtbot):
         ),
         open_files=(
             OpenFileEntry(
-                path=f"{home}/examples/demo.py",
+                path=f"{home}/some_folder/demo.py",
                 is_probed=True,
                 is_executed=True,
                 has_unsaved=False,
-                contents=f"# Script at {home}/examples/demo.py\nimport numpy\n",
+                contents=f"# Script at {home}/some_folder/demo.py\nimport numpy\n",
             ),
         ),
         environment={
             "pyprobe_version": "0.1.27",
             "virtualenv": f"{home}/.venv/bin/python",
         },
-        logs=f"ERROR in {home}/repos/pyprobe/core/tracer.py at line 99\n",
+        logs=f"ERROR in {home}/some_folder/core/tracer.py at line 99\n",
     )
 
     formatter = ReportFormatter()
