@@ -20,7 +20,7 @@ Goal: Move test helpers to a stable location and update tests to use relative pa
 - [x] Task: Relocate Helper Scripts 550216a
     - [ ] Move `regression/loop.py` and other identified helpers to `tests/data/`.
     - [ ] Ensure any shared resources used by these scripts are also moved or correctly referenced.
-- [ ] Task: Update Path Resolution in Tests
+- [x] Task: Update Path Resolution in Tests a4c7155
     - [ ] Refactor `test_cli_automation.py` to use `Path(__file__).parent / "data" / "loop.py"`.
     - [ ] Update all other audited tests to use similar robust path resolution.
     - [ ] Remove all `os.getcwd()` calls used for finding test assets.
