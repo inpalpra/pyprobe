@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 
 # ---- System runtime deps (Qt6 compatible) ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    xvfb \
+    xvfb xauth \
     libgl1 libegl1 libglib2.0-0 \
     libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
     libxcb-keysyms1 libxcb-render-util0 \
