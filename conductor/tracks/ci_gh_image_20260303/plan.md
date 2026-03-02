@@ -16,8 +16,8 @@ This track implements a versioned CI image strategy using GitHub Container Regis
 
 ## Phase 2: Workflow Migration [ ]
 
-- [ ] Task: Update CI workflow to use versioned GHCR image
-    - [ ] Modify `.github/workflows/ci.yml` to pull image from GHCR using `.ci-version`
+- [x] Task: Update CI workflow to use versioned GHCR image 925a2b1
+    - [x] Modify `.github/workflows/ci.yml` to pull image from GHCR using `.ci-version`
 - [ ] Task: Update Release workflow to use versioned GHCR image
     - [ ] Modify `.github/workflows/release.yml` to pull image from GHCR using `.ci-version`
 - [ ] Task: Verify CI integration
