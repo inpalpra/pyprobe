@@ -17,7 +17,7 @@ Goal: Move test helpers to a stable location and update tests to use relative pa
 - [x] Task: Create `tests/data/` Directory 4333baf
     - [ ] Create the directory structure.
     - [ ] Add a `.gitkeep` or initial helper script.
-- [ ] Task: Relocate Helper Scripts
+- [x] Task: Relocate Helper Scripts 550216a
     - [ ] Move `regression/loop.py` and other identified helpers to `tests/data/`.
     - [ ] Ensure any shared resources used by these scripts are also moved or correctly referenced.
 - [ ] Task: Update Path Resolution in Tests
