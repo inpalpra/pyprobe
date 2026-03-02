@@ -17,8 +17,4 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [ ] **Track: Upgraded Step Recorder & Scene Graph**
 *Link: [./tracks/upgraded_step_recorder_20260227/](./tracks/upgraded_step_recorder_20260227/)*
 
----
-
-- [x] **Track: 3-Stage Maximization Cycle for Graph Widgets**
-*Link: [./tracks/maximize_cycle_3stage_20260302/](./tracks/maximize_cycle_3stage_20260302/)*
 
