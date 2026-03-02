@@ -10,3 +10,6 @@ def test_ci_version_content():
 
 def test_ci_dockerfile_exists():
     assert os.path.exists("docker/ci.Dockerfile")
+
+def test_build_ci_image_workflow_exists():
+    assert os.path.exists(".github/workflows/build-ci-image.yml")
