@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Portabilize the test suite (Issue #10)**
+- [x] **Track: Portabilize the test suite (Issue #10)**
 *Link: [./tracks/portabilize-tests_20260302/](./tracks/portabilize-tests_20260302/)*
