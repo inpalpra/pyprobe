@@ -46,6 +46,6 @@ PyProbe Plots is a powerful, visual, variable-probing debugger designed specific
 - **Forensic-Grade Observability:** User-triggered interactions can be recorded with precise file/line/column identity, enabling exact reconstruction of UI state changes.
 - **No Heuristic Rewriting of User Intent:** Bug reports preserve the user's description and interaction history verbatim. The system does not reinterpret, reclassify, or infer meaning.
 - **Strict Separation of Concerns:** Debugger/tracer logic runs independently of the GUI to ensure stability, fault isolation, and performance.
-- **Regression-Protected Evolution:** All core behavior (graph lifecycle, reference counting, recording, formatting) is guarded by permanent regression tests to prevent behavioral drift.
+- **Regression-Protected Evolution:** All core behavior is guarded by permanent product tests. A strict boundary is maintained between product tests (runnable against a clean installation) and repository-specific infrastructure checks.
 - **LLM-Aware but Human-First:** Reports are readable by engineers and optionally optimized for LLM consumption — without compromising honesty or structural integrity.
 - **Zero-Loss Recording Principle:** If a user interaction mutates state or visuals, it should be observable and recordable.
