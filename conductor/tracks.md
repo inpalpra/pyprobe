@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Refactor: Separate Product Tests from Infrastructure Tests**
+- [~] **Track: Refactor: Separate Product Tests from Infrastructure Tests**
 *Link: [./tracks/test_separation_20260303/](./tracks/test_separation_20260303/)*

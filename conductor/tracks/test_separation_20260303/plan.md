@@ -6,9 +6,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Audit and Preparation' (Protocol in workflow.md) (442206a)
 
 ## Phase 2: Reorganization (Move Files)
-- [ ] Task: Move `test_ci_config.py` and other infrastructure tests to `dev-tests/infra/`.
-- [ ] Task: Move `check_scroll_click.py` and other manual scripts to `dev-tests/manual/`.
-- [ ] Task: Update any internal imports or paths affected by the move.
+- [x] Task: Move `test_ci_config.py` and other infrastructure tests to `dev-tests/infra/`. (9134005)
+- [x] Task: Move `check_scroll_click.py` and other manual scripts to `dev-tests/manual/`. (d37f25f)
+- [x] Task: Update any internal imports or paths affected by the move. (5e95d4e)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Reorganization (Move Files)' (Protocol in workflow.md)
 
 ## Phase 3: Infrastructure Refactor
