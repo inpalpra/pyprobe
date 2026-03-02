@@ -112,6 +112,13 @@ def probe_color():
     return QColor("#00ffff")
 
 
+@pytest.fixture
+def data_dir():
+    """Fixture to provide the path to the tests/data directory."""
+    from pathlib import Path
+    return Path(__file__).parent / "data"
+
+
 class PlotAssertions:
     """Helper methods to inspect actual pyqtgraph widget state.
 

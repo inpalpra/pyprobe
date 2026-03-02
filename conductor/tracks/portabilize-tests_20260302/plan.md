@@ -6,9 +6,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research & Setup' (Protocol in workflow.md) 0580db2
 
 ## Phase 2: Asset Migration
-- [ ] Task: Create `tests/data/` if it doesn't exist and migrate identified minimum assets.
-- [ ] Task: Update `tests/conftest.py` or create a new fixture to provide a stable base path for test data.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Asset Migration' (Protocol in workflow.md)
+- [x] Task: Create `tests/data/` if it doesn't exist and migrate identified minimum assets. 30cf21e
+- [x] Task: Update `tests/conftest.py` or create a new fixture to provide a stable base path for test data. 30cf21e
+- [~] Task: Conductor - User Manual Verification 'Phase 2: Asset Migration' (Protocol in workflow.md)
 
 ## Phase 3: Test Refactoring (TDD)
 - [ ] Task: Refactor `tests/test_e2e_folder_browsing_fast.py` to use `tests/data/` and strictly portable imports.
