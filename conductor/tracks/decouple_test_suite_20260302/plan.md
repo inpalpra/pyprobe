@@ -11,7 +11,7 @@ Goal: Identify all tests and code paths that depend on the repository root or th
     - [ ] Document all affected test files and the specific files they depend on.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Research & Audit' (Protocol in workflow.md)
 
-## Phase 2: Relocation & Refactoring [ ]
+## Phase 2: Relocation & Refactoring [x] [checkpoint: db16f08]
 Goal: Move test helpers to a stable location and update tests to use relative path resolution.
 
 - [x] Task: Create `tests/data/` Directory 4333baf
