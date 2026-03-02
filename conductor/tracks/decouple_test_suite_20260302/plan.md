@@ -14,7 +14,7 @@ Goal: Identify all tests and code paths that depend on the repository root or th
 ## Phase 2: Relocation & Refactoring [ ]
 Goal: Move test helpers to a stable location and update tests to use relative path resolution.
 
-- [ ] Task: Create `tests/data/` Directory
+- [x] Task: Create `tests/data/` Directory 4333baf
     - [ ] Create the directory structure.
     - [ ] Add a `.gitkeep` or initial helper script.
 - [ ] Task: Relocate Helper Scripts
