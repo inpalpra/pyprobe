@@ -65,6 +65,7 @@ jobs:
       - name: Hide source package to ensure portability
         run: |
           mv pyprobe _pyprobe_hidden
+          mv pyprobe_tracer _pyprobe_tracer_hidden
           mv examples _examples_hidden
           mv regression _regression_hidden
 
