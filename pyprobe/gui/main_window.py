@@ -167,6 +167,7 @@ class MainWindow(QMainWindow):
         self._script_runner = ScriptRunner(self)
         self._message_handler = MessageHandler(self._script_runner, self._tracer, self)
         self._redraw_throttler = RedrawThrottler()
+        self._saved_ui_states: Dict[str, bool] = {}
         self._setup_script_runner()
         self._setup_message_handler()
         self._setup_fps_timer()
@@ -438,8 +439,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._tree_pane)
 
         # === M1: Code viewer with gutter (replaces watch list) ===
-        code_container = QWidget()
-        code_layout = QHBoxLayout(code_container)
+        self._code_container = QWidget()
+        code_layout = QHBoxLayout(self._code_container)
         code_layout.setContentsMargins(0, 0, 0, 0)
         code_layout.setSpacing(0)
 
@@ -449,7 +450,7 @@ class MainWindow(QMainWindow):
 
         code_layout.addWidget(self._code_gutter)
         code_layout.addWidget(self._code_viewer)
-        splitter.addWidget(code_container)
+        splitter.addWidget(self._code_container)
 
         # Probe panel container (right panel)
         self._probe_container = ProbePanelContainer()
@@ -814,6 +815,7 @@ class MainWindow(QMainWindow):
         lm = self._probe_container.layout_manager
         lm.panel_park_requested.connect(self._on_panel_park_requested)
         lm.panel_unpark_requested.connect(self._on_dock_bar_restore_anchor)
+        lm.full_maximize_toggled.connect(self._on_full_maximize_toggled)
 
         # M3: Connect marker changes to save
         from ..plots.marker_model import MarkerStore
@@ -1730,6 +1732,40 @@ class MainWindow(QMainWindow):
                 print(f"PLOT_DATA:{json.dumps(export_record, cls=NumpyEncoder)}", file=sys.stderr)
 
     # === M2.5: Park / Restore / Overlay ===
+
+    @pyqtSlot(bool)
+    def _on_full_maximize_toggled(self, is_full: bool) -> None:
+        """Handle transition to/from FULL maximization state."""
+        if is_full:
+            # Save current visibility/expanded states
+            self._saved_ui_states = {
+                'tree_pane': self._tree_pane.isVisible(),
+                'watch_pane': self._watch_pane.isVisible(),
+                'code_container': self._code_container.isVisible(),
+                'control_bar': self._control_bar.isVisible(),
+            }
+            # Force hide components for full focus
+            self._tree_pane.hide()
+            self._watch_pane.hide()
+            self._code_container.hide()
+            self._control_bar.hide()
+            
+            # Show restoration message in status bar
+            self._status_bar.showMessage("Press 'M' to restore layout.")
+        else:
+            # Restore visibility from saved states
+            if 'tree_pane' in self._saved_ui_states:
+                self._tree_pane.setVisible(self._saved_ui_states['tree_pane'])
+                self._watch_pane.setVisible(self._saved_ui_states['watch_pane'])
+                self._code_container.setVisible(self._saved_ui_states['code_container'])
+                self._control_bar.setVisible(self._saved_ui_states['control_bar'])
+            
+            # Clear restoration message
+            self._status_bar.clearMessage()
+            if self._script_runner.is_running:
+                self._status_bar.showMessage(f"Running: {os.path.basename(self._script_path or '')}")
+            else:
+                self._status_bar.showMessage("Ready")
 
     def _on_panel_park_requested(self, anchor: ProbeAnchor) -> None:
         """Park all panels for an anchor to the dock bar."""

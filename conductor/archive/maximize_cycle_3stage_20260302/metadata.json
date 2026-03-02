@@ -1,0 +1,8 @@
+{
+  "track_id": "maximize_cycle_3stage_20260302",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-03-02T13:45:00Z",
+  "updated_at": "2026-03-02T13:45:00Z",
+  "description": "Enhance the 'Maximize' (M key) behavior to support a 3-stage cycle instead of the current 2-stage toggle. First Press (Normal -> Maximized in Container): The focused graph fills the entire graphing area (ProbePanelContainer). Other graph widgets are parked (hidden). Second Press (Maximized in Container -> Maximized Full): The focused graph fills the entire application space. Non-graph widgets (Code Viewer, Symbol Watch, File Explorer, Control Bar, Status Bar, Dock Bar) are hidden. Third Press (Maximized Full -> Normal): Restore all graphs and non-graph widgets to their original states."
+}
