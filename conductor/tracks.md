@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: Decouple test suite from repository filesystem layout**
+- [x] **Track: Decouple test suite from repository filesystem layout**
 *Link: [./tracks/decouple_test_suite_20260302/](./tracks/decouple_test_suite_20260302/)*
