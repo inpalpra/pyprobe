@@ -8,10 +8,10 @@ This track implements a versioned CI image strategy using GitHub Container Regis
     - [x] Create `.ci-version` containing `v1`
 - [x] Task: Implement Base CI Dockerfile `docker/ci.Dockerfile` cb5967c
     - [x] Define `docker/ci.Dockerfile` with all required system and Python dependencies (Xvfb, Qt6 libs, build tools, pytest, etc.)
-- [ ] Task: Create GitHub Workflow to build and push the CI image
-    - [ ] Implement `.github/workflows/build-ci-image.yml`
-    - [ ] Set up triggers for `docker/ci.Dockerfile` and `.ci-version`
-    - [ ] Use `GITHUB_TOKEN` for GHCR authentication and push to `ghcr.io/inpalpra/pyprobe-ci:<version>`
+- [x] Task: Create GitHub Workflow to build and push the CI image a06a7c6
+    - [x] Implement `.github/workflows/build-ci-image.yml`
+    - [x] Set up triggers for `docker/ci.Dockerfile` and `.ci-version`
+    - [x] Use `GITHUB_TOKEN` for GHCR authentication and push to `ghcr.io/inpalpra/pyprobe-ci:<version>`
 - [ ] Task: Conductor - User Manual Verification 'Infrastructure & Versioning' (Protocol in workflow.md)
 
 ## Phase 2: Workflow Migration [ ]
