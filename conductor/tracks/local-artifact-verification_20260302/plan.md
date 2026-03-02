@@ -2,7 +2,7 @@
 
 This plan outlines the steps to implement a high-integrity, multi-stage Docker pipeline for local artifact verification, ensuring that the `pyprobe` wheel is correctly built and fully functional in an isolated environment.
 
-## Phase 1: Build Stage and Initial Orchestration
+## Phase 1: Build Stage and Initial Orchestration [checkpoint: 6afbb1d]
 - [x] **Task: Create Build Dockerfile**
     - [x] Create `docker/build.Dockerfile` using `python:3.12-slim`.
     - [x] Implement layer caching by copying `pyproject.toml` and `uv.lock` first.
@@ -16,7 +16,7 @@ This plan outlines the steps to implement a high-integrity, multi-stage Docker p
     - [x] Run `scripts/verify-artifact.sh` (build-only mode).
     - [x] Confirm that a `.whl` file is produced in the local `dist/` directory.
     - [x] Inspect the built wheel to ensure it contains expected package metadata.
-- [~] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)**
+- [x] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)** 6afbb1d
 
 ## Phase 2: Isolated Test Stage with GUI Support
 - [ ] **Task: Create Test Dockerfile**
