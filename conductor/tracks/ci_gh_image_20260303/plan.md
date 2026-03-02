@@ -2,7 +2,7 @@
 
 This track implements a versioned CI image strategy using GitHub Container Registry (GHCR) to ensure consistency and speed up CI/CD workflows.
 
-## Phase 1: Infrastructure & Versioning [ ]
+## Phase 1: Infrastructure & Versioning [checkpoint: 76ba093]
 
 - [x] Task: Create centralized versioning file `.ci-version` 333d62d
     - [x] Create `.ci-version` containing `v1`
@@ -12,7 +12,7 @@ This track implements a versioned CI image strategy using GitHub Container Regis
     - [x] Implement `.github/workflows/build-ci-image.yml`
     - [x] Set up triggers for `docker/ci.Dockerfile` and `.ci-version`
     - [x] Use `GITHUB_TOKEN` for GHCR authentication and push to `ghcr.io/inpalpra/pyprobe-ci:<version>`
-- [ ] Task: Conductor - User Manual Verification 'Infrastructure & Versioning' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Infrastructure & Versioning' (Protocol in workflow.md) 76ba093
 
 ## Phase 2: Workflow Migration [ ]
 
