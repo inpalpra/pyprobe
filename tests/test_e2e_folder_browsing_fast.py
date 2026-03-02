@@ -97,18 +97,26 @@ class TestE2EFolderBrowsingFast(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, "regression")):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
-
-        cls.examples_dir = os.path.join(cls.repo_root, "examples")
-        cls.folder_test_dir = os.path.join(cls.repo_root, "regression", "folder_test")
-
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        repo_root = os.path.dirname(test_dir)
+        
+        # Path to examples directory (relative to repo_root)
+        cls.examples_dir = os.path.join(repo_root, "examples")
+        
+        # Path to fixture folder (now in tests/data)
+        cls.folder_test_dir = os.path.join(test_dir, "data", "folder_test")
         if not os.path.isdir(cls.folder_test_dir):
-            raise RuntimeError(
-                f"Fixture folder not found: {cls.folder_test_dir}\n"
-                "Ensure regression/folder_test/ is present."
-            )
+            # Fallback for local development
+            cls.folder_test_dir = os.path.join(repo_root, "regression", "folder_test")
+            if not os.path.isdir(cls.folder_test_dir):
+                raise RuntimeError(
+                    f"Fixture folder not found: {cls.folder_test_dir}\n"
+                    "Ensure tests/data/folder_test/ or regression/folder_test/ is present."
+                )
+
+        # Ensure pyprobe is available (add repo root to sys.path)
+        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
             
         # Cache standard subprocess runs for A1, A2, and A3/A4
         # A1: Open folder only. Timeouts reduced from 3.0 to 0.5s for speed.

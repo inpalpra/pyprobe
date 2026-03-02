@@ -20,22 +20,26 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
            all subsequent tests, breaking their probes. Building dynamically calculates the 
            correct line offsets at runtime so probes always map accurately.
         """
-        cls.repo_root = os.getcwd()
-        if not os.path.isdir(os.path.join(cls.repo_root, 'regression')):
-            raise RuntimeError("Run tests from repo root (regression/ directory not found)")
-            
-        cls.megascript_path = os.path.join(cls.repo_root, "tests", "gui", "data", "e2e_capture_temporal_megascript.py")
-        os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)
-        
-        files = {
-            "loop": os.path.join(cls.repo_root, "regression", "loop.py"),
-            "deferred_return": os.path.join(cls.repo_root, "regression", "deferred_return.py"),
-            "high_freq": os.path.join(cls.repo_root, "regression", "high_freq.py"),
-            "multi_probe": os.path.join(cls.repo_root, "regression", "multi_probe.py"),
-        }
-        
         megascript_content = 'import sys\nimport time\n'
         probes = []
+        
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        repo_root = os.path.dirname(test_dir)
+        
+        cls.megascript_path = os.path.join(test_dir, "gui", "data", "e2e_capture_temporal_megascript.py")
+        os.makedirs(os.path.dirname(cls.megascript_path), exist_ok=True)
+        
+        # Determine base directory for helper scripts (tests/data or regression)
+        base_data_dir = os.path.join(test_dir, "data")
+        if not os.path.exists(os.path.join(base_data_dir, "loop.py")):
+            base_data_dir = os.path.join(repo_root, "regression")
+            
+        files = {
+            "loop": os.path.join(base_data_dir, "loop.py"),
+            "deferred_return": os.path.join(base_data_dir, "deferred_return.py"),
+            "high_freq": os.path.join(base_data_dir, "high_freq.py"),
+            "multi_probe": os.path.join(base_data_dir, "multi_probe.py"),
+        }
         
         current_megascript_line = 3
         
@@ -47,6 +51,10 @@ class TestE2ECapturePipelineFast(unittest.TestCase):
             "multi_probe": [(9, "a", 1), (9, "b", 1), (9, "x", 1)]
         }
         
+        # Ensure pyprobe is available (add repo root to sys.path)
+        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+            
         funcs = []
         for name, path in files.items():
             func_name = f"run_{name}"
