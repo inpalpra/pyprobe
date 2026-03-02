@@ -28,3 +28,8 @@ def test_local_dockerfile_uses_ghcr_image():
     with open("docker/Dockerfile", "r") as f:
         content = f.read()
     assert "ghcr.io/inpalpra/pyprobe-ci" in content
+
+def test_makefile_uses_ci_version():
+    with open("Makefile", "r") as f:
+        content = f.read()
+    assert ".ci-version" in content
