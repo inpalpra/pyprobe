@@ -21,3 +21,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: why did https://github.com/inpalpra/pyprobe/actions/runs/22540049369/ fail? Create a new GH issue. Use GH cli api.**
 *Link: [./tracks/investigate_ci_failure_20260302/](./tracks/investigate_ci_failure_20260302/)*
+
+---
+
+- [ ] **Track: Portabilize the test suite (Issue #10)**
+*Link: [./tracks/portabilize-tests_20260302/](./tracks/portabilize-tests_20260302/)*
