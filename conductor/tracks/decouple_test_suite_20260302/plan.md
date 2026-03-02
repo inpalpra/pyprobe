@@ -26,7 +26,7 @@ Goal: Move test helpers to a stable location and update tests to use relative pa
     - [ ] Remove all `os.getcwd()` calls used for finding test assets.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Relocation & Refactoring' (Protocol in workflow.md)
 
-## Phase 3: Verification & Tooling [ ]
+## Phase 3: Verification & Tooling [x] [checkpoint: b00a54f]
 Goal: Ensure the test suite passes in an isolated environment and provide a verification mechanism.
 
 - [x] Task: Update Docker Verification Tooling
