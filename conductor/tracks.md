@@ -22,7 +22,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [x] **Track: why did https://github.com/inpalpra/pyprobe/actions/runs/22540049369/ fail? Create a new GH issue. Use GH cli api.**
 *Link: [./tracks/investigate_ci_failure_20260302/](./tracks/investigate_ci_failure_20260302/)*
 
----
-
-- [x] **Track: Implement a local artifact verification pipeline (Docker-based) for pyprobe to validate built wheels in isolation, ensuring consistency with CI.**
-*Link: [./tracks/local-artifact-verification_20260302/](./tracks/local-artifact-verification_20260302/)*
