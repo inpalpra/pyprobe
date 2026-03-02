@@ -11,10 +11,10 @@ without requiring GUI mouse interaction.
 """
 
 import json
+import sys as _sys
 import os
 import subprocess
 import sys
-import tempfile
 import unittest
 from typing import Dict, List
 
@@ -42,6 +42,7 @@ def run_pyprobe_with_overlay(
     cmd = [
         python_exe, "-m", "pyprobe",
         "--auto-run",
+        "--auto-quit",
         "--auto-quit-timeout", str(timeout),
         "--loglevel", "WARNING",
         "--probe", probe_spec,
@@ -51,18 +52,24 @@ def run_pyprobe_with_overlay(
 
     env = os.environ.copy()
 
-    with tempfile.TemporaryFile(mode='w+') as tmp_out:
-        result = subprocess.run(
-            cmd,
-            stdout=tmp_out,
-            stderr=tmp_out,
-            text=True,
-            env=env,
-            timeout=timeout + 2,
-        )
+    # Fast test pattern: capture directly to memory instead of tempfile
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=timeout + 2,
+    )
 
-        tmp_out.seek(0)
-        output = tmp_out.read()
+    output = result.stdout + "\n" + result.stderr
+
+    # Forward subprocess output info to CI for debugging
+    print(f"[SUBPROC] rc={result.returncode} stdout_len={len(result.stdout)} stderr_len={len(result.stderr)}", file=_sys.stderr)
+    # Dump last 2000 chars of combined output for DIAG visibility
+    combined = result.stdout + result.stderr
+    for line in combined.splitlines()[-30:]:
+        if 'DIAG' in line or 'PLOT_DATA' in line:
+            print(f"[SUBPROC] {line}", file=_sys.stderr)
 
     # Parse PLOT_DATA lines from output (each is a single line of JSON)
     # Accept even if process crashed during cleanup (e.g. SIGSEGV on headless CI)
@@ -71,6 +78,7 @@ def run_pyprobe_with_overlay(
         raise RuntimeError(f"PyProbe failed with code {result.returncode}:\n{output}")
 
     # Parse PLOT_DATA lines from output (each is a single line of JSON)
+    last_valid_data = {}
     for line in output.splitlines():
         if not line.startswith('PLOT_DATA:'):
             continue
@@ -78,9 +86,11 @@ def run_pyprobe_with_overlay(
         try:
             data = json.loads(json_str)
             if 'curves' in data:
-                return data
+                last_valid_data = data
         except json.JSONDecodeError:
             continue
+    if last_valid_data:
+        return last_valid_data
 
     # Fallback: return first parseable PLOT_DATA if none had curves
     for line in output.splitlines():
@@ -95,15 +105,43 @@ def run_pyprobe_with_overlay(
     return {}
 
 
-class TestOverlayDragDropTwoFrames(unittest.TestCase):
+class TestOverlayDragDropTwoFramesFast(unittest.TestCase):
     """Verify overlay with two frames captures correct data for each iteration."""
 
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root."""
-        cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, 'pyprobe', '__main__.py')):
-            raise RuntimeError("Run tests from repo root")
+        """Determine paths relative to this test file and run the test."""
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        repo_root = os.path.dirname(test_dir)
+        
+        # Path to regression script (fallback if not moved to tests/data yet)
+        script = os.path.join(test_dir, 'data', 'dsp_demo_two_frames.py')
+        if not os.path.exists(script):
+            script = os.path.join(repo_root, 'regression', 'dsp_demo_two_frames.py')
+            if not os.path.exists(script):
+                raise RuntimeError(f"Could not find regression script at {script}")
+
+        # Ensure pyprobe is available (add repo root to sys.path)
+        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+
+        # Run subprocess EXACTLY ONCE and cache for all test methods
+        # Probe signal_i at line 64 (tuple unpack assignment in main())
+        # Overlay received_symbols at line 64, instance 1
+        cls.plot_data = run_pyprobe_with_overlay(
+            script,
+            probe_spec="64:signal_i:1",
+            overlay_spec="signal_i:64:received_symbols:1",
+            timeout=15,
+        )
+
+        # Pre-load expected data so we only read the file once too
+        expected_file = '/tmp/dsp_demo_two_frames_expected.json'
+        if os.path.exists(expected_file):
+            with open(expected_file, 'r') as f:
+                cls.expected_data = json.load(f)
+        else:
+            cls.expected_data = None
 
     def test_signal_i_values_match_expected(self):
         """
@@ -112,16 +150,19 @@ class TestOverlayDragDropTwoFrames(unittest.TestCase):
         The script writes expected values to /tmp/dsp_demo_two_frames_expected.json.
         We compare the last frame's signal_i values with the plot data.
         """
-        script = os.path.join(self.repo_root, 'regression', 'dsp_demo_two_frames.py')
+        # Rely on the class-level cached payload
+        plot_data = self.plot_data
 
-        # Probe signal_i at line 64 (tuple unpack assignment in main())
-        # Overlay received_symbols at line 64, instance 1
-        plot_data = run_pyprobe_with_overlay(
-            script,
-            probe_spec="64:signal_i:1",
-            overlay_spec="signal_i:64:received_symbols:1",
-            timeout=15,
-        )
+        # DIAGNOSTIC: dump first few values for CI debugging
+        if 'curves' in plot_data:
+            curves = plot_data['curves']
+            primary = [c for c in curves if not c.get('is_overlay', False)]
+            if primary:
+                y = primary[0].get('y', [])
+                print(f"[DIAG] plot signal_i[:3] = {y[:3]}", file=_sys.stderr)
+        if self.expected_data:
+            for i, frame in enumerate(self.expected_data):
+                print(f"[DIAG] expected frame {i} signal_i[:3] = {frame['signal_i'][:3]}", file=_sys.stderr)
 
         self.assertIn('curves', plot_data,
                       f"No 'curves' key in PLOT_DATA. Got keys: {list(plot_data.keys())}. "
@@ -135,13 +176,8 @@ class TestOverlayDragDropTwoFrames(unittest.TestCase):
 
         plot_signal_i = primary_curves[0].get('y', [])
 
-        # Load expected values from JSON file
-        expected_file = '/tmp/dsp_demo_two_frames_expected.json'
-        self.assertTrue(os.path.exists(expected_file),
-                       f"Expected file not found: {expected_file}")
-
-        with open(expected_file, 'r') as f:
-            expected_data = json.load(f)
+        self.assertIsNotNone(self.expected_data, "Expected file not found")
+        expected_data = self.expected_data
 
         # The plot should show the last frame's data (waveform replaces on each update)
         last_frame = expected_data[-1]
@@ -163,14 +199,8 @@ class TestOverlayDragDropTwoFrames(unittest.TestCase):
         """
         Verify that overlay curves (received_symbols real/imag) match expected values.
         """
-        script = os.path.join(self.repo_root, 'regression', 'dsp_demo_two_frames.py')
-
-        plot_data = run_pyprobe_with_overlay(
-            script,
-            probe_spec="64:signal_i:1",
-            overlay_spec="signal_i:64:received_symbols:1",
-            timeout=15,
-        )
+        # Rely on the class-level cached payload
+        plot_data = self.plot_data
 
         if 'curves' not in plot_data:
             self.skipTest("No curves data available")
@@ -183,13 +213,8 @@ class TestOverlayDragDropTwoFrames(unittest.TestCase):
                         f"Expected 2 overlay curves, got {len(overlay_curves)}. "
                         f"Names: {[c.get('name') for c in overlay_curves]}")
 
-        # Load expected values
-        expected_file = '/tmp/dsp_demo_two_frames_expected.json'
-        if not os.path.exists(expected_file):
-            self.skipTest("Expected file not found")
-
-        with open(expected_file, 'r') as f:
-            expected_data = json.load(f)
+        self.assertIsNotNone(self.expected_data, "Expected file not found")
+        expected_data = self.expected_data
 
         last_frame = expected_data[-1]
         # The overlay captures received_symbols before the -1-1j offset is applied
@@ -235,22 +260,10 @@ class TestOverlayDragDropTwoFrames(unittest.TestCase):
         """
         Verify that both frames are processed (script runs to completion).
         """
-        script = os.path.join(self.repo_root, 'regression', 'dsp_demo_two_frames.py')
-
-        plot_data = run_pyprobe_with_overlay(
-            script,
-            probe_spec="64:signal_i:1",
-            overlay_spec="signal_i:64:received_symbols:1",
-            timeout=15,
-        )
-
-        # Load expected data to verify both frames were processed
-        expected_file = '/tmp/dsp_demo_two_frames_expected.json'
-        self.assertTrue(os.path.exists(expected_file),
+        # Rely on the class-level cached expected data instead of making subprocess calls
+        self.assertIsNotNone(self.expected_data, 
                        "Expected file not created - script may not have completed")
-
-        with open(expected_file, 'r') as f:
-            expected_data = json.load(f)
+        expected_data = self.expected_data
 
         self.assertEqual(len(expected_data), 2,
                         f"Expected 2 frames in expected data, got {len(expected_data)}")

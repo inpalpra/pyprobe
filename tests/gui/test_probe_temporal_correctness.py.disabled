@@ -129,18 +129,25 @@ class TestProbeTemporalCorrectness(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Verify we're running from repo root and locate regression scripts."""
-        cls.repo_root = os.getcwd()
-        if not os.path.exists(os.path.join(cls.repo_root, 'pyprobe', '__main__.py')):
-            # Try to find repo root from test file location
-            cls.repo_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
-        cls.temporal_dir = os.path.join(cls.repo_root, 'regression', 'temporal')
-        assert os.path.isdir(cls.temporal_dir), (
-            f"Cannot find regression/temporal/ at {cls.temporal_dir}. "
-            f"Run tests from repo root."
-        )
+        """Determine paths relative to this test file and locate regression scripts."""
+        gui_test_dir = os.path.dirname(os.path.abspath(__file__))
+        test_dir = os.path.dirname(gui_test_dir)
+        repo_root = os.path.dirname(test_dir)
+        
+        # Path to fixture folder (now in tests/data)
+        cls.temporal_dir = os.path.join(test_dir, "data", "temporal")
+        if not os.path.isdir(cls.temporal_dir):
+            # Fallback for local development
+            cls.temporal_dir = os.path.join(repo_root, "regression", "temporal")
+            if not os.path.isdir(cls.temporal_dir):
+                raise RuntimeError(
+                    f"Fixture folder not found: {cls.temporal_dir}\n"
+                    "Ensure tests/data/temporal/ or regression/temporal/ is present."
+                )
+
+        # Ensure pyprobe is available (add repo root to sys.path)
+        if os.path.exists(os.path.join(repo_root, 'pyprobe', '__main__.py')) and repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
 
     def _run(self, script_name: str, probes: List[str]) -> List[dict]:
         """Shorthand E2E launcher."""
