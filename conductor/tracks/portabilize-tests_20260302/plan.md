@@ -5,10 +5,10 @@
 - [x] Task: List minimum required assets to migrate from `examples/` and `regression/` to `tests/data/`. 30cf21e
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Research & Setup' (Protocol in workflow.md) 0580db2
 
-## Phase 2: Asset Migration
+## Phase 2: Asset Migration [checkpoint: 40a17f7]
 - [x] Task: Create `tests/data/` if it doesn't exist and migrate identified minimum assets. 30cf21e
 - [x] Task: Update `tests/conftest.py` or create a new fixture to provide a stable base path for test data. 30cf21e
-- [~] Task: Conductor - User Manual Verification 'Phase 2: Asset Migration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Asset Migration' (Protocol in workflow.md) 40a17f7
 
 ## Phase 3: Test Refactoring (TDD)
 - [ ] Task: Refactor `tests/test_e2e_folder_browsing_fast.py` to use `tests/data/` and strictly portable imports.
