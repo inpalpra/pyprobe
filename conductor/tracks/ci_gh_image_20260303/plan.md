@@ -24,7 +24,7 @@ This track implements a versioned CI image strategy using GitHub Container Regis
     - [x] Confirm that a test PR triggers the CI and correctly pulls the image
 - [x] Task: Conductor - User Manual Verification 'Workflow Migration' (Protocol in workflow.md) 961f11f
 
-## Phase 3: Local Dev Parity & Cleanup [ ]
+## Phase 3: Local Dev Parity & Cleanup [checkpoint: f36544e]
 
 - [x] Task: Update local Dockerfile to extend the CI base image 61a7f9c
     - [x] Modify `docker/Dockerfile` to use `ghcr.io/inpalpra/pyprobe-ci:<version>` as its base
@@ -32,4 +32,4 @@ This track implements a versioned CI image strategy using GitHub Container Regis
     - [x] Modify `Makefile` to read version from `.ci-version` and pass it as a build argument
 - [x] Task: Verify local Docker execution
     - [x] Run `make verify-docker` and ensure it passes
-- [ ] Task: Conductor - User Manual Verification 'Local Dev Parity & Cleanup' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Local Dev Parity & Cleanup' (Protocol in workflow.md) f36544e
