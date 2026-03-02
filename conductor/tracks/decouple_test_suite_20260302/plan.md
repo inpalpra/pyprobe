@@ -5,7 +5,7 @@ This plan outlines the steps to decouple the PyProbe test suite from the source 
 ## Phase 1: Research & Audit [ ]
 Goal: Identify all tests and code paths that depend on the repository root or the `regression/` directory.
 
-- [ ] Task: Audit Test Suite for Root Dependencies
+- [x] Task: Audit Test Suite for Root Dependencies 2302302
     - [ ] Search for all occurrences of `os.getcwd()` in `tests/`.
     - [ ] Search for all references to the `regression/` directory in `tests/`.
     - [ ] Document all affected test files and the specific files they depend on.
