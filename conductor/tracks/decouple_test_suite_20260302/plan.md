@@ -2,7 +2,7 @@
 
 This plan outlines the steps to decouple the PyProbe test suite from the source repository's filesystem layout, as specified in `spec.md`.
 
-## Phase 1: Research & Audit [ ]
+## Phase 1: Research & Audit [x] [checkpoint: cdc54b9]
 Goal: Identify all tests and code paths that depend on the repository root or the `regression/` directory.
 
 - [x] Task: Audit Test Suite for Root Dependencies 2302302
