@@ -6,8 +6,8 @@ This track implements a versioned CI image strategy using GitHub Container Regis
 
 - [x] Task: Create centralized versioning file `.ci-version` 333d62d
     - [x] Create `.ci-version` containing `v1`
-- [ ] Task: Implement Base CI Dockerfile `docker/ci.Dockerfile`
-    - [ ] Define `docker/ci.Dockerfile` with all required system and Python dependencies (Xvfb, Qt6 libs, build tools, pytest, etc.)
+- [x] Task: Implement Base CI Dockerfile `docker/ci.Dockerfile` cb5967c
+    - [x] Define `docker/ci.Dockerfile` with all required system and Python dependencies (Xvfb, Qt6 libs, build tools, pytest, etc.)
 - [ ] Task: Create GitHub Workflow to build and push the CI image
     - [ ] Implement `.github/workflows/build-ci-image.yml`
     - [ ] Set up triggers for `docker/ci.Dockerfile` and `.ci-version`
