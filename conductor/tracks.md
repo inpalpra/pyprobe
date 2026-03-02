@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [~] **Track: Implement a local artifact verification pipeline (Docker-based) for pyprobe to validate built wheels in isolation, ensuring consistency with CI.**
+- [x] **Track: Implement a local artifact verification pipeline (Docker-based) for pyprobe to validate built wheels in isolation, ensuring consistency with CI.**
 *Link: [./tracks/local-artifact-verification_20260302/](./tracks/local-artifact-verification_20260302/)*
