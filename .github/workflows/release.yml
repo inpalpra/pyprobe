@@ -13,27 +13,14 @@ jobs:
 
   test-wheel:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/inpalpra/pyprobe-ci:v1
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v4
-
-      - name: Install display dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libglib2.0-0 \
-            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
-            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
-            libxcb-xkb1 libxkbcommon-x11-0 \
-            libfontconfig1 libxrender1 libxext6 \
-            libdbus-1-3 \
-            xvfb xauth
-
       - name: Build wheel
-        run: uv build --wheel
+        run: python -m build --wheel
 
       - name: Test built wheel
         run: bash scripts/test_artifact.sh wheel
@@ -60,22 +47,11 @@ jobs:
   verify-pypi:
     needs: publish
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/inpalpra/pyprobe-ci:v1
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install display dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libglib2.0-0 \
-            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
-            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
-            libxcb-xkb1 libxkbcommon-x11-0 \
-            libfontconfig1 libxrender1 libxext6 \
-            libdbus-1-3 \
-            xvfb xauth
 
       - name: Wait for PyPI index
         run: sleep 90
