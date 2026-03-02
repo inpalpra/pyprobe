@@ -17,14 +17,12 @@
 - **pytest:** The primary testing framework.
 - **pytest-qt:** For testing PyQt6 components.
 - **Docker:** Used for artifact-first, isolated verification.
-  - **Versioned CI Image Strategy:** A multi-arch base image (`ghcr.io/inpalpra/pyprobe-ci`) provides a canonical environment for building wheels and running the full GUI test suite under Xvfb.
-  - **Multi-Arch Support:** Supports both `linux/amd64` and `linux/arm64` (Apple Silicon) to ensure parity between local development and CI runners.
-  - **GHCR Integration:** Images are automatically built and cached via GitHub Actions and published to GitHub Container Registry.
-  - **Source Isolation:** Ensures tests validate the built wheel rather than the source tree.
+  - **Canonical Environment:** Multi-arch base image (`ghcr.io/inpalpra/pyprobe-ci`) for deterministic builds and testing.
+  - **Forced Isolation:** Artifact verification scripts simulate a clean OS by moving tests to an isolated workspace, preventing accidental shadowing by source code.
 - **setuptools / uv:** For packaging and dependency management.
 - **Makefile:** Provides a single entry point for local developer verification (`make verify-docker`).
   - Dynamically reads `CI_VERSION` from `.ci-version` to ensure local tests use the correct environment version.
-- **Canonical Scripts:** `run_tests.sh` and `test_artifact.sh` centralize pytest configuration and artifact installation logic across local, Docker, and CI environments.
+- **Canonical Scripts:** `run_tests.py`, `run_tests.sh` and `test_artifact.sh` centralize pytest configuration, discovery, and isolation logic across local, Docker, and CI environments.
 
 ## IPC & Subprocess Management
 - **Socket-based IPC:** A custom bidirectional protocol using TCP sockets for reliable communication between the GUI and the tracer.

@@ -24,22 +24,32 @@ fi
 echo "Installing test dependencies..."
 pip install pytest pytest-qt pytest-xdist pytest-forked
 
-echo "Removing source tree to prevent shadowing..."
+echo "Creating isolated test workspace to prevent shadowing and repo dependencies..."
 # WARNING: This script is intended for CI/Docker environments.
-# Running this locally in your repo root will delete your source code.
 if [ -z "$CI" ] && [ ! -f /.dockerenv ]; then
-    echo "Error: Refusing to delete source tree outside of CI or Docker."
-    echo "Use with caution or set CI=true if you really want this."
+    echo "Error: Refusing to create workspace outside of CI or Docker."
     exit 1
 fi
 
-rm -rf pyprobe pyprobe_tracer examples regression
-find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
+TEST_WORKSPACE="/tmp/pyprobe-product-tests"
+rm -rf "$TEST_WORKSPACE"
+mkdir -p "$TEST_WORKSPACE"
+
+# Copy ONLY what is strictly needed for running product tests.
+cp -r tests "$TEST_WORKSPACE/"
+cp -r scripts "$TEST_WORKSPACE/"
+cp pyproject.toml "$TEST_WORKSPACE/" 2>/dev/null || true
+
+echo "Switching to isolated workspace: $TEST_WORKSPACE"
+cd "$TEST_WORKSPACE"
 
 echo "Verifying import location..."
 python - <<EOF
 import pyprobe
 print("pyprobe imported from:", pyprobe.__file__)
+# Ensure it's NOT importing from the original workspace
+import os
+assert "/workspace/pyprobe" not in pyprobe.__file__, "Shadowing detected! pyprobe imported from source."
 EOF
 
 bash scripts/run_tests.sh

@@ -40,7 +40,7 @@ DEFAULT_PARALLEL = max(os.cpu_count()-4, 1)
 # Any file matching test_*.py at the top level forms the "top-level" suite.
 
 # Files to exclude from discovery (helpers, not proper test modules).
-EXCLUDE_FILES = {"check_scroll_click.py", "conftest.py"}
+EXCLUDE_FILES = {"conftest.py"}
 
 
 # ── Discovery ─────────────────────────────────────────────────────────────────
