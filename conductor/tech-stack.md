@@ -16,11 +16,12 @@
 ## Build & Testing
 - **pytest:** The primary testing framework.
 - **pytest-qt:** For testing PyQt6 components.
-- **Docker:** Used for high-integrity artifact verification via multi-stage builds.
-  - **Build Stage:** Isolated container for building wheels.
-  - **Test Stage:** Isolated, non-root container with Xvfb for full GUI test verification. Tests are fully decoupled from the repository layout and validate the installed artifact.
+- **Docker:** Used for artifact-first, isolated verification.
+  - Provides a single, canonical environment for building wheels and running the full GUI test suite under Xvfb.
+  - Ensures tests validate the built wheel rather than the source tree.
 - **setuptools / uv:** For packaging and dependency management.
-- **Makefile:** Provides a unified interface for the local verification pipeline (`make verify-docker`).
+- **Makefile:** Provides a single entry point for local developer verification (`make verify-docker`).
+- **Canonical Scripts:** `run_tests.sh` and `test_artifact.sh` centralize pytest configuration and artifact installation logic across local, Docker, and CI environments.
 
 ## IPC & Subprocess Management
 - **Socket-based IPC:** A custom bidirectional protocol using TCP sockets for reliable communication between the GUI and the tracer.

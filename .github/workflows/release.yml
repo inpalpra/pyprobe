@@ -1,154 +1,25 @@
-name: Build & Release
+name: Release
 
 on:
   push:
     tags: ['v*']
-
-  # Allow manual trigger for testing
   workflow_dispatch:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
-#  build:
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - os: macos-latest
-#            artifact: pyprobe-macos-arm64
-#            archive_ext: tar.gz
-#          - os: ubuntu-22.04
-#            artifact: pyprobe-linux-x86_64
-#            archive_ext: tar.gz
-#          - os: windows-latest
-#            artifact: pyprobe-windows-x86_64
-#            archive_ext: zip
-#
-#    runs-on: ${{ matrix.os }}
-#    name: Build (${{ matrix.artifact }})
-#
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#
-#      - name: Set up Python
-#        uses: actions/setup-python@v5
-#        with:
-#          python-version: '3.12'
-#
-#      - name: Install uv
-#        uses: astral-sh/setup-uv@v4
-#
-#      # ── Linux: install system Qt / display dependencies ──
-#      - name: Install Linux system dependencies
-#        if: runner.os == 'Linux'
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y --no-install-recommends \
-#            libegl1 libgl1 libglib2.0-0 \
-#            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
-#            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
-#            libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
-#            libxcb-xkb1 libxkbcommon-x11-0 \
-#            xvfb
-#
-#      # ── Install project + PyInstaller ──
-#      - name: Install dependencies
-#        run: |
-#          uv sync --no-dev --frozen
-#          uv pip install pyinstaller
-#
-#      # ── Build ──
-#      - name: Build executable
-#        run: uv run pyinstaller pyprobe.spec
-#
-#      # ── Smoke test ──
-#      - name: Smoke test (Linux)
-#        if: runner.os == 'Linux'
-#        run: |
-#          xvfb-run --auto-servernum dist/pyprobe/pyprobe --help
-#
-#      - name: Smoke test (macOS / Windows)
-#        if: runner.os != 'Linux'
-#        run: |
-#          dist/pyprobe/pyprobe --help
-#        shell: bash
-#
-#      # ── Archive ──
-#      - name: Archive (tar.gz)
-#        if: matrix.archive_ext == 'tar.gz'
-#        run: tar -czf ${{ matrix.artifact }}.tar.gz -C dist pyprobe
-#
-#      - name: Archive (zip)
-#        if: matrix.archive_ext == 'zip'
-#        shell: pwsh
-#        run: Compress-Archive -Path dist\pyprobe -DestinationPath ${{ matrix.artifact }}.zip
-#
-#      - name: Upload artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: ${{ matrix.artifact }}
-#          path: ${{ matrix.artifact }}.${{ matrix.archive_ext }}
-#          retention-days: 14
-#
-#  # ── Create GitHub Release and attach binaries ──
-#  release:
-#    needs: build
-#    runs-on: ubuntu-latest
-#    if: startsWith(github.ref, 'refs/tags/v')
-#
-#    steps:
-#      - name: Download all artifacts
-#        uses: actions/download-artifact@v4
-#        with:
-#          path: artifacts
-#
-#      - name: Create Release
-#        uses: softprops/action-gh-release@v2
-#        with:
-#          generate_release_notes: true
-#          files: artifacts/**/*
 
-  # ── 1. Build the wheel and test it in isolation ──
   test-wheel:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
 
-      - name: Auto-bump version (Manual trigger only)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: astral-sh/setup-uv@v4
 
-          CURRENT_VERSION=$(grep -E '^version = ' pyproject.toml | cut -d'"' -f2 | tr -d ' ')
-          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
-          patch=$((patch + 1))
-          NEW_VERSION="${major}.${minor}.${patch}"
-
-          echo "Bumping version from ${CURRENT_VERSION} to ${NEW_VERSION}"
-          sed -i "s/^version = \".*\"/version = \"${NEW_VERSION}\"/" pyproject.toml
-
-          git add pyproject.toml
-          git commit -m "Auto-bump version to ${NEW_VERSION}"
-          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
-
-          git push origin ${{ github.ref_name }}
-          git push origin "v${NEW_VERSION}"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Install Linux display dependencies (for Qt/GUI tests)
+      - name: Install display dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -157,72 +28,28 @@ jobs:
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
             libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
             libxcb-xkb1 libxkbcommon-x11-0 \
-            xvfb
+            libfontconfig1 libxrender1 libxext6 \
+            libdbus-1-3 \
+            xvfb xauth
 
       - name: Build wheel
-        run: uv build
+        run: uv build --wheel
 
-      - name: Install wheel in isolated venv
-        run: |
-          python3 -m venv /tmp/test-env
-          /tmp/test-env/bin/pip install dist/pyprobe_plots-*.whl
-          /tmp/test-env/bin/pip install pytest pytest-qt pytest-xdist pytest-forked
-
-      - name: Verify package_data (icons, resources)
-        run: |
-          /tmp/test-env/bin/python -c "
-          import os, pyprobe.gui.plot_toolbar as tb
-          icon_dir = os.path.join(os.path.dirname(tb.__file__), 'icons')
-          assert os.path.isdir(icon_dir), f'Icon dir missing: {icon_dir}'
-          svgs = [f for f in os.listdir(icon_dir) if f.endswith('.svg')]
-          assert len(svgs) >= 6, f'Expected >=6 SVGs, found {svgs}'
-          print(f'✓ {len(svgs)} icon SVGs present')
-          "
-
-      - name: Hide source package to ensure portability
-        run: |
-          mv pyprobe _pyprobe_hidden
-          mv pyprobe_tracer _pyprobe_tracer_hidden
-          mv examples _examples_hidden
-          mv regression _regression_hidden
-
-      - name: Run wheel-safe test suite
-        run: |
-          # Slow/flaky tests ignored; their _fast variants run automatically.
-          # Keep this list in sync with test-only.yml.
-          # Tolerate exit-139 (SIGSEGV during Qt/C++ cleanup at process exit).
-          set +e
-          xvfb-run --auto-servernum \
-            /tmp/test-env/bin/python -m pytest tests/ -v --tb=short \
-              --ignore=tests/gui/test_script_runner_subprocess.py \
-              --ignore=tests/test_cli_automation.py \
-              --ignore=tests/ipc/test_socket_channel.py
-          rc=$?
-          set -e
-          if [ $rc -eq 139 ]; then
-            echo "⚠ SIGSEGV during Qt cleanup (cosmetic, exit 139) — tests passed."
-            exit 0
-          fi
-          exit $rc
+      - name: Test built wheel
+        run: bash scripts/test_artifact.sh wheel
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
           name: wheel
-          path: dist/pyprobe_plots-*.whl
+          path: dist/*.whl
 
-  # ── 2. Publish only if test-wheel passed ──
-  publish-pypi:
+  publish:
     needs: test-wheel
     runs-on: ubuntu-latest
 
-    permissions:
-      id-token: write
-      contents: write
-
     steps:
-      - name: Download wheel
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: wheel
           path: dist/
@@ -230,23 +57,14 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
-  # ── 3. Post-release: install from PyPI and re-run tests ──
   verify-pypi:
-    needs: publish-pypi
+    needs: publish
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
 
-      - name: Remove source packages to prevent shadowing installed wheel
-        run: |
-          echo "Removing source package and regression directories to ensure tests are decoupled"
-          rm -rf pyprobe pyprobe_tracer examples regression
-          find . -maxdepth 1 -name "*.egg-info" -exec rm -rf {} +
-
-      - name: Install Linux display dependencies
+      - name: Install display dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -255,46 +73,12 @@ jobs:
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
             libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 \
             libxcb-xkb1 libxkbcommon-x11-0 \
-            xvfb
+            libfontconfig1 libxrender1 libxext6 \
+            libdbus-1-3 \
+            xvfb xauth
 
-      - name: Wait for PyPI index to update
+      - name: Wait for PyPI index
         run: sleep 90
 
-      - name: Install from PyPI in clean venv
-        run: |
-          python3 -m venv /tmp/verify-env
-          /tmp/verify-env/bin/pip install pyprobe-plots
-          /tmp/verify-env/bin/pip install pytest pytest-qt pytest-xdist pytest-forked
-
-      - name: Verify installed version matches tag
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          INSTALLED=$(/tmp/verify-env/bin/pip show pyprobe-plots | grep '^Version:' | awk '{print $2}')
-          echo "Tag version: $TAG"
-          echo "Installed version: $INSTALLED"
-          [ "$TAG" = "$INSTALLED" ] || { echo "❌ Version mismatch!"; exit 1; }
-          echo "✅ Version match"
-
-      - name: Run test suite against PyPI install
-        run: |
-          # Tolerate exit-139 (SIGSEGV during Qt/C++ cleanup at process exit).
-          set +e
-          xvfb-run --auto-servernum \
-            /tmp/verify-env/bin/python -m pytest tests/ -v --tb=short \
-              --ignore=tests/gui/test_probe_temporal_correctness.py \
-              --ignore=tests/gui/test_script_runner_subprocess.py \
-              --ignore=tests/gui/test_folder_browsing.py \
-              --ignore=tests/test_e2e_capture_pipeline.py \
-              --ignore=tests/test_e2e_folder_browsing.py \
-              --ignore=tests/test_cli_automation.py \
-              --ignore=tests/test_constellation_verify.py \
-              --ignore=tests/test_overlay_drag_drop_single_frame.py \
-              --ignore=tests/test_overlay_drag_drop_two_frames.py \
-              --ignore=tests/ipc/test_socket_channel.py
-          rc=$?
-          set -e
-          if [ $rc -eq 139 ]; then
-            echo "⚠ SIGSEGV during Qt cleanup (cosmetic, exit 139) — tests passed."
-            exit 0
-          fi
-          exit $rc
+      - name: Test installed PyPI artifact
+        run: bash scripts/test_artifact.sh pypi
