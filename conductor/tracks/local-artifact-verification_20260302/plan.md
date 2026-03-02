@@ -3,20 +3,20 @@
 This plan outlines the steps to implement a high-integrity, multi-stage Docker pipeline for local artifact verification, ensuring that the `pyprobe` wheel is correctly built and fully functional in an isolated environment.
 
 ## Phase 1: Build Stage and Initial Orchestration
-- [ ] **Task: Create Build Dockerfile**
-    - [ ] Create `docker/build.Dockerfile` using `python:3.12-slim`.
-    - [ ] Implement layer caching by copying `pyproject.toml` and `uv.lock` first.
-    - [ ] Configure the build stage to use `python -m build --wheel`.
-- [ ] **Task: Create Verification Script (Build Logic)**
-    - [ ] Create `scripts/verify-artifact.sh` with `set -euo pipefail`.
-    - [ ] Implement logic to build the Stage A image.
-    - [ ] Implement logic to create a temporary container and extract the built wheel to a local `dist/` directory.
-    - [ ] Add clear logging headers for each step.
-- [ ] **Task: Verify Build Isolation**
-    - [ ] Run `scripts/verify-artifact.sh` (build-only mode).
-    - [ ] Confirm that a `.whl` file is produced in the local `dist/` directory.
-    - [ ] Inspect the built wheel to ensure it contains expected package metadata.
-- [ ] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)**
+- [x] **Task: Create Build Dockerfile**
+    - [x] Create `docker/build.Dockerfile` using `python:3.12-slim`.
+    - [x] Implement layer caching by copying `pyproject.toml` and `uv.lock` first.
+    - [x] Configure the build stage to use `python -m build --wheel`.
+- [x] **Task: Create Verification Script (Build Logic)**
+    - [x] Create `scripts/verify-artifact.sh` with `set -euo pipefail`.
+    - [x] Implement logic to build the Stage A image.
+    - [x] Implement logic to create a temporary container and extract the built wheel to a local `dist/` directory.
+    - [x] Add clear logging headers for each step.
+- [x] **Task: Verify Build Isolation**
+    - [x] Run `scripts/verify-artifact.sh` (build-only mode).
+    - [x] Confirm that a `.whl` file is produced in the local `dist/` directory.
+    - [x] Inspect the built wheel to ensure it contains expected package metadata.
+- [~] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)**
 
 ## Phase 2: Isolated Test Stage with GUI Support
 - [ ] **Task: Create Test Dockerfile**

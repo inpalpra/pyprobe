@@ -1,0 +1,21 @@
+# Dockerized Build and Test Pipeline for PyProbe
+
+DOCKER_IMAGE_NAME = pyprobe-test-runner
+DOCKERFILE = Dockerfile.test
+
+.PHONY: build test clean help
+
+help:
+	@echo "Available commands:"
+	@echo "  make build  - Build the Docker image"
+	@echo "  make test   - Run the test suite inside the Docker container"
+	@echo "  make clean  - Remove the Docker image"
+
+build:
+	docker build -t $(DOCKER_IMAGE_NAME) -f $(DOCKERFILE) .
+
+test:
+	docker run --rm $(DOCKER_IMAGE_NAME)
+
+clean:
+	docker rmi $(DOCKER_IMAGE_NAME)
