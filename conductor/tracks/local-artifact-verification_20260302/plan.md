@@ -18,7 +18,7 @@ This plan outlines the steps to implement a high-integrity, multi-stage Docker p
     - [x] Inspect the built wheel to ensure it contains expected package metadata.
 - [x] **Task: Conductor - User Manual Verification 'Phase 1: Build Stage and Initial Orchestration' (Protocol in workflow.md)** 6afbb1d
 
-## Phase 2: Isolated Test Stage with GUI Support
+## Phase 2: Isolated Test Stage with GUI Support [checkpoint: e457e70]
 - [x] **Task: Create Test Dockerfile**
     - [x] Create `docker/test.Dockerfile` starting from `python:3.12-slim`.
     - [x] Install system dependencies for GUI testing: `xvfb`, `libgl1`, `libegl1`, `libdbus-1-3`, `libxkbcommon-x11-0`.
@@ -33,7 +33,7 @@ This plan outlines the steps to implement a high-integrity, multi-stage Docker p
     - [x] Run the full verification pipeline via `scripts/verify-artifact.sh`.
     - [x] Confirm that tests pass in the isolated container.
     - [x] Intentionally introduce a packaging error and confirm the pipeline fails.
-- [~] **Task: Conductor - User Manual Verification 'Phase 2: Isolated Test Stage with GUI Support' (Protocol in workflow.md)**
+- [x] **Task: Conductor - User Manual Verification 'Phase 2: Isolated Test Stage with GUI Support' (Protocol in workflow.md)** e457e70
 
 ## Phase 3: Final Orchestration and Cleanup
 - [ ] **Task: Replace Makefile.docker**
