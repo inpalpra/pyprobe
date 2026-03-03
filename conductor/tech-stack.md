@@ -17,8 +17,8 @@
 - **pytest:** The primary testing framework.
 - **pytest-qt:** For testing PyQt6 components.
 - **Docker:** Used for artifact-first, isolated verification.
-  - **Canonical Environment:** Multi-arch base image (`ghcr.io/inpalpra/pyprobe-ci`) for deterministic builds and testing.
-  - **Forced Isolation:** Artifact verification scripts simulate a clean OS by moving tests to an isolated workspace, preventing accidental shadowing by source code.
+  - **Canonical Environment:** Multi-arch base image (`ghcr.io/inpalpra/pyprobe-ci`) for deterministic builds and testing. All dependencies (production and test) are pre-baked into the base image using `uv` for zero-install runtime execution.
+  - **Forced Isolation:** Artifact verification scripts simulate a clean OS by moving tests to an isolated workspace, preventing accidental shadowing by source code. Scripts utilize the pre-baked base image environment to eliminate runtime network dependency installations.
 - **setuptools / uv:** For packaging and dependency management.
 - **Makefile:** Provides a single entry point for local developer verification (`make verify-docker`).
   - Dynamically reads `CI_VERSION` from `.ci-version` to ensure local tests use the correct environment version.
