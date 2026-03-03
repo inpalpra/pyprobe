@@ -14,13 +14,13 @@ jobs:
   test-wheel:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
+      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v2
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheel
-        run: python -m build --wheel
+        run: uv build --wheel
 
       - name: Test built wheel
         run: bash scripts/test_artifact.sh wheel
@@ -48,7 +48,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v1
+      image: ghcr.io/inpalpra/pyprobe-ci:py3.12-qt6-v2
 
     steps:
       - uses: actions/checkout@v4
