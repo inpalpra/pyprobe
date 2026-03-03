@@ -10,13 +10,13 @@
     - [x] Audit `scripts/test_artifact.sh` for runtime `pip install` calls.
 
 ## Phase 2: Optimize Base Image (`docker/ci.Dockerfile`)
-- [ ] Task: Implement `uv` dependency baking in `docker/ci.Dockerfile`
-    - [ ] Install `uv` in the base image if not already present.
-    - [ ] Copy `pyproject.toml` and `uv.lock` into the base image.
-    - [ ] Execute `uv sync --frozen --no-install-project --all-groups` to pre-install **all** dependencies.
-    - [ ] Ensure the virtual environment is correctly located and accessible for downstream images.
-- [ ] Task: Update CI build process (if applicable)
-    - [ ] Verify that the base image build command (in Makefile or CI) includes the necessary files (`pyproject.toml`, `uv.lock`).
+- [x] Task: Implement `uv` dependency baking in `docker/ci.Dockerfile` 0b01e13
+    - [x] Install `uv` in the base image if not already present.
+    - [x] Copy `pyproject.toml` and `uv.lock` into the base image.
+    - [x] Execute `uv sync --frozen --no-install-project --all-groups` to pre-install **all** dependencies.
+    - [x] Ensure the virtual environment is correctly located and accessible for downstream images.
+- [x] Task: Update CI build process (if applicable) 0b01e13
+    - [x] Verify that the base image build command (in Makefile or CI) includes the necessary files (`pyproject.toml`, `uv.lock`).
 
 ## Phase 3: Optimize Project Dockerfile & Scripts
 - [ ] Task: Streamline `docker/Dockerfile`
