@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV UV_PROJECT_ENVIRONMENT=/usr/local/uv-env
+ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
 # ---- System runtime deps (Qt6 compatible) ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,14 +18,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdbus-1-3 \
     build-essential \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Stable Python tooling layer ----
-RUN pip install --no-cache-dir \
-    build \
-    pytest \
-    pytest-qt \
-    pytest-xdist \
-    pytest-forked
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /workspace
+
+# Copy dependency manifests
+COPY pyproject.toml uv.lock ./
+
+# Pre-install ALL dependencies into a global-ish environment
+# We use --no-install-project because we only want the dependencies in the base image.
+RUN uv sync --frozen --no-install-project --all-groups
+
+# Ensure the environment is usable by downstream
+RUN chmod -R a+rx $UV_PROJECT_ENVIRONMENT
