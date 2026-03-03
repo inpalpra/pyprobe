@@ -8,6 +8,7 @@
 4. **High Code Coverage:** Aim for >80% code coverage for all modules
 5. **User Experience First:** Every decision should prioritize user experience
 6. **Non-Interactive & CI-Aware:** Prefer non-interactive commands. Use `CI=true` for watch-mode tools (tests, linters) to ensure single execution.
+7. **Every Track Ends with a Release:** Every feature, bug fix, or chore track MUST culminate in a PyPI release. The track's `spec.md` MUST include an acceptance criterion for successful `release.yml` execution. No track is considered complete until the new version is available on PyPI and verified.
 
 ## Task Workflow
 
@@ -147,6 +148,7 @@ Before marking any task complete, verify:
 - [ ] Works correctly in the desktop GUI
 - [ ] Documentation updated if needed
 - [ ] No security vulnerabilities introduced
+- [ ] **Track Specific:** Final version bumped and `release.yml` verification successful on PyPI.
 
 ## Development Commands
 
@@ -294,6 +296,7 @@ A task is complete when:
 7. Implementation notes added to `plan.md`
 8. Changes committed with proper message
 9. Git note with task summary attached to the commit
+10. **PyPI Release Verified:** Version bumped, `release.yml` passed, and package available on PyPI (non-negotiable for tracks).
 
 ## Emergency Procedures
 
