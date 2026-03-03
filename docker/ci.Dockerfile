@@ -31,6 +31,7 @@ COPY pyproject.toml uv.lock ./
 # Install ALL dependencies into the SYSTEM site-packages.
 # This makes them available to any python process (including pip inside test_artifact.sh)
 # without needing a virtualenv.
-RUN uv export --frozen --all-groups --no-hashes > requirements.txt && \
+# We exclude the current project (-e .) from the requirements to avoid "ghost" editable installs.
+RUN uv export --frozen --all-groups --no-hashes | grep -v "^-e \." > requirements.txt && \
     uv pip install --system --requirement requirements.txt && \
     rm requirements.txt

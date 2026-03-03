@@ -25,7 +25,7 @@ if [ "$MODE" = "wheel" ]; then
     pip install dist/*.whl
 elif [ "$MODE" = "pypi" ]; then
     echo "Installing wheel from PyPI..."
-    pip install pyprobe-plots
+    pip install --force-reinstall pyprobe-plots
 else
     echo "Unknown mode: $MODE"
     exit 1

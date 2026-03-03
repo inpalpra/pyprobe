@@ -2,6 +2,7 @@ name: Build CI Image (Multi-Arch)
 
 on:
   push:
+    branches: [ "main" ]
     paths:
       - docker/ci.Dockerfile
       - .ci-version
