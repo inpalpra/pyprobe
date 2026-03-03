@@ -57,9 +57,6 @@ rfutil = [
 dev = [
     "pytest-qt>=4.5.0",
 ]
-planning = [
-    "pyplan",
-]
 
 [tool.setuptools.package-data]
 "pyprobe.gui" = ["icons/*.svg"]
@@ -70,7 +67,6 @@ where = ["."]
 include = ["pyprobe*"]
 
 [tool.uv.sources]
-pyplan = { git = "https://github.com/inpalpra/pyplan.git", rev = "main" }
 rfutil = { git = "https://github.com/inpalpra/rfutil" }
 
 [tool.pytest.ini_options]
