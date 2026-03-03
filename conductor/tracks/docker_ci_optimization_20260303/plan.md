@@ -4,10 +4,10 @@
 - [x] Task: Remove unused `Dockerfile.test` d366f68
     - [x] Locate and delete `Dockerfile.test` at the root.
     - [x] Verify no references exist in the codebase (Makefiles, scripts, GitHub Workflows).
-- [ ] Task: Analyze existing Docker dependency flows
-    - [ ] Audit `docker/ci.Dockerfile` for current installation logic.
-    - [ ] Audit `docker/Dockerfile` for current installation logic.
-    - [ ] Audit `scripts/test_artifact.sh` for runtime `pip install` calls.
+- [x] Task: Analyze existing Docker dependency flows 11a2b3c
+    - [x] Audit `docker/ci.Dockerfile` for current installation logic.
+    - [x] Audit `docker/Dockerfile` for current installation logic.
+    - [x] Audit `scripts/test_artifact.sh` for runtime `pip install` calls.
 
 ## Phase 2: Optimize Base Image (`docker/ci.Dockerfile`)
 - [ ] Task: Implement `uv` dependency baking in `docker/ci.Dockerfile`
