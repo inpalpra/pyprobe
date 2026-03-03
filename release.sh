@@ -100,7 +100,11 @@ fi
 sed -i.bak -e "s/^version = \".*\"/version = \"${PURE_VERSION}\"/" pyproject.toml
 rm pyproject.toml.bak
 
-git add pyproject.toml
+# Update uv.lock
+uv lock
+echo -e "${GREEN}✓ Updated uv.lock with new version${RESET}"
+
+git add pyproject.toml uv.lock
 git commit -m "Bump version to ${PURE_VERSION}"
 echo -e "${GREEN}✓ Bumped version in pyproject.toml${RESET}"
 
