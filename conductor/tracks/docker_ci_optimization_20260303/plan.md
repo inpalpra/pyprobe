@@ -1,9 +1,9 @@
 # Implementation Plan: Docker/CI Bandwidth & Speed Optimization (All-in-Base)
 
 ## Phase 1: Research & Repository Cleanup
-- [ ] Task: Remove unused `Dockerfile.test`
-    - [ ] Locate and delete `Dockerfile.test` at the root.
-    - [ ] Verify no references exist in the codebase (Makefiles, scripts, GitHub Workflows).
+- [x] Task: Remove unused `Dockerfile.test` d366f68
+    - [x] Locate and delete `Dockerfile.test` at the root.
+    - [x] Verify no references exist in the codebase (Makefiles, scripts, GitHub Workflows).
 - [ ] Task: Analyze existing Docker dependency flows
     - [ ] Audit `docker/ci.Dockerfile` for current installation logic.
     - [ ] Audit `docker/Dockerfile` for current installation logic.
