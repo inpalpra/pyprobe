@@ -24,5 +24,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Improve Docker/CI Bandwidth Efficiency via Layer Caching and Base Image Baking**
+- [x] **Track: Improve Docker/CI Bandwidth Efficiency via Layer Caching and Base Image Baking**
 *Link: [./tracks/docker_ci_optimization_20260303/](./tracks/docker_ci_optimization_20260303/)*
