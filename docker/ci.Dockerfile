@@ -16,14 +16,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdbus-1-3 \
     build-essential \
     ca-certificates \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Stable Python tooling layer ----
-RUN pip install --no-cache-dir \
-    build \
-    pytest \
-    pytest-qt \
-    pytest-xdist \
-    pytest-forked
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /workspace
+
+# Copy dependency manifests
+COPY pyproject.toml uv.lock ./
+
+# Install ALL dependencies into the SYSTEM site-packages.
+# This makes them available to any python process (including pip inside test_artifact.sh)
+# without needing a virtualenv.
+RUN uv export --frozen --all-groups --no-hashes > requirements.txt && \
+    uv pip install --system --requirement requirements.txt && \
+    rm requirements.txt
