@@ -28,8 +28,8 @@
     - [x] Verify the script uses the pre-installed environment correctly.
 
 ## Phase 4: Verification & Checkpointing
-- [ ] Task: Local Verification with `make verify-docker`
-    - [ ] Run `make verify-docker` and monitor the build logs.
-    - [ ] Confirm that dependency layers are either baked into the base or shown as "CACHED".
-    - [ ] Verify that no network requests are made for heavy libraries during the `docker build`.
-- [ ] Task: Conductor - User Manual Verification 'Docker/CI Optimization' (Protocol in workflow.md)
+- [x] Task: Local Verification with `make verify-docker` 851d055
+    - [x] Run `make verify-docker` and monitor the build logs.
+    - [x] Confirm that dependency layers are either baked into the base or shown as "CACHED".
+    - [x] Verify that no network requests are made for heavy libraries during the `docker build`.
+- [x] Task: Conductor - User Manual Verification 'Docker/CI Optimization' (Protocol in workflow.md) 851d055
