@@ -665,19 +665,33 @@ class ComplexWidget(QWidget):
 
 class ComplexRIWidget(ComplexWidget):
     """Real & Imaginary components."""
-    
+
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(var_name, color, parent)
         self._real_curve = self._plot_widget.plot(pen=pg.mkPen('#00ffff', width=1.5), name="Real")
         self._imag_curve = self._plot_widget.plot(pen=pg.mkPen('#ff00ff', width=1.5), name="Imag")
         self._plot_widget.setLabel('left', 'Amplitude')
-        
+
         prefix = f"{trace_id}: {var_name} " if trace_id else ""
         self._legend.addItem(self._real_curve, f"{prefix}(real)")
         self._legend.addItem(self._imag_curve, f"{prefix}(imag)")
-        
+
         self._register_series('Real', self._real_curve, '#00ffff')
         self._register_series('Imag', self._imag_curve, '#ff00ff')
+
+        # Apply current theme colors now that curves exist
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        self._apply_theme(ThemeManager.instance().current)
+
+    def _apply_theme(self, theme) -> None:
+        super()._apply_theme(theme)
+        if not hasattr(self, '_real_curve'):
+            return
+        rc = theme.row_colors
+        real_color = rc[0] if len(rc) > 0 else '#00ffff'
+        imag_color = rc[1] if len(rc) > 1 else '#ff00ff'
+        self._real_curve.setPen(pg.mkPen(real_color, width=1.5))
+        self._imag_curve.setPen(pg.mkPen(imag_color, width=1.5))
 
     def update_data(self, value: np.ndarray):
         value = np.atleast_1d(value)
@@ -710,14 +724,14 @@ class ComplexRIWidget(ComplexWidget):
 
 class ComplexMAWidget(ComplexWidget):
     """Magnitude (Log) & Phase."""
-    
+
     def __init__(self, var_name: str, color: QColor, parent: Optional[QWidget] = None, trace_id: str = ""):
         super().__init__(var_name, color, parent)
-        
+
         # Mag on left axis
         self._mag_curve = self._plot_widget.plot(pen=pg.mkPen('#ffff00', width=1.5), name="Log Mag (dB)")
         self._plot_widget.setLabel('left', 'Magnitude (dB)', color='#ffff00')
-        
+
         self._p1 = self._plot_widget.plotItem
         self._p2 = pg.ViewBox()
         self._p1.showAxis('right')
@@ -726,14 +740,14 @@ class ComplexMAWidget(ComplexWidget):
         self._p2.setXLink(self._p1)
         self._p1.getAxis('right').setLabel('Phase (rad)', color='#00ff00')
         self._p1.getAxis('right').setZValue(10)
-        
+
         self._phase_curve = pg.PlotDataItem(pen=pg.mkPen('#00ff7f', width=1.5))
         self._p2.addItem(self._phase_curve)
-        
+
         prefix = f"{trace_id}: {var_name} " if trace_id else ""
         self._legend.addItem(self._mag_curve, f"{prefix}(mag_db)")
         self._legend.addItem(self._phase_curve, f"{prefix}(phase_rad)")
-        
+
         self._register_series('Log Mag', self._mag_curve, '#ffff00')
         self._register_series('Phase', self._phase_curve, '#00ff7f')
 
@@ -748,6 +762,24 @@ class ComplexMAWidget(ComplexWidget):
         self._p1.vb.sigYRangeChanged.connect(self._sync_p2_y)
         self._last_mag_range = None
         self._syncing_y = False
+
+        # Apply current theme colors now that curves exist
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        self._apply_theme(ThemeManager.instance().current)
+
+    def _apply_theme(self, theme) -> None:
+        super()._apply_theme(theme)
+        if not hasattr(self, '_mag_curve'):
+            return
+        rc = theme.row_colors
+        mag_color   = rc[2] if len(rc) > 2 else '#ffff00'
+        phase_color = rc[3] if len(rc) > 3 else '#00ff7f'
+        self._mag_curve.setPen(pg.mkPen(mag_color, width=1.5))
+        self._phase_curve.setPen(pg.mkPen(phase_color, width=1.5))
+        self._plot_widget.setLabel('left', 'Magnitude (dB)', color=mag_color)
+        if hasattr(self, '_p1'):
+            self._p1.getAxis('right').setLabel('Phase (rad)', color=phase_color)
+            self._p1.getAxis('right').setPen(pg.mkPen(phase_color, width=1))
 
     def _sync_p2_y(self):
         """Synchronize secondary Y axis proportionally when primary is panned/zoomed."""

@@ -7,7 +7,7 @@ from enum import Enum, auto
 import os
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
 from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QColor
 
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
@@ -38,31 +38,13 @@ class PlotToolbar(QWidget):
         self._buttons = {}
         self._setup_ui()
         self._setup_opacity()
+        self._setup_theme()
 
     def _setup_ui(self) -> None:
         """Create toolbar buttons."""
-        self.setStyleSheet("""
-            QWidget {
-                background: transparent;
-            }
-            QPushButton {
-                background-color: rgba(26, 26, 46, 200);
-                border: 1px solid #00ffff;
-                border-radius: 3px;
-                padding: 2px;
-                min-width: 20px;
-                min-height: 20px;
-                max-width: 20px;
-                max-height: 20px;
-            }
-            QPushButton:hover {
-                background-color: rgba(0, 255, 255, 60);
-            }
-            QPushButton:checked {
-                background-color: rgba(0, 255, 255, 100);
-                border: 2px solid #00ffff;
-            }
-        """)
+        # Stylesheet applied later by _apply_theme; set a neutral default to
+        # avoid a flash of unstyled content before theme is connected.
+        self.setStyleSheet("QWidget { background: transparent; }")
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
@@ -85,9 +67,9 @@ class PlotToolbar(QWidget):
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
             else:
-                # Fallback text
+                # Fallback text — color applied via _apply_theme
                 btn.setText(mode.name[0])
-                btn.setStyleSheet(btn.styleSheet() + "QPushButton { color: #00ffff; font-size: 10px; }")
+                btn.setObjectName("fallbackModeBtn")
             btn.setToolTip(tooltip)
             btn.setCheckable(True)
             btn.setChecked(mode == InteractionMode.POINTER)
@@ -102,7 +84,7 @@ class PlotToolbar(QWidget):
             self._reset_btn.setIcon(QIcon(icon_path))
         else:
             self._reset_btn.setText("R")
-            self._reset_btn.setStyleSheet(self._reset_btn.styleSheet() + "QPushButton { color: #ff00ff; font-size: 10px; }")
+            self._reset_btn.setObjectName("fallbackResetBtn")
         self._reset_btn.setToolTip('Reset (unpin + autoscale)')
         self._reset_btn.setCheckable(False)
         self._reset_btn.clicked.connect(self._on_reset_clicked)
@@ -121,6 +103,58 @@ class PlotToolbar(QWidget):
         self._fade_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
         self.hide()
+
+    def _setup_theme(self) -> None:
+        """Connect to ThemeManager and apply the current theme."""
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
+    def _apply_theme(self, theme) -> None:
+        """Rebuild the toolbar stylesheet from theme colors."""
+        c = theme.colors
+        accent = c['accent_primary']
+        accent2 = c['accent_secondary']
+
+        # Derive semi-transparent overlay background from bg_darkest
+        bg_color = QColor(c['bg_darkest'])
+        bg_r, bg_g, bg_b = bg_color.red(), bg_color.green(), bg_color.blue()
+
+        # Derive accent RGB components for rgba() expressions
+        ac_color = QColor(accent)
+        ac_r, ac_g, ac_b = ac_color.red(), ac_color.green(), ac_color.blue()
+
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: transparent;
+            }}
+            QPushButton {{
+                background-color: rgba({bg_r}, {bg_g}, {bg_b}, 210);
+                border: 1px solid {accent};
+                border-radius: 3px;
+                padding: 2px;
+                min-width: 20px;
+                min-height: 20px;
+                max-width: 20px;
+                max-height: 20px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 60);
+            }}
+            QPushButton:checked {{
+                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 100);
+                border: 2px solid {accent};
+            }}
+            QPushButton#fallbackModeBtn {{
+                color: {accent};
+                font-size: 10px;
+            }}
+            QPushButton#fallbackResetBtn {{
+                color: {accent2};
+                font-size: 10px;
+            }}
+        """)
 
     def _on_mode_clicked(self, mode: InteractionMode) -> None:
         """Handle mode button click."""
