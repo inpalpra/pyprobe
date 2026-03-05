@@ -24,16 +24,16 @@ class MarkerShape(Enum):
     STAR = auto()
 
 MARKER_COLORS = [
-    '#ff5555',   # red
-    '#55ff55',   # green
-    '#5555ff',   # blue
-    '#ffff55',   # yellow
-    '#ff55ff',   # magenta
-    '#55ffff',   # cyan
-    '#ff8800',   # orange
-    '#88ff00',   # lime
-    '#0088ff',   # sky blue
-    '#ff0088',   # hot pink
+    '#CC3333',   # red      — visible on dark and light backgrounds
+    '#2E9E4F',   # green
+    '#3355CC',   # blue
+    '#B07D00',   # amber    — replaces yellow (near-invisible on white)
+    '#9B33B0',   # purple   — replaces magenta
+    '#1A8FA0',   # teal     — replaces cyan (near-invisible on white)
+    '#CC6F1A',   # orange
+    '#5C8A00',   # olive-green
+    '#1A6FCC',   # cornflower blue
+    '#B03375',   # raspberry
 ]
 
 @dataclass
@@ -46,7 +46,7 @@ class MarkerData:
     ref_marker_id: Optional[str] = None
     label: str = None
     shape: MarkerShape = None
-    color: str = '#ffffff'
+    color: str = MARKER_COLORS[0]
 
     def __post_init__(self):
         if self.label is None:
@@ -106,10 +106,10 @@ class MarkerStore(QObject):
         MarkerStore._global_used_ids.add(data.id)
         self.markers_changed.emit()
 
-    def add_marker(self, trace_key: Union[int, str], x: float, y: float, color: str = '#ffffff') -> MarkerData:
+    def add_marker(self, trace_key: Union[int, str], x: float, y: float, color: str = MARKER_COLORS[0]) -> MarkerData:
         m_id = self.get_next_id()
         # Auto-assign color from palette when caller doesn't specify one
-        if color == '#ffffff':
+        if color == MARKER_COLORS[0]:
             try:
                 idx = int(m_id[1:])
             except (ValueError, IndexError):

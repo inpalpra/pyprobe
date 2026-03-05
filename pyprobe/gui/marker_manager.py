@@ -156,7 +156,37 @@ class MarkerManager(QDialog):
         self._layout.addLayout(bottom_layout)
 
         from .theme.theme_manager import ThemeManager
-        c = ThemeManager.instance().current.colors
+        self._apply_theme(ThemeManager.instance().current)
+
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table.verticalHeader().hide()
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+        self._populating = False
+        self._self_updating = False
+        self._rebuild_pending = False
+        self._current_row_markers = []
+        self._connected_stores: list[MarkerStore] = []
+        self._combo_delegate = ItemHeightDelegate(self)
+
+        # Connect to store lifecycle signals
+        MarkerStore.store_signals().stores_changed.connect(self._on_stores_changed)
+
+        # Connect to theme changes so stylesheet stays current
+        from .theme.theme_manager import ThemeManager
+        ThemeManager.instance().theme_changed.connect(self._on_theme_changed)
+
+        self._sync_store_connections()
+        self._populate_table()
+        self._toggle_columns()
+
+    def _apply_theme(self, theme) -> None:
+        """Rebuild stylesheet from current theme colors."""
+        c = theme.colors
         self.setStyleSheet(f"""
             QDialog {{
                 background-color: {c['bg_dark']};
@@ -195,20 +225,20 @@ class MarkerManager(QDialog):
                 background-color: {c['bg_medium']};
                 color: {c['text_primary']};
                 border: 1px solid {c['border_default']};
-                selection-background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
-                selection-color: {c['bg_dark'] if 'accent_primary' in c else c['text_primary']};
+                selection-background-color: {c['accent_primary']};
+                selection-color: {c['bg_darkest']};
                 min-height: 100px;
             }}
             QComboBox QAbstractItemView::item {{
                 min-height: 24px;
             }}
             QComboBox QAbstractItemView::item:selected {{
-                background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
-                color: {c['bg_darkest'] if 'bg_darkest' in c else c['bg_dark']};
+                background-color: {c['accent_primary']};
+                color: {c['bg_darkest']};
             }}
             QComboBox QAbstractItemView::item:hover {{
-                background-color: {c['accent_primary'] if 'accent_primary' in c else c['bg_light']};
-                color: {c['bg_darkest'] if 'bg_darkest' in c else c['bg_dark']};
+                background-color: {c['accent_primary']};
+                color: {c['bg_darkest']};
             }}
             QComboBox::drop-down, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
                 border: none;
@@ -223,27 +253,10 @@ class MarkerManager(QDialog):
             }}
         """)
 
-        self.table.setAlternatingRowColors(True)
-        self.table.setShowGrid(False)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table.verticalHeader().hide()
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-
-        self._populating = False
-        self._self_updating = False
-        self._rebuild_pending = False
-        self._current_row_markers = []
-        self._connected_stores: list[MarkerStore] = []
-        self._combo_delegate = ItemHeightDelegate(self)
-
-        # Connect to store lifecycle signals
-        MarkerStore.store_signals().stores_changed.connect(self._on_stores_changed)
-
-        self._sync_store_connections()
+    def _on_theme_changed(self, theme) -> None:
+        """Reapply stylesheet and repopulate rows when theme changes."""
+        self._apply_theme(theme)
         self._populate_table()
-        self._toggle_columns()
 
     def _toggle_columns(self):
         detailed = self.detailed_chk.isChecked()
@@ -446,7 +459,9 @@ class MarkerManager(QDialog):
             # Delete
             del_btn = QPushButton("\u2715")
             del_btn.setFixedSize(20, 20)
-            del_btn.setStyleSheet("QPushButton { border: none; font-weight: bold; font-size: 14px; background: transparent; } QPushButton:hover { color: #ff5555; }")
+            from .theme.theme_manager import ThemeManager
+            err = ThemeManager.instance().current.colors['error']
+            del_btn.setStyleSheet(f"QPushButton {{ border: none; font-weight: bold; font-size: 14px; background: transparent; }} QPushButton:hover {{ color: {err}; }}")
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda _, s=store, mid=m.id: s.remove_marker(mid))
             self.table.setCellWidget(i, 10, self._centered_widget(del_btn))
