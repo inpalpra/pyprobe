@@ -6,6 +6,7 @@ from .cyberpunk import CYBERPUNK_THEME
 from .instrument_panel import INSTRUMENT_PANEL_THEME
 from .monokai import MONOKAI_THEME
 from .ocean import OCEAN_THEME
+from .light import LIGHT_THEME
 
 THEMES: dict[str, Theme] = {
 	CYBERPUNK_THEME.id: CYBERPUNK_THEME,
@@ -13,6 +14,7 @@ THEMES: dict[str, Theme] = {
 	OCEAN_THEME.id: OCEAN_THEME,
 	INSTRUMENT_PANEL_THEME.id: INSTRUMENT_PANEL_THEME,
 	ANTHROPIC_THEME.id: ANTHROPIC_THEME,
+	LIGHT_THEME.id: LIGHT_THEME,
 }
 
 DEFAULT_THEME_ID = CYBERPUNK_THEME.id
@@ -26,4 +28,5 @@ __all__ = [
 	"MONOKAI_THEME",
 	"OCEAN_THEME",
 	"INSTRUMENT_PANEL_THEME",
+	"LIGHT_THEME",
 ]

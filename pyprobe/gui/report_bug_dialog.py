@@ -48,6 +48,48 @@ class ReportBugDialog(QDialog):
         self._recorded_steps: tuple[RecordedStep, ...] = ()
 
         self._setup_ui()
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
+
+    def _apply_theme(self, theme=None) -> None:
+        """Apply theme colors to the dialog."""
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        c = (theme.colors if theme is not None else ThemeManager.instance().current.colors)
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {c['bg_dark']};
+                color: {c['text_primary']};
+            }}
+            QLabel {{
+                color: {c['text_secondary']};
+            }}
+            QTextEdit, QPlainTextEdit {{
+                background-color: {c['bg_medium']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: 3px;
+            }}
+            QCheckBox, QRadioButton {{
+                color: {c['text_primary']};
+            }}
+            QPushButton {{
+                background-color: {c['bg_medium']};
+                color: {c['text_primary']};
+                border: 1px solid {c['border_default']};
+                border-radius: 3px;
+                padding: 4px 10px;
+            }}
+            QPushButton:hover {{
+                background-color: {c['bg_light']};
+                border-color: {c['accent_primary']};
+            }}
+            QPushButton:disabled {{
+                color: {c['text_muted']};
+                border-color: {c['border_dark']};
+            }}
+        """)
 
     # ── UI setup ──────────────────────────────────────────────────────────────
 

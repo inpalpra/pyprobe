@@ -723,11 +723,18 @@ class ProbePanel(QFrame):
         """Reposition toolbar on resize."""
         super().resizeEvent(event)
         if self._toolbar:
-            # Position at bottom-right of panel
-            self._toolbar.move(
-                self.width() - self._toolbar.sizeHint().width() - 8,
-                self.height() - self._toolbar.sizeHint().height() - 8
-            )
+            if getattr(self, '_plot', None) and hasattr(self._plot, 'geometry'):
+                # Position near the top-right of the plot area
+                plot_rect = self._plot.geometry()
+                self._toolbar.move(
+                    plot_rect.right() - self._toolbar.width() - 8,
+                    plot_rect.top() + 8
+                )
+            else:
+                self._toolbar.move(
+                    self.width() - self._toolbar.width() - 8,
+                    self.height() - self._toolbar.height() - 8
+                )
             self._toolbar.raise_()  # Ensure topmost z-order
             
             # Pass toolbar geometry to pin indicator for dynamic positioning

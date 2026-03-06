@@ -37,13 +37,16 @@ class EquationEditorDialog(QDialog):
     def __init__(self, manager: EquationManager, parent=None):
         super().__init__(parent)
         self._manager = manager
-        
+
         self.setWindowTitle("Equation Editor")
         self.setMinimumSize(500, 300)
         self.setWindowFlag(Qt.WindowType.Tool)
 
         self._setup_ui()
-        self._apply_theme()
+        from .theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
         self._populate_table()
 
     def _setup_ui(self):
@@ -65,9 +68,9 @@ class EquationEditorDialog(QDialog):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
-    def _apply_theme(self):
+    def _apply_theme(self, theme=None):
         from .theme.theme_manager import ThemeManager
-        c = ThemeManager.instance().current.colors
+        c = (theme.colors if theme is not None else ThemeManager.instance().current.colors)
         self.setStyleSheet(f"""
             QDialog {{ background-color: {c['bg_dark']}; color: {c['text_primary']}; }}
             QTableWidget {{ background-color: {c['bg_dark']}; gridline-color: {c['border_default']}; border: none; }}
@@ -87,9 +90,11 @@ class EquationEditorDialog(QDialog):
         self.table.insertRow(row)
         
         # ID label (Draggable)
+        from .theme.theme_manager import ThemeManager
+        c = ThemeManager.instance().current.colors
         id_label = DraggableLabel(eq.id)
         id_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: 'Menlo', 'Consolas';")
+        id_label.setStyleSheet(f"color: {c['accent_primary']}; font-weight: bold; font-family: 'Menlo', 'Consolas';")
         self.table.setCellWidget(row, 0, id_label)
         
         # Equation input
@@ -112,7 +117,7 @@ class EquationEditorDialog(QDialog):
         
         del_btn = QPushButton("×")
         del_btn.setFixedSize(20, 20)
-        del_btn.setStyleSheet("QPushButton { background: transparent; color: #555555; } QPushButton:hover { color: #ff5555; }")
+        del_btn.setStyleSheet(f"QPushButton {{ background: transparent; color: {c['text_muted']}; }} QPushButton:hover {{ color: {c['error']}; }}")
         del_btn.clicked.connect(lambda _, eid=eq.id: self._on_delete_clicked(eid))
         status_layout.addWidget(del_btn)
         

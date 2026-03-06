@@ -3,6 +3,46 @@
 # Designed for LLM Context Packaging
 # ==========================================================
 
+# Tests
+
+/pyprobe/
+/pyprobe_tracer/
+CONSTITUTION.md
+README.md
+scripts/
+Makefile
+docker/
+uv.lock
+.ci-version
+.gitconfig
+docs/
+.github/
+.agent/
+*.toml
+
+# ----------------------------
+# Agents
+# ----------------------------
+.claude/
+conductor/
+plans/
+**/*.disabled
+.github/commands/
+
+#-----------------------------
+# tempfiles
+# ----------------------------
+**/*.pyprobe
+.ruff_cache/
+**/*.prof
+tmp/
+
+# ----------------------------
+# images, html
+# ----------------------------
+**/*.png
+**/*.html
+**/*.svg
 
 # ----------------------------
 # Virtual Environments
@@ -49,7 +89,8 @@ pip-wheel-metadata/
 # ----------------------------
 .git/
 .gitignore
-
+.gitkeep
+.proj2ignore.md
 
 # ----------------------------
 # IDE / Editor

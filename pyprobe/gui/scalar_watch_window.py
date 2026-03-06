@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from pyprobe.core.anchor import ProbeAnchor
+from pyprobe.gui.theme.theme_manager import ThemeManager
 
 
 class ScalarWatchSidebar(QWidget):
@@ -31,7 +32,9 @@ class ScalarWatchSidebar(QWidget):
         self._scalars: Dict[ProbeAnchor, tuple] = {}
         
         self._setup_ui()
-        self._apply_styles()
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
     
     def _setup_ui(self):
         """Build the UI."""
@@ -84,66 +87,67 @@ class ScalarWatchSidebar(QWidget):
         self._placeholder.setWordWrap(True)
         self._content_layout.insertWidget(0, self._placeholder)
     
-    def _apply_styles(self):
-        """Apply dark theme styling."""
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #000000;
-                color: #e0e0e0;
-            }
-            QScrollArea {
+    def _apply_theme(self, theme) -> None:
+        """Rebuild stylesheet from current theme colors."""
+        c = theme.colors
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {c['bg_darkest']};
+                color: {c['text_primary']};
+            }}
+            QScrollArea {{
                 background-color: transparent;
-            }
-            QLabel#sidebarHeader {
-                color: #888888;
+            }}
+            QLabel#sidebarHeader {{
+                color: {c['text_muted']};
                 font-size: 12px;
                 font-weight: bold;
                 text-transform: uppercase;
                 letter-spacing: 1px;
                 padding-bottom: 4px;
-            }
-            QWidget#watchHeader {
-                border-bottom: 1px solid #2a2a4a;
-            }
-            QToolButton {
-                color: #555555;
+            }}
+            QWidget#watchHeader {{
+                border-bottom: 1px solid {c['border_medium']};
+            }}
+            QToolButton {{
+                color: {c['text_muted']};
                 background: transparent;
                 border: none;
                 font-size: 11px;
-            }
-            QToolButton:hover {
-                color: #00ccff;
-            }
-            QLabel#placeholder {
-                color: #555555;
+            }}
+            QToolButton:hover {{
+                color: {c['accent_primary']};
+            }}
+            QLabel#placeholder {{
+                color: {c['text_muted']};
                 font-style: italic;
                 font-size: 11px;
-            }
-            QLabel#scalarLabel {
-                color: #888888;
+            }}
+            QLabel#scalarLabel {{
+                color: {c['text_secondary']};
                 font-size: 11px;
                 font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-            }
-            QLabel#scalarValue {
-                color: #ffffff;
+            }}
+            QLabel#scalarValue {{
+                color: {c['text_primary']};
                 font-size: 20px;
                 font-family: 'JetBrains Mono', 'SF Mono', 'Consolas';
                 font-weight: 500;
-            }
-            QWidget#scalarCard {
-                background-color: #1e1e32;
+            }}
+            QWidget#scalarCard {{
+                background-color: {c['bg_medium']};
                 border-radius: 4px;
-            }
-            QPushButton#removeBtn {
+            }}
+            QPushButton#removeBtn {{
                 background-color: transparent;
-                color: #555555;
+                color: {c['text_muted']};
                 border: none;
                 font-size: 14px;
                 font-weight: bold;
-            }
-            QPushButton#removeBtn:hover {
-                color: #ff6666;
-            }
+            }}
+            QPushButton#removeBtn:hover {{
+                color: {c['error']};
+            }}
         """)
     
 
@@ -170,8 +174,11 @@ class ScalarWatchSidebar(QWidget):
         top_layout.setSpacing(4)
         
         # Trace ID label (e.g., tr0)
+        tm = ThemeManager.instance()
+        accent = tm.current.colors['accent_primary']
+        text_primary = tm.current.colors['text_primary']
         id_label = QLabel(trace_id)
-        id_label.setStyleSheet("color: #00ffff; font-weight: bold; font-family: 'Menlo', 'Consolas'; font-size: 10px;")
+        id_label.setStyleSheet(f"color: {accent}; font-weight: bold; font-family: 'Menlo', 'Consolas'; font-size: 10px;")
         top_layout.addWidget(id_label)
 
         # Label with highlight background (like code viewer probes)
@@ -179,7 +186,7 @@ class ScalarWatchSidebar(QWidget):
         name_label = QLabel(anchor.symbol)
         name_label.setObjectName("scalarLabel")
         name_label.setStyleSheet(f"""
-            color: #ffffff;
+            color: {text_primary};
             background-color: rgba({color.red()}, {color.green()}, {color.blue()}, 60);
             border: 1px solid {color.name()};
             border-radius: 2px;

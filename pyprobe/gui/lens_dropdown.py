@@ -10,6 +10,45 @@ from pyprobe.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _build_lens_stylesheet(c: dict) -> str:
+    return f"""
+        QComboBox {{
+            background-color: {c['bg_dark']};
+            color: {c['accent_primary']};
+            border: 1px solid {c['accent_primary']};
+            border-radius: 3px;
+            padding: 2px 20px 2px 8px;
+            min-width: 100px;
+            font-family: 'JetBrains Mono';
+            font-size: 10px;
+        }}
+        QComboBox:hover {{
+            border-color: {c['accent_secondary']};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 20px;
+        }}
+        QComboBox::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 6px solid {c['accent_primary']};
+            margin-right: 8px;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {c['bg_dark']};
+            color: {c['accent_primary']};
+            selection-background-color: {c['accent_primary']};
+            selection-color: {c['bg_darkest']};
+            border: 1px solid {c['accent_primary']};
+        }}
+        QComboBox QAbstractItemView::item:disabled {{
+            color: {c['text_muted']};
+        }}
+    """
+
+
 class LensDropdown(QComboBox):
     """Dropdown for selecting visualization lens.
     
@@ -28,48 +67,16 @@ class LensDropdown(QComboBox):
         self._current_dtype: Optional[str] = None
         self._current_shape: Optional[tuple] = None
         self._compatible_plugins: List[ProbePlugin] = []
-        
-        self._setup_style()
+
+        from pyprobe.gui.theme.theme_manager import ThemeManager
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
         self.currentIndexChanged.connect(self._on_selection_changed)
-    
-    def _setup_style(self):
-        """Apply dark cyberpunk styling."""
-        self.setStyleSheet("""
-            QComboBox {
-                background-color: #1a1a2e;
-                color: #00ffff;
-                border: 1px solid #00ffff;
-                border-radius: 3px;
-                padding: 2px 20px 2px 8px;
-                min-width: 100px;
-                font-family: 'JetBrains Mono';
-                font-size: 10px;
-            }
-            QComboBox:hover {
-                border-color: #ff00ff;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 6px solid #00ffff;
-                margin-right: 8px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #1a1a2e;
-                color: #00ffff;
-                selection-background-color: #00ffff;
-                selection-color: #1a1a2e;
-                border: 1px solid #00ffff;
-            }
-            QComboBox QAbstractItemView::item:disabled {
-                color: #555555;
-            }
-        """)
+
+    def _apply_theme(self, theme) -> None:
+        """Rebuild stylesheet from current theme colors."""
+        self.setStyleSheet(_build_lens_stylesheet(theme.colors))
     
     def update_for_dtype(self, dtype: str, shape: Optional[tuple] = None) -> None:
         """Update dropdown items based on data type.

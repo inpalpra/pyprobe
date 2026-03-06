@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
+from pyprobe.gui.theme.theme_manager import ThemeManager
+
 
 class RecordingIndicator(QWidget):
     """Small always-on-top frameless widget showing '● Recording Steps'.
@@ -22,6 +24,9 @@ class RecordingIndicator(QWidget):
         )
         self._shown: bool = False
         self._setup_ui()
+        tm = ThemeManager.instance()
+        tm.theme_changed.connect(self._apply_theme)
+        self._apply_theme(tm.current)
         self.hide()
 
     def _setup_ui(self) -> None:
@@ -38,10 +43,14 @@ class RecordingIndicator(QWidget):
         text.setFont(font)
         layout.addWidget(text)
 
-        self.setStyleSheet(
-            "background-color: #2a2a2a; color: #ffffff; border-radius: 4px;"
-        )
+        self._text_label = text
         self.adjustSize()
+
+    def _apply_theme(self, theme) -> None:
+        c = theme.colors
+        self.setStyleSheet(
+            f"background-color: {c['bg_medium']}; color: {c['text_primary']}; border-radius: 4px;"
+        )
 
     # ── Public API ────────────────────────────────────────────────────────────
 

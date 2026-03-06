@@ -2,6 +2,7 @@
 **/.pyprobe/
 build/
 dist/
+*.egg-info/
 *.spec.bak
 **/bin_test/
 .gemini/
