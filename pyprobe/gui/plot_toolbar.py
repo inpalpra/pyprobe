@@ -5,12 +5,35 @@ Appears on mouse hover, fades to max 40% opacity.
 
 from enum import Enum, auto
 import os
+import re
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
 from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtGui import QIcon, QColor
+from PyQt6.QtGui import QIcon, QColor, QPixmap
 
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
+
+_BTN = 26
+_ICON = 16
+
+
+def _svg_icon(path: str, color: str) -> QIcon:
+    """Load an SVG file, recolor all non-none stroke/fill to `color`, return QIcon."""
+    try:
+        with open(path, 'r') as f:
+            data = f.read()
+        # Replace all explicit colors; preserve stroke="none" / fill="none"
+        data = re.sub(
+            r'(stroke|fill)="(?!none)([^"]+)"',
+            lambda m: f'{m.group(1)}="{color}"',
+            data,
+        )
+        data = data.replace('currentColor', color)
+        pixmap = QPixmap()
+        pixmap.loadFromData(data.encode('utf-8'), 'SVG')
+        return QIcon(pixmap)
+    except Exception:
+        return QIcon()
 
 
 class InteractionMode(Enum):
@@ -36,26 +59,21 @@ class PlotToolbar(QWidget):
         super().__init__(parent)
         self._current_mode = InteractionMode.POINTER
         self._buttons = {}
+        self._icon_paths = {}  # mode/key -> path (or None if missing)
         self._setup_ui()
         self._setup_opacity()
         self._setup_theme()
 
     def _setup_ui(self) -> None:
         """Create toolbar buttons."""
-        # Stylesheet applied later by _apply_theme; set a neutral default to
-        # avoid a flash of unstyled content before theme is connected.
         self.setStyleSheet("QWidget { background: transparent; }")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
-
-        _BTN = 22
-        _ICON = 14
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
 
         icon_dir = os.path.join(os.path.dirname(__file__), 'icons')
 
-        # Mode buttons (checkable, exclusive)
         modes = [
             (InteractionMode.POINTER, 'icon_pointer.svg', 'Pointer (default)'),
             (InteractionMode.PAN, 'icon_pan.svg', 'Pan (drag to pan)'),
@@ -67,12 +85,12 @@ class PlotToolbar(QWidget):
         for mode, icon_file, tooltip in modes:
             btn = QPushButton(self)
             btn.setFixedSize(_BTN, _BTN)
+            btn.setIconSize(QSize(_ICON, _ICON))
             icon_path = os.path.join(icon_dir, icon_file)
             if os.path.exists(icon_path):
-                btn.setIcon(QIcon(icon_path))
-                btn.setIconSize(QSize(_ICON, _ICON))
+                self._icon_paths[mode] = icon_path
             else:
-                # Fallback text — color applied via _apply_theme
+                self._icon_paths[mode] = None
                 btn.setText(mode.name[0])
                 btn.setObjectName("fallbackModeBtn")
             btn.setToolTip(tooltip)
@@ -85,11 +103,12 @@ class PlotToolbar(QWidget):
         # Reset button (not checkable)
         self._reset_btn = QPushButton(self)
         self._reset_btn.setFixedSize(_BTN, _BTN)
-        icon_path = os.path.join(icon_dir, 'icon_reset.svg')
-        if os.path.exists(icon_path):
-            self._reset_btn.setIcon(QIcon(icon_path))
-            self._reset_btn.setIconSize(QSize(_ICON, _ICON))
+        self._reset_btn.setIconSize(QSize(_ICON, _ICON))
+        reset_path = os.path.join(icon_dir, 'icon_reset.svg')
+        if os.path.exists(reset_path):
+            self._icon_paths['reset'] = reset_path
         else:
+            self._icon_paths['reset'] = None
             self._reset_btn.setText("R")
             self._reset_btn.setObjectName("fallbackResetBtn")
         self._reset_btn.setToolTip('Reset (unpin + autoscale)')
@@ -117,10 +136,20 @@ class PlotToolbar(QWidget):
         self._apply_theme(tm.current)
 
     def _apply_theme(self, theme) -> None:
-        """Rebuild the toolbar stylesheet from theme colors."""
+        """Rebuild the toolbar stylesheet and recolor icons from theme colors."""
         c = theme.colors
         accent = c['accent_primary']
         accent2 = c['accent_secondary']
+        icon_color = c['text_primary']
+
+        # Recolor all SVG icons with the theme's text color
+        for mode, btn in self._buttons.items():
+            path = self._icon_paths.get(mode)
+            if path:
+                btn.setIcon(_svg_icon(path, icon_color))
+        reset_path = self._icon_paths.get('reset')
+        if reset_path:
+            self._reset_btn.setIcon(_svg_icon(reset_path, icon_color))
 
         # Derive semi-transparent overlay background from bg_darkest
         bg_color = QColor(c['bg_darkest'])
