@@ -13,7 +13,7 @@ from PyQt6.QtGui import QIcon, QColor, QPixmap
 from pyprobe.logging import get_logger
 logger = get_logger(__name__)
 
-_BTN = 26
+_BTN = 30
 _ICON = 16
 
 
@@ -66,11 +66,13 @@ class PlotToolbar(QWidget):
 
     def _setup_ui(self) -> None:
         """Create toolbar buttons."""
-        self.setStyleSheet("QWidget { background: transparent; }")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("PlotToolbar { background: transparent; }")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(6)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+        layout.setSizeConstraint(QHBoxLayout.SizeConstraint.SetFixedSize)
 
         icon_dir = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -140,6 +142,8 @@ class PlotToolbar(QWidget):
         c = theme.colors
         accent = c['accent_primary']
         accent2 = c['accent_secondary']
+        
+        # Use a theme-appropriate color instead of harsh black
         icon_color = c['text_primary']
 
         # Recolor all SVG icons with the theme's text color
@@ -160,29 +164,32 @@ class PlotToolbar(QWidget):
         ac_r, ac_g, ac_b = ac_color.red(), ac_color.green(), ac_color.blue()
 
         self.setStyleSheet(f"""
-            QWidget {{
-                background: transparent;
+            PlotToolbar {{
+                background-color: rgba({bg_r}, {bg_g}, {bg_b}, 230);
+                border: 1px solid {c['border_medium']};
+                border-radius: 6px;
             }}
             QPushButton {{
-                background-color: rgba({bg_r}, {bg_g}, {bg_b}, 210);
-                border: 1px solid {accent};
-                border-radius: 3px;
-                padding: 2px;
+                background-color: transparent;
+                border: none;
+                border-radius: 4px;
+                padding: 4px;
             }}
             QPushButton:hover {{
-                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 60);
+                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 40);
             }}
             QPushButton:checked {{
-                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 100);
-                border: 2px solid {accent};
+                background-color: rgba({ac_r}, {ac_g}, {ac_b}, 80);
             }}
             QPushButton#fallbackModeBtn {{
                 color: {accent};
-                font-size: 10px;
+                font-size: 11px;
+                font-weight: bold;
             }}
             QPushButton#fallbackResetBtn {{
                 color: {accent2};
-                font-size: 10px;
+                font-size: 11px;
+                font-weight: bold;
             }}
         """)
 
