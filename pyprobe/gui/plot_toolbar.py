@@ -6,7 +6,7 @@ Appears on mouse hover, fades to max 40% opacity.
 from enum import Enum, auto
 import os
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QGraphicsOpacityEffect
-from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize
 from PyQt6.QtGui import QIcon, QColor
 
 from pyprobe.logging import get_logger
@@ -47,8 +47,11 @@ class PlotToolbar(QWidget):
         self.setStyleSheet("QWidget { background: transparent; }")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(2)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(3)
+
+        _BTN = 22
+        _ICON = 14
 
         icon_dir = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -63,9 +66,11 @@ class PlotToolbar(QWidget):
 
         for mode, icon_file, tooltip in modes:
             btn = QPushButton(self)
+            btn.setFixedSize(_BTN, _BTN)
             icon_path = os.path.join(icon_dir, icon_file)
             if os.path.exists(icon_path):
                 btn.setIcon(QIcon(icon_path))
+                btn.setIconSize(QSize(_ICON, _ICON))
             else:
                 # Fallback text — color applied via _apply_theme
                 btn.setText(mode.name[0])
@@ -79,9 +84,11 @@ class PlotToolbar(QWidget):
 
         # Reset button (not checkable)
         self._reset_btn = QPushButton(self)
+        self._reset_btn.setFixedSize(_BTN, _BTN)
         icon_path = os.path.join(icon_dir, 'icon_reset.svg')
         if os.path.exists(icon_path):
             self._reset_btn.setIcon(QIcon(icon_path))
+            self._reset_btn.setIconSize(QSize(_ICON, _ICON))
         else:
             self._reset_btn.setText("R")
             self._reset_btn.setObjectName("fallbackResetBtn")
@@ -89,8 +96,6 @@ class PlotToolbar(QWidget):
         self._reset_btn.setCheckable(False)
         self._reset_btn.clicked.connect(self._on_reset_clicked)
         layout.addWidget(self._reset_btn)
-
-        self.adjustSize()
 
     def _setup_opacity(self) -> None:
         """Setup opacity effect for fade in/out."""
@@ -134,10 +139,6 @@ class PlotToolbar(QWidget):
                 border: 1px solid {accent};
                 border-radius: 3px;
                 padding: 2px;
-                min-width: 20px;
-                min-height: 20px;
-                max-width: 20px;
-                max-height: 20px;
             }}
             QPushButton:hover {{
                 background-color: rgba({ac_r}, {ac_g}, {ac_b}, 60);
